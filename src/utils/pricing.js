@@ -8,7 +8,9 @@ export function calculateQuote(formData, settings) {
     numberOfDumpLoads = 1,
     difficulty,
     addOns = [],
-    distanceToLandfill = 0,
+    homeBaseToJob = 0,
+    jobToLandfill = 0,
+    landfillToHomeBase = 0,
     customBasePrice,
   } = formData;
 
@@ -25,26 +27,28 @@ export function calculateQuote(formData, settings) {
   // Add-ons total
   const addOnsTotal = addOns.reduce((sum, addon) => sum + (addOnPrices[addon] || 0), 0);
 
-  // Distance surcharge
-  const miles = Number(distanceToLandfill) || 0;
+  // Distance surcharge (based on job-to-landfill leg)
+  const jobToLandfillMiles = Number(jobToLandfill) || 0;
   let distanceSurcharge = 0;
   let distanceWarning = false;
   for (const tier of distanceSurcharges) {
-    if (miles >= tier.min && miles < tier.max) {
+    if (jobToLandfillMiles >= tier.min && jobToLandfillMiles < tier.max) {
       distanceSurcharge = tier.surcharge;
       break;
     }
   }
-  if (miles >= 40) {
+  if (jobToLandfillMiles >= 40) {
     distanceWarning = true;
   }
 
   // Difficulty modifier
   const difficultyModifier = difficultyModifiers[difficulty] || 0;
 
-  // Disposal costs
-  const disposalRouteMiles = miles * 2;
-  const fuelCost = (disposalRouteMiles / mpg) * gasPrice;
+  // Total route: home -> job -> landfill -> home
+  const homeToJobMiles = Number(homeBaseToJob) || 0;
+  const landfillToHomeMiles = Number(landfillToHomeBase) || 0;
+  const totalRouteMiles = homeToJobMiles + jobToLandfillMiles + landfillToHomeMiles;
+  const fuelCost = (totalRouteMiles / mpg) * gasPrice;
   const dumpCost = dumpFee * Number(numberOfDumpLoads);
   const directCost = dumpCost + fuelCost;
 
@@ -68,7 +72,10 @@ export function calculateQuote(formData, settings) {
     addOnsTotal: roundToNearest5(addOnsTotal),
     distanceSurcharge,
     difficultyModifier,
-    disposalRouteMiles,
+    homeToJobMiles,
+    jobToLandfillMiles,
+    landfillToHomeMiles,
+    totalRouteMiles,
     fuelCost: Math.round(fuelCost * 100) / 100,
     dumpCost,
     directCost: Math.round(directCost * 100) / 100,

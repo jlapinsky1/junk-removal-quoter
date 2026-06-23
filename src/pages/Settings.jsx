@@ -62,6 +62,15 @@ export default function Settings({ settings, onSettingsChange }) {
   return (
     <div className="space-y-4 pb-8">
       <Card title="General">
+        <Field label="Home Base Address">
+          <input
+            type="text"
+            className="w-full border rounded-lg px-3 py-2 text-sm"
+            value={local.homeBaseAddress}
+            onChange={e => update('homeBaseAddress', e.target.value)}
+            placeholder="Your starting address"
+          />
+        </Field>
         <Field label="Landfill Address">
           <input
             type="text"

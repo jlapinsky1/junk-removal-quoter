@@ -15,7 +15,8 @@ const marginLabels = {
 export default function InternalQuoteView({ formData, quoteResult }) {
   const {
     basePrice, addOnsTotal, distanceSurcharge, difficultyModifier,
-    disposalRouteMiles, fuelCost, dumpCost, directCost,
+    homeToJobMiles, jobToLandfillMiles, landfillToHomeMiles, totalRouteMiles,
+    fuelCost, dumpCost, directCost,
     suggestedQuote, estimatedGrossProfit, estimatedMargin,
     profitabilityStatus, distanceWarning,
   } = quoteResult;
@@ -55,8 +56,10 @@ export default function InternalQuoteView({ formData, quoteResult }) {
 
       <div className="bg-white rounded-lg border p-4 space-y-2">
         <h3 className="font-bold text-gray-700 border-b pb-1">Cost Analysis (Internal)</h3>
-        <Row label="Distance to landfill" value={`${formData.distanceToLandfill} mi`} />
-        <Row label={`Disposal route (round trip)`} value={`${disposalRouteMiles} mi`} />
+        <Row label="Home to Job" value={`${homeToJobMiles} mi`} />
+        <Row label="Job to Landfill" value={`${jobToLandfillMiles} mi`} />
+        <Row label="Landfill to Home" value={`${landfillToHomeMiles} mi`} />
+        <Row label="Total route" value={`${totalRouteMiles} mi`} bold />
         <Row label="Fuel cost" value={`$${fuelCost.toFixed(2)}`} />
         <Row label={`Dump fee (x${formData.numberOfDumpLoads})`} value={`$${dumpCost}`} />
         <Row label="Total direct cost" value={`$${directCost.toFixed(2)}`} bold />

@@ -2,6 +2,7 @@ const SETTINGS_KEY = 'junkremoval_settings';
 const QUOTES_KEY = 'junkremoval_quotes';
 
 export const DEFAULT_SETTINGS = {
+  homeBaseAddress: '',
   landfillAddress: '100 Landfill Dr, Jefferson, GA 30549',
   mpg: 15,
   gasPrice: 3.50,

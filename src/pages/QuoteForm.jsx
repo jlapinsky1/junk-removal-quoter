@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { calculateQuote } from '../utils/pricing';
-import { calculateDistance } from '../utils/distance';
+import { calculateAllDistances } from '../utils/distance';
 import { saveQuote } from '../utils/storage';
 import InternalQuoteView from '../components/InternalQuoteView';
 import CustomerQuoteView from '../components/CustomerQuoteView';
@@ -40,7 +40,9 @@ const emptyForm = {
   customerPhone: '',
   customerEmail: '',
   jobAddress: '',
-  distanceToLandfill: '',
+  homeBaseToJob: '',
+  jobToLandfill: '',
+  landfillToHomeBase: '',
   distanceSource: 'manual',
   loadSize: 'Half truck/trailer',
   customBasePrice: '',
@@ -73,20 +75,30 @@ export default function QuoteForm({ settings, initialData }) {
     setQuoteResult(null);
   }
 
-  async function handleCalculateDistance() {
+  async function handleCalculateDistances() {
     if (!formData.jobAddress.trim()) {
       setDistanceError('Enter a job address first');
+      return;
+    }
+    if (!settings.homeBaseAddress?.trim()) {
+      setDistanceError('Set your home base address in Settings first');
       return;
     }
     setDistanceLoading(true);
     setDistanceError('');
 
-    const result = await calculateDistance(formData.jobAddress, settings.landfillAddress);
+    const result = await calculateAllDistances(
+      settings.homeBaseAddress,
+      formData.jobAddress,
+      settings.landfillAddress
+    );
 
     if (result.success) {
       setFormData(prev => ({
         ...prev,
-        distanceToLandfill: result.miles,
+        homeBaseToJob: result.homeBaseToJob,
+        jobToLandfill: result.jobToLandfill,
+        landfillToHomeBase: result.landfillToHomeBase,
         distanceSource: 'api',
       }));
       setDistanceError('');
@@ -134,39 +146,79 @@ export default function QuoteForm({ settings, initialData }) {
       <Card title="Job Details">
         <Input label="Job Address" value={formData.jobAddress} onChange={v => updateField('jobAddress', v)} />
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Distance to Landfill (miles)
-            <span className="ml-2 text-xs text-gray-400">
-              {formData.distanceSource === 'api' ? '(API calculated)' : '(manual entry)'}
-            </span>
-          </label>
-          <div className="flex gap-2">
-            <input
-              type="number"
-              step="0.1"
-              min="0"
-              className="flex-1 border rounded-lg px-3 py-2 text-sm"
-              value={formData.distanceToLandfill}
-              onChange={e => {
-                updateField('distanceToLandfill', e.target.value);
-                setFormData(prev => ({ ...prev, distanceSource: 'manual' }));
-              }}
-              placeholder="Enter miles"
-            />
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="block text-sm font-medium text-gray-700">
+              Route Distances (miles)
+              <span className="ml-2 text-xs text-gray-400">
+                {formData.distanceSource === 'api' ? '(API calculated)' : '(manual entry)'}
+              </span>
+            </label>
             {hasApiKey && (
               <button
-                onClick={handleCalculateDistance}
+                onClick={handleCalculateDistances}
                 disabled={distanceLoading}
-                className="bg-blue-500 text-white px-3 py-2 rounded-lg text-sm font-medium disabled:opacity-50"
+                className="bg-blue-500 text-white px-3 py-1.5 rounded-lg text-xs font-medium disabled:opacity-50"
               >
-                {distanceLoading ? '...' : 'Auto'}
+                {distanceLoading ? 'Calculating...' : 'Auto-Calculate All'}
               </button>
             )}
           </div>
-          {distanceError && <p className="text-red-500 text-xs mt-1">{distanceError}</p>}
+
+          <div className="grid grid-cols-3 gap-2">
+            <div>
+              <label className="text-xs text-gray-500">Home to Job</label>
+              <input
+                type="number"
+                step="0.1"
+                min="0"
+                className="w-full border rounded-lg px-2 py-2 text-sm"
+                value={formData.homeBaseToJob}
+                onChange={e => {
+                  updateField('homeBaseToJob', e.target.value);
+                  setFormData(prev => ({ ...prev, distanceSource: 'manual' }));
+                }}
+                placeholder="mi"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500">Job to Landfill</label>
+              <input
+                type="number"
+                step="0.1"
+                min="0"
+                className="w-full border rounded-lg px-2 py-2 text-sm"
+                value={formData.jobToLandfill}
+                onChange={e => {
+                  updateField('jobToLandfill', e.target.value);
+                  setFormData(prev => ({ ...prev, distanceSource: 'manual' }));
+                }}
+                placeholder="mi"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500">Landfill to Home</label>
+              <input
+                type="number"
+                step="0.1"
+                min="0"
+                className="w-full border rounded-lg px-2 py-2 text-sm"
+                value={formData.landfillToHomeBase}
+                onChange={e => {
+                  updateField('landfillToHomeBase', e.target.value);
+                  setFormData(prev => ({ ...prev, distanceSource: 'manual' }));
+                }}
+                placeholder="mi"
+              />
+            </div>
+          </div>
+
+          {distanceError && <p className="text-red-500 text-xs">{distanceError}</p>}
           {!hasApiKey && (
-            <p className="text-gray-400 text-xs mt-1">No Google Maps API key configured. Enter distance manually.</p>
+            <p className="text-gray-400 text-xs">No Google Maps API key configured. Enter distances manually.</p>
+          )}
+          {hasApiKey && !settings.homeBaseAddress && (
+            <p className="text-amber-500 text-xs">Set your home base address in Settings to enable auto-calculation.</p>
           )}
         </div>
 

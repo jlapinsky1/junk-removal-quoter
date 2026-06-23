@@ -1,4 +1,4 @@
-export async function calculateDistance(jobAddress, landfillAddress) {
+export async function calculateDistance(origin, destination) {
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 
   if (!apiKey) {
@@ -7,8 +7,8 @@ export async function calculateDistance(jobAddress, landfillAddress) {
 
   try {
     const params = new URLSearchParams({
-      origins: jobAddress,
-      destinations: landfillAddress,
+      origins: origin,
+      destinations: destination,
       units: 'imperial',
       key: apiKey,
     });
@@ -40,4 +40,38 @@ export async function calculateDistance(jobAddress, landfillAddress) {
   } catch (e) {
     return { success: false, error: e.message };
   }
+}
+
+export async function calculateAllDistances(homeBase, jobAddress, landfillAddress) {
+  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+
+  if (!apiKey) {
+    return { success: false, error: 'No API key configured' };
+  }
+
+  if (!homeBase || !jobAddress || !landfillAddress) {
+    return { success: false, error: 'All three addresses are required for auto-calculation' };
+  }
+
+  const [homeToJob, jobToLandfill, landfillToHome] = await Promise.all([
+    calculateDistance(homeBase, jobAddress),
+    calculateDistance(jobAddress, landfillAddress),
+    calculateDistance(landfillAddress, homeBase),
+  ]);
+
+  const errors = [];
+  if (!homeToJob.success) errors.push(`Home to Job: ${homeToJob.error}`);
+  if (!jobToLandfill.success) errors.push(`Job to Landfill: ${jobToLandfill.error}`);
+  if (!landfillToHome.success) errors.push(`Landfill to Home: ${landfillToHome.error}`);
+
+  if (errors.length > 0) {
+    return { success: false, error: errors.join('; ') };
+  }
+
+  return {
+    success: true,
+    homeBaseToJob: homeToJob.miles,
+    jobToLandfill: jobToLandfill.miles,
+    landfillToHomeBase: landfillToHome.miles,
+  };
 }
