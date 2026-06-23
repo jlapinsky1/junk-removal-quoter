@@ -22,7 +22,7 @@ export default function CustomerQuoteView({ formData, quoteResult, onClose }) {
       'Notes:',
       '- Final price may change if load size/materials differ from photos or description.',
       '- Hazardous materials not included.',
-      '- Price includes loading, hauling, disposal, and cleanup of the work area.',
+      '- Price includes loading, hauling, disposal, and cleanup around the pickup area.',
     ].filter(Boolean).join('\n');
 
     navigator.clipboard.writeText(text);
@@ -65,7 +65,7 @@ export default function CustomerQuoteView({ formData, quoteResult, onClose }) {
             <p>Valid until: {validUntil.toLocaleDateString()}</p>
             <p>- Final price may change if load size/materials differ from photos or description.</p>
             <p>- Hazardous materials not included.</p>
-            <p>- Price includes loading, hauling, disposal, and cleanup of the work area.</p>
+            <p>- Price includes loading, hauling, disposal, and cleanup around the pickup area.</p>
           </div>
         </div>
 

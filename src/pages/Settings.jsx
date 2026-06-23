@@ -35,6 +35,28 @@ export default function Settings({ settings, onSettingsChange }) {
     setSaved(false);
   }
 
+  function updateAccessModifier(accessType, value) {
+    setLocal(prev => ({
+      ...prev,
+      accessModifiers: {
+        ...prev.accessModifiers,
+        [accessType]: Number(value),
+      },
+    }));
+    setSaved(false);
+  }
+
+  function updateSensitivity(field, value) {
+    setLocal(prev => ({
+      ...prev,
+      priceSensitivity: {
+        ...prev.priceSensitivity,
+        [field]: Number(value),
+      },
+    }));
+    setSaved(false);
+  }
+
   function updateDistanceSurcharge(index, value) {
     setLocal(prev => {
       const tiers = [...prev.distanceSurcharges];
@@ -173,11 +195,69 @@ export default function Settings({ settings, onSettingsChange }) {
         ))}
       </Card>
 
+      <Card title="Access Modifiers">
+        {Object.entries(local.accessModifiers).map(([accessType, price]) => (
+          <div key={accessType} className="flex items-center justify-between gap-2">
+            <span className="text-sm text-gray-700">{accessType}</span>
+            <div className="flex items-center gap-1">
+              <span className="text-gray-400 text-sm">$</span>
+              <input
+                type="number"
+                className="w-20 border rounded px-2 py-1 text-sm text-right"
+                value={price}
+                onChange={e => updateAccessModifier(accessType, e.target.value)}
+              />
+            </div>
+          </div>
+        ))}
+      </Card>
+
+      <Card title="Price Sensitivity Adjustments">
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-sm text-gray-700">Win the Job discount (easy curbside)</span>
+            <div className="flex items-center gap-1">
+              <span className="text-gray-400 text-sm">$</span>
+              <input
+                type="number"
+                className="w-20 border rounded px-2 py-1 text-sm text-right"
+                value={local.priceSensitivity.winTheJobDiscount}
+                onChange={e => updateSensitivity('winTheJobDiscount', e.target.value)}
+              />
+            </div>
+          </div>
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-sm text-gray-700">Protect Margin add (small jobs)</span>
+            <div className="flex items-center gap-1">
+              <span className="text-gray-400 text-sm">$</span>
+              <input
+                type="number"
+                className="w-20 border rounded px-2 py-1 text-sm text-right"
+                value={local.priceSensitivity.protectMarginSmall}
+                onChange={e => updateSensitivity('protectMarginSmall', e.target.value)}
+              />
+            </div>
+          </div>
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-sm text-gray-700">Protect Margin add (medium/full)</span>
+            <div className="flex items-center gap-1">
+              <span className="text-gray-400 text-sm">$</span>
+              <input
+                type="number"
+                className="w-20 border rounded px-2 py-1 text-sm text-right"
+                value={local.priceSensitivity.protectMarginLarge}
+                onChange={e => updateSensitivity('protectMarginLarge', e.target.value)}
+              />
+            </div>
+          </div>
+        </div>
+      </Card>
+
       <Card title="Distance Surcharges">
         {local.distanceSurcharges.map((tier, i) => (
           <div key={i} className="flex items-center justify-between gap-2">
             <span className="text-sm text-gray-700">
-              {tier.min}–{tier.max === Infinity ? '40+' : tier.max} mi
+              {tier.min === 0 ? '0' : `>${tier.min - 0.1}`}–{tier.max === Infinity ? '40+' : tier.max} mi
             </span>
             <div className="flex items-center gap-1">
               <span className="text-gray-400 text-sm">$</span>

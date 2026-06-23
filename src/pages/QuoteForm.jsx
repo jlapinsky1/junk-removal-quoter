@@ -6,8 +6,10 @@ import InternalQuoteView from '../components/InternalQuoteView';
 import CustomerQuoteView from '../components/CustomerQuoteView';
 
 const LOAD_SIZES = [
-  'Minimum pickup',
-  'Small job',
+  'Single item curbside',
+  'Small curbside pile',
+  'Couch + small curbside pile',
+  'Normal small job',
   'Quarter truck/trailer',
   'Half truck/trailer',
   'Three-quarter truck/trailer',
@@ -15,13 +17,19 @@ const LOAD_SIZES = [
   'Oversized / custom',
 ];
 
-const DIFFICULTIES = [
-  'Easy curbside',
-  'Normal',
-  'Stairs / inside removal',
-  'Heavy items',
-  'Dirty / messy / loose debris',
-  'Construction debris',
+const ACCESS_TYPES = [
+  'Curbside / already outside',
+  'Garage / driveway',
+  'Inside first floor',
+  'Upstairs / basement',
+  'Long carry',
+  'Difficult access',
+];
+
+const SENSITIVITY_MODES = [
+  { value: 'win', label: 'Win the Job' },
+  { value: 'balanced', label: 'Balanced' },
+  { value: 'protect', label: 'Protect Margin' },
 ];
 
 const ADD_ONS = [
@@ -45,10 +53,11 @@ const emptyForm = {
   landfillToHomeBase: '',
   distanceSource: 'manual',
   loadSize: 'Half truck/trailer',
+  accessType: 'Curbside / already outside',
+  priceSensitivity: 'balanced',
   customBasePrice: '',
   numberOfDumpLoads: 1,
   estimatedJobTime: '',
-  difficulty: 'Normal',
   addOns: [],
   notes: '',
 };
@@ -256,11 +265,32 @@ export default function QuoteForm({ settings, initialData }) {
         />
 
         <Select
-          label="Difficulty"
-          value={formData.difficulty}
-          options={DIFFICULTIES}
-          onChange={v => updateField('difficulty', v)}
+          label="Job Access Type"
+          value={formData.accessType}
+          options={ACCESS_TYPES}
+          onChange={v => updateField('accessType', v)}
         />
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Price Sensitivity</label>
+          <div className="flex gap-1">
+            {SENSITIVITY_MODES.map(mode => (
+              <button
+                key={mode.value}
+                onClick={() => updateField('priceSensitivity', mode.value)}
+                className={`flex-1 py-2 px-2 rounded-lg text-xs font-medium transition-colors ${
+                  formData.priceSensitivity === mode.value
+                    ? mode.value === 'win' ? 'bg-green-100 border-green-500 text-green-800 border'
+                    : mode.value === 'protect' ? 'bg-orange-100 border-orange-500 text-orange-800 border'
+                    : 'bg-blue-100 border-blue-500 text-blue-800 border'
+                    : 'bg-gray-100 text-gray-600 border border-gray-200'
+                }`}
+              >
+                {mode.label}
+              </button>
+            ))}
+          </div>
+        </div>
       </Card>
 
       {/* Add-Ons */}

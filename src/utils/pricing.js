@@ -2,19 +2,50 @@ export function roundToNearest5(n) {
   return Math.round(n / 5) * 5;
 }
 
+const SMALL_CURBSIDE_LOADS = [
+  'Single item curbside',
+  'Small curbside pile',
+  'Couch + small curbside pile',
+];
+
+const SMALL_LOADS = [
+  ...SMALL_CURBSIDE_LOADS,
+  'Normal small job',
+];
+
+const EASY_ACCESS_TYPES = [
+  'Curbside / already outside',
+  'Garage / driveway',
+];
+
+const DISQUALIFYING_ADDONS = [
+  'Heavy item',
+  'Stairs',
+  'Same-day / urgent',
+];
+
+function isEligibleForDiscount(loadSize, accessType, addOns) {
+  if (!SMALL_CURBSIDE_LOADS.includes(loadSize)) return false;
+  if (!EASY_ACCESS_TYPES.includes(accessType)) return false;
+  if (addOns.some(a => DISQUALIFYING_ADDONS.includes(a))) return false;
+  return true;
+}
+
 export function calculateQuote(formData, settings) {
   const {
     loadSize,
     numberOfDumpLoads = 1,
-    difficulty,
+    accessType = 'Curbside / already outside',
+    priceSensitivity = 'balanced',
     addOns = [],
     homeBaseToJob = 0,
     jobToLandfill = 0,
     landfillToHomeBase = 0,
+    estimatedJobTime = 0,
     customBasePrice,
   } = formData;
 
-  const { mpg, gasPrice, dumpFee, minimumPrice, basePrices, addOnPrices, distanceSurcharges, difficultyModifiers } = settings;
+  const { mpg, gasPrice, dumpFee, minimumPrice, basePrices, addOnPrices, distanceSurcharges, accessModifiers, priceSensitivity: sensitivitySettings } = settings;
 
   // Base price
   let basePrice = 0;
@@ -24,15 +55,20 @@ export function calculateQuote(formData, settings) {
     basePrice = basePrices[loadSize]?.default || 0;
   }
 
+  // Access modifier
+  const accessModifier = accessModifiers[accessType] || 0;
+
   // Add-ons total
   const addOnsTotal = addOns.reduce((sum, addon) => sum + (addOnPrices[addon] || 0), 0);
 
   // Distance surcharge (based on job-to-landfill leg)
+  // At exactly 10.0 miles: $0. Above 10.0: next tier.
   const jobToLandfillMiles = Number(jobToLandfill) || 0;
   let distanceSurcharge = 0;
   let distanceWarning = false;
   for (const tier of distanceSurcharges) {
-    if (jobToLandfillMiles >= tier.min && jobToLandfillMiles < tier.max) {
+    const upperBound = tier.max === Infinity ? Infinity : tier.max;
+    if (jobToLandfillMiles >= tier.min && jobToLandfillMiles <= upperBound) {
       distanceSurcharge = tier.surcharge;
       break;
     }
@@ -41,8 +77,20 @@ export function calculateQuote(formData, settings) {
     distanceWarning = true;
   }
 
-  // Difficulty modifier
-  const difficultyModifier = difficultyModifiers[difficulty] || 0;
+  // Price sensitivity adjustment
+  let sensitivityAdjustment = 0;
+  const eligible = isEligibleForDiscount(loadSize, accessType, addOns);
+  if (priceSensitivity === 'win') {
+    if (eligible) {
+      sensitivityAdjustment = -(sensitivitySettings?.winTheJobDiscount || 25);
+    }
+  } else if (priceSensitivity === 'protect') {
+    if (SMALL_LOADS.includes(loadSize)) {
+      sensitivityAdjustment = sensitivitySettings?.protectMarginSmall || 25;
+    } else if (loadSize !== 'Oversized / custom') {
+      sensitivityAdjustment = sensitivitySettings?.protectMarginLarge || 50;
+    }
+  }
 
   // Total route: home -> job -> landfill -> home
   const homeToJobMiles = Number(homeBaseToJob) || 0;
@@ -53,12 +101,14 @@ export function calculateQuote(formData, settings) {
   const directCost = dumpCost + fuelCost;
 
   // Quote calculation
-  const quoteSubtotal = basePrice + addOnsTotal + distanceSurcharge + difficultyModifier;
+  const quoteSubtotal = basePrice + accessModifier + addOnsTotal + distanceSurcharge + sensitivityAdjustment;
   const suggestedQuote = roundToNearest5(Math.max(quoteSubtotal, minimumPrice));
 
   // Profitability
   const estimatedGrossProfit = suggestedQuote - directCost;
   const estimatedMargin = suggestedQuote > 0 ? estimatedGrossProfit / suggestedQuote : 0;
+  const hours = Number(estimatedJobTime) || 0;
+  const grossProfitPerHour = hours > 0 ? estimatedGrossProfit / hours : null;
 
   let profitabilityStatus = 'green';
   if (estimatedMargin < 0.60) {
@@ -69,9 +119,11 @@ export function calculateQuote(formData, settings) {
 
   return {
     basePrice: roundToNearest5(basePrice),
+    accessModifier,
     addOnsTotal: roundToNearest5(addOnsTotal),
     distanceSurcharge,
-    difficultyModifier,
+    sensitivityAdjustment,
+    priceSensitivity,
     homeToJobMiles,
     jobToLandfillMiles,
     landfillToHomeMiles,
@@ -83,6 +135,7 @@ export function calculateQuote(formData, settings) {
     suggestedQuote,
     estimatedGrossProfit: roundToNearest5(estimatedGrossProfit),
     estimatedMargin,
+    grossProfitPerHour: grossProfitPerHour !== null ? roundToNearest5(grossProfitPerHour) : null,
     profitabilityStatus,
     distanceWarning,
   };
