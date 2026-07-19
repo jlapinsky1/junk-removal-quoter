@@ -30,10 +30,10 @@ const ELEVATOR_OPTIONS = [
   { value: 'yes', label: 'Yes, elevator available' },
 ];
 
-const TIME_SLOTS = [
-  'Morning (8am - 12pm)',
-  'Afternoon (12pm - 4pm)',
-  'Anytime',
+const TIME_PREFERENCES = [
+  { value: 'morning', label: 'Morning (8am - 12pm)' },
+  { value: 'afternoon', label: 'Afternoon (12pm - 4pm)' },
+  { value: 'flexible', label: 'Flexible / either works' },
 ];
 
 function generateNextDays(count) {
@@ -80,7 +80,8 @@ export default function BookingFlow() {
     stairs: 'none',
     elevator: 'no',
     preferredDate: '',
-    preferredTime: 'Morning (8am - 12pm)',
+    secondChoiceDate: '',
+    timePreference: 'morning',
   });
 
   function update(field, value) {
@@ -101,7 +102,7 @@ export default function BookingFlow() {
       case 1: return form.address.trim() && form.city.trim() && form.zip.trim();
       case 2: return form.photos.length >= 3;
       case 3: return form.quantity;
-      case 4: return form.preferredDate && form.preferredTime;
+      case 4: return form.preferredDate && form.timePreference;
       default: return true;
     }
   }
@@ -206,7 +207,8 @@ export default function BookingFlow() {
       stairs: form.stairs,
       elevator: form.elevator,
       preferredDate: form.preferredDate,
-      preferredTime: form.preferredTime,
+      secondChoiceDate: form.secondChoiceDate,
+      timePreference: form.timePreference,
     });
     setBookingId(id);
     setSubmitted(true);
@@ -226,8 +228,9 @@ export default function BookingFlow() {
             We've received your junk removal request. We'll review your photos and details, then send you a firm quote within a few hours.
           </p>
           <div className="bg-gray-50 rounded-xl p-4 text-sm text-gray-600 space-y-1">
-            <p><span className="font-medium">Pickup date:</span> {formatDate(form.preferredDate)}</p>
-            <p><span className="font-medium">Time:</span> {form.preferredTime}</p>
+            <p><span className="font-medium">Preferred date:</span> {formatDate(form.preferredDate)}</p>
+            {form.secondChoiceDate && <p><span className="font-medium">Second choice:</span> {formatDate(form.secondChoiceDate)}</p>}
+            <p><span className="font-medium">Time preference:</span> {TIME_PREFERENCES.find(t => t.value === form.timePreference)?.label || form.timePreference}</p>
             <p><span className="font-medium">Confirmation #:</span> {bookingId.slice(0, 8).toUpperCase()}</p>
           </div>
           <p className="text-sm text-gray-500">
@@ -497,7 +500,7 @@ export default function BookingFlow() {
         )}
 
         {step === 4 && (
-          <StepCard title="Pick a day and time" subtitle="When should we come?">
+          <StepCard title="When works best for you?" subtitle="We'll confirm your pickup time after reviewing your request">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Preferred day</label>
               <div className="grid grid-cols-2 gap-2">
@@ -507,6 +510,29 @@ export default function BookingFlow() {
                     onClick={() => update('preferredDate', day)}
                     className={`p-3 rounded-xl border text-sm font-medium transition-colors ${
                       form.preferredDate === day
+                        ? 'bg-blue-50 border-blue-500 text-blue-800'
+                        : form.secondChoiceDate === day
+                        ? 'bg-gray-50 border-gray-400 text-gray-700'
+                        : 'bg-white border-gray-200 text-gray-700'
+                    }`}
+                  >
+                    {formatDate(day)}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Second choice <span className="text-gray-400 font-normal">(optional)</span>
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                {availableDays.filter(d => d !== form.preferredDate).map(day => (
+                  <button
+                    key={day}
+                    onClick={() => update('secondChoiceDate', form.secondChoiceDate === day ? '' : day)}
+                    className={`p-3 rounded-xl border text-sm font-medium transition-colors ${
+                      form.secondChoiceDate === day
                         ? 'bg-blue-50 border-blue-500 text-blue-800'
                         : 'bg-white border-gray-200 text-gray-700'
                     }`}
@@ -518,22 +544,26 @@ export default function BookingFlow() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Preferred time</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Time preference</label>
               <div className="space-y-2">
-                {TIME_SLOTS.map(slot => (
+                {TIME_PREFERENCES.map(pref => (
                   <button
-                    key={slot}
-                    onClick={() => update('preferredTime', slot)}
+                    key={pref.value}
+                    onClick={() => update('timePreference', pref.value)}
                     className={`w-full text-left p-3 rounded-xl border text-sm font-medium transition-colors ${
-                      form.preferredTime === slot
+                      form.timePreference === pref.value
                         ? 'bg-blue-50 border-blue-500 text-blue-800'
                         : 'bg-white border-gray-200 text-gray-700'
                     }`}
                   >
-                    {slot}
+                    {pref.label}
                   </button>
                 ))}
               </div>
+            </div>
+
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-xs text-blue-700">
+              Your preferred time is not confirmed until we review your request and send you a quote. You'll choose from available time slots when you accept the quote.
             </div>
           </StepCard>
         )}

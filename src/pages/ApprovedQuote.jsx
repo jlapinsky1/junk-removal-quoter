@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { getBookingById, acceptQuote } from '../utils/bookings';
+import { getBookingById, acceptQuote, getBookedSlots } from '../utils/bookings';
+import { CUSTOMER_TERMS } from '../utils/quoteSnapshot';
+import { checkAcceptanceBlockers, hasBlockers } from '../utils/riskFlags';
 
 export default function ApprovedQuote() {
   const { id } = useParams();
@@ -8,6 +10,8 @@ export default function ApprovedQuote() {
   const [loading, setLoading] = useState(true);
   const [selectedSlot, setSelectedSlot] = useState('');
   const [accepted, setAccepted] = useState(false);
+  const [error, setError] = useState(null);
+  const [confirmations, setConfirmations] = useState([false, false, false]);
 
   useEffect(() => {
     const b = getBookingById(id);
@@ -36,8 +40,18 @@ export default function ApprovedQuote() {
   }
 
   const isExpired = booking.quoteExpiresAt && new Date(booking.quoteExpiresAt) < new Date();
+  const bookedSlots = getBookedSlots();
+  const availableSlots = (booking.availableSlots || []).filter(s => !bookedSlots.includes(s));
+
+  // Get customer terms from snapshot or fallback
+  const terms = booking.quoteSnapshots?.length > 0
+    ? booking.quoteSnapshots[booking.quoteSnapshots.length - 1].customerTerms
+    : CUSTOMER_TERMS;
+
+  const allConfirmed = confirmations.every(Boolean);
 
   if (accepted || booking.status === 'scheduled') {
+    const acc = booking.acceptance || {};
     return (
       <div className="min-h-screen bg-gradient-to-b from-green-50 to-white flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-lg max-w-md w-full p-8 text-center space-y-4">
@@ -49,10 +63,10 @@ export default function ApprovedQuote() {
           <h2 className="text-2xl font-bold text-gray-900">You're All Set!</h2>
           <p className="text-gray-600">Your junk removal pickup has been confirmed.</p>
           <div className="bg-gray-50 rounded-xl p-4 text-sm space-y-2">
-            <div className="font-bold text-lg text-gray-900">${booking.approvedQuote}</div>
-            {booking.scheduledPickup && (
+            <div className="font-bold text-lg text-gray-900">${acc.acceptedPrice || booking.approvedQuote}</div>
+            {(acc.selectedSlot || booking.scheduledPickup) && (
               <div className="text-gray-600">
-                <span className="font-medium">Pickup:</span> {booking.scheduledPickup}
+                <span className="font-medium">Pickup:</span> {acc.selectedSlot || booking.scheduledPickup}
               </div>
             )}
             <div className="text-gray-600">
@@ -68,14 +82,47 @@ export default function ApprovedQuote() {
   }
 
   function handleAccept() {
-    if (booking.availableSlots?.length > 0 && !selectedSlot) {
-      alert('Please select a pickup time');
+    setError(null);
+
+    // Check acceptance blockers
+    const blockers = checkAcceptanceBlockers(booking, selectedSlot, bookedSlots);
+    if (hasBlockers(blockers)) {
+      setError(blockers.find(b => b.severity === 'blocker').message);
       return;
     }
-    acceptQuote(booking.id, {
-      scheduledPickup: selectedSlot || `${booking.preferredDate} - ${booking.preferredTime}`,
+
+    if (!allConfirmed) {
+      setError('Please confirm all items below before accepting.');
+      return;
+    }
+
+    const result = acceptQuote(booking.id, {
+      scheduledPickup: selectedSlot || `${booking.preferredDate} - ${booking.timePreference || booking.preferredTime}`,
+      acceptedPrice: booking.approvedQuote,
+      quoteVersion: booking.quoteVersion,
+      confirmations: terms.customerConfirmations,
     });
-    setAccepted(true);
+
+    if (result.success) {
+      setAccepted(true);
+    } else if (result.error === 'slot_taken') {
+      setError('This time slot was just taken by another customer. Please choose a different slot.');
+      // Refresh booking to get updated slot list
+      const updated = getBookingById(id);
+      setBooking(updated);
+    } else if (result.error === 'expired') {
+      setError('This quote has expired. Please contact us for an updated price.');
+    } else {
+      setError('Something went wrong. Please try again or contact us.');
+    }
+  }
+
+  function toggleConfirmation(index) {
+    setConfirmations(prev => {
+      const next = [...prev];
+      next[index] = !next[index];
+      return next;
+    });
   }
 
   return (
@@ -94,17 +141,16 @@ export default function ApprovedQuote() {
           <div className="text-sm text-gray-400 mt-2">No hidden fees</div>
         </div>
 
+        {/* Quote protection notice */}
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-sm text-amber-800">
+          {terms.priceAdjustmentNotice}
+        </div>
+
         {/* What's included */}
         <div className="bg-white rounded-2xl shadow-sm border p-5">
           <h3 className="font-bold text-gray-800 mb-3">What's included</h3>
           <div className="space-y-2">
-            {[
-              'Professional loading & hauling',
-              'All labor included',
-              'Responsible disposal & recycling',
-              'Cleanup of the pickup area',
-              'All dump fees included',
-            ].map(item => (
+            {terms.included.map(item => (
               <div key={item} className="flex items-center gap-2 text-sm text-gray-700">
                 <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
@@ -113,6 +159,14 @@ export default function ApprovedQuote() {
               </div>
             ))}
           </div>
+          {terms.excluded?.length > 0 && (
+            <div className="mt-3 pt-3 border-t">
+              <div className="text-xs text-gray-500 font-medium mb-1">Not included:</div>
+              {terms.excluded.map(item => (
+                <div key={item} className="text-sm text-gray-500">{item}</div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Pickup details */}
@@ -131,11 +185,11 @@ export default function ApprovedQuote() {
         </div>
 
         {/* Time slot selection */}
-        {booking.availableSlots?.length > 0 && (
+        {availableSlots.length > 0 && (
           <div className="bg-white rounded-2xl shadow-sm border p-5">
             <h3 className="font-bold text-gray-800 mb-3">Choose your pickup time</h3>
             <div className="space-y-2">
-              {booking.availableSlots.map(slot => (
+              {availableSlots.map(slot => (
                 <button
                   key={slot}
                   onClick={() => setSelectedSlot(slot)}
@@ -147,6 +201,31 @@ export default function ApprovedQuote() {
                 >
                   {slot}
                 </button>
+              ))}
+            </div>
+            {booking.availableSlots.length > availableSlots.length && (
+              <p className="text-xs text-gray-400 mt-2">
+                Some time slots are no longer available.
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Confirmation checkboxes */}
+        {!isExpired && (
+          <div className="bg-white rounded-2xl shadow-sm border p-5">
+            <h3 className="font-bold text-gray-800 mb-3">Before you accept</h3>
+            <div className="space-y-3">
+              {terms.customerConfirmations.map((text, i) => (
+                <label key={i} className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={confirmations[i]}
+                    onChange={() => toggleConfirmation(i)}
+                    className="mt-0.5 rounded"
+                  />
+                  <span className="text-sm text-gray-700">{text}</span>
+                </label>
               ))}
             </div>
           </div>
@@ -162,11 +241,19 @@ export default function ApprovedQuote() {
           </div>
         )}
 
+        {/* Error message */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700 text-center">
+            {error}
+          </div>
+        )}
+
         {/* Accept button */}
         {!isExpired && (
           <button
             onClick={handleAccept}
-            className="w-full bg-green-600 text-white py-4 rounded-xl text-lg font-bold shadow-lg active:bg-green-700 transition-colors"
+            disabled={!allConfirmed || (availableSlots.length > 0 && !selectedSlot)}
+            className="w-full bg-green-600 text-white py-4 rounded-xl text-lg font-bold shadow-lg disabled:opacity-40 disabled:shadow-none active:bg-green-700 transition-colors"
           >
             Accept & Schedule Pickup
           </button>
@@ -174,8 +261,7 @@ export default function ApprovedQuote() {
 
         {/* Fine print */}
         <div className="text-xs text-gray-400 text-center space-y-1 px-4">
-          <p>Final price may change if load size or materials differ significantly from photos or description.</p>
-          <p>Hazardous materials, chemicals, and paint are not included.</p>
+          <p>{terms.priceAdjustmentNotice}</p>
         </div>
       </div>
     </div>
