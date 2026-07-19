@@ -1,23 +1,31 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { getBookingById, acceptQuote, getBookedSlots } from '../utils/bookings';
 import { CUSTOMER_TERMS } from '../utils/quoteSnapshot';
-import { checkAcceptanceBlockers, hasBlockers } from '../utils/riskFlags';
+import { getRepo } from '../utils/repository';
 
 export default function ApprovedQuote() {
   const { id } = useParams();
-  const [booking, setBooking] = useState(null);
+  const [quoteData, setQuoteData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedSlot, setSelectedSlot] = useState('');
   const [accepted, setAccepted] = useState(false);
   const [error, setError] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
   const [confirmations, setConfirmations] = useState([false, false, false]);
 
   useEffect(() => {
-    const b = getBookingById(id);
-    setBooking(b);
-    setLoading(false);
-    if (b?.status === 'scheduled') setAccepted(true);
+    (async () => {
+      try {
+        const repo = await getRepo();
+        const data = await repo.getCustomerQuote(id);
+        setQuoteData(data);
+        if (data?.booking?.status === 'scheduled') setAccepted(true);
+      } catch {
+        // Failed to load
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, [id]);
 
   if (loading) {
@@ -28,7 +36,7 @@ export default function ApprovedQuote() {
     );
   }
 
-  if (!booking || !booking.approvedQuote) {
+  if (!quoteData || !quoteData.quote) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
         <div className="bg-white rounded-2xl shadow-lg max-w-md w-full p-8 text-center">
@@ -39,19 +47,23 @@ export default function ApprovedQuote() {
     );
   }
 
-  const isExpired = booking.quoteExpiresAt && new Date(booking.quoteExpiresAt) < new Date();
-  const bookedSlots = getBookedSlots();
-  const availableSlots = (booking.availableSlots || []).filter(s => !bookedSlots.includes(s));
+  const { booking, quote, bookedSlots = [] } = quoteData;
+  const isExpired = quote.expiresAt && new Date(quote.expiresAt) < new Date();
 
-  // Get customer terms from snapshot or fallback
-  const terms = booking.quoteSnapshots?.length > 0
-    ? booking.quoteSnapshots[booking.quoteSnapshots.length - 1].customerTerms
-    : CUSTOMER_TERMS;
+  // Build available slots, filtering out booked ones
+  const allSlots = quote.availableSlots || [];
+  const bookedSet = new Set(bookedSlots.map(s =>
+    `${s.resource_id || s.resourceId}:${s.pickup_date || s.pickupDate}:${s.start_time || s.startTime}`
+  ));
+  const availableSlots = allSlots.filter(s => {
+    const key = `${s.resourceId || 'truck-1'}:${s.date}:${s.startTime}`;
+    return !bookedSet.has(key);
+  });
 
+  const terms = quote.customerTerms || CUSTOMER_TERMS;
   const allConfirmed = confirmations.every(Boolean);
 
   if (accepted || booking.status === 'scheduled') {
-    const acc = booking.acceptance || {};
     return (
       <div className="min-h-screen bg-gradient-to-b from-green-50 to-white flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-lg max-w-md w-full p-8 text-center space-y-4">
@@ -63,14 +75,9 @@ export default function ApprovedQuote() {
           <h2 className="text-2xl font-bold text-gray-900">You're All Set!</h2>
           <p className="text-gray-600">Your junk removal pickup has been confirmed.</p>
           <div className="bg-gray-50 rounded-xl p-4 text-sm space-y-2">
-            <div className="font-bold text-lg text-gray-900">${acc.acceptedPrice || booking.approvedQuote}</div>
-            {(acc.selectedSlot || booking.scheduledPickup) && (
-              <div className="text-gray-600">
-                <span className="font-medium">Pickup:</span> {acc.selectedSlot || booking.scheduledPickup}
-              </div>
-            )}
+            <div className="font-bold text-lg text-gray-900">${quote.price}</div>
             <div className="text-gray-600">
-              <span className="font-medium">Address:</span> {booking.fullAddress}
+              <span className="font-medium">Address:</span> {booking.address}
             </div>
           </div>
           <p className="text-sm text-gray-500">
@@ -81,39 +88,51 @@ export default function ApprovedQuote() {
     );
   }
 
-  function handleAccept() {
+  async function handleAccept() {
     setError(null);
-
-    // Check acceptance blockers
-    const blockers = checkAcceptanceBlockers(booking, selectedSlot, bookedSlots);
-    if (hasBlockers(blockers)) {
-      setError(blockers.find(b => b.severity === 'blocker').message);
-      return;
-    }
 
     if (!allConfirmed) {
       setError('Please confirm all items below before accepting.');
       return;
     }
 
-    const result = acceptQuote(booking.id, {
-      scheduledPickup: selectedSlot || `${booking.preferredDate} - ${booking.timePreference || booking.preferredTime}`,
-      acceptedPrice: booking.approvedQuote,
-      quoteVersion: booking.quoteVersion,
-      confirmations: terms.customerConfirmations,
-    });
+    // For structured slots, parse the selected slot
+    let pickupDate, startTime, endTime, resourceId;
+    const slot = availableSlots.find(s => JSON.stringify(s) === selectedSlot);
+    if (slot) {
+      pickupDate = slot.date;
+      startTime = slot.startTime;
+      endTime = slot.endTime;
+      resourceId = slot.resourceId || 'truck-1';
+    } else if (selectedSlot) {
+      // Legacy string slot — pass as-is
+      pickupDate = booking.preferredDate;
+      startTime = '08:00';
+      endTime = '12:00';
+      resourceId = 'truck-1';
+    }
 
-    if (result.success) {
-      setAccepted(true);
-    } else if (result.error === 'slot_taken') {
-      setError('This time slot was just taken by another customer. Please choose a different slot.');
-      // Refresh booking to get updated slot list
-      const updated = getBookingById(id);
-      setBooking(updated);
-    } else if (result.error === 'expired') {
-      setError('This quote has expired. Please contact us for an updated price.');
-    } else {
-      setError('Something went wrong. Please try again or contact us.');
+    setSubmitting(true);
+    try {
+      const repo = await getRepo();
+      const result = await repo.acceptQuote(id, {
+        resourceId,
+        pickupDate,
+        startTime,
+        endTime,
+        confirmations: terms.customerConfirmations,
+        idempotencyKey: `accept-${id}-${Date.now()}`,
+      });
+
+      if (result.success) {
+        setAccepted(true);
+      } else {
+        setError(result.error || 'Something went wrong. Please try again.');
+      }
+    } catch (err) {
+      setError(err.message || 'Something went wrong. Please try again.');
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -137,7 +156,7 @@ export default function ApprovedQuote() {
         {/* Price card */}
         <div className="bg-white rounded-2xl shadow-lg p-6 text-center">
           <div className="text-sm text-gray-500 mb-1">Total Price</div>
-          <div className="text-4xl font-bold text-gray-900">${booking.approvedQuote}</div>
+          <div className="text-4xl font-bold text-gray-900">${quote.price}</div>
           <div className="text-sm text-gray-400 mt-2">No hidden fees</div>
         </div>
 
@@ -175,7 +194,7 @@ export default function ApprovedQuote() {
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
               <span className="text-gray-500">Address</span>
-              <span className="text-gray-800 font-medium text-right">{booking.fullAddress}</span>
+              <span className="text-gray-800 font-medium text-right">{booking.address}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-500">Items</span>
@@ -189,21 +208,25 @@ export default function ApprovedQuote() {
           <div className="bg-white rounded-2xl shadow-sm border p-5">
             <h3 className="font-bold text-gray-800 mb-3">Choose your pickup time</h3>
             <div className="space-y-2">
-              {availableSlots.map(slot => (
-                <button
-                  key={slot}
-                  onClick={() => setSelectedSlot(slot)}
-                  className={`w-full text-left p-3 rounded-xl border text-sm font-medium transition-colors ${
-                    selectedSlot === slot
-                      ? 'bg-blue-50 border-blue-500 text-blue-800'
-                      : 'bg-white border-gray-200 text-gray-700'
-                  }`}
-                >
-                  {slot}
-                </button>
-              ))}
+              {availableSlots.map((slot, i) => {
+                const slotKey = JSON.stringify(slot);
+                const label = slot.label || `${slot.date} ${slot.startTime}-${slot.endTime}`;
+                return (
+                  <button
+                    key={i}
+                    onClick={() => setSelectedSlot(slotKey)}
+                    className={`w-full text-left p-3 rounded-xl border text-sm font-medium transition-colors ${
+                      selectedSlot === slotKey
+                        ? 'bg-blue-50 border-blue-500 text-blue-800'
+                        : 'bg-white border-gray-200 text-gray-700'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
             </div>
-            {booking.availableSlots.length > availableSlots.length && (
+            {allSlots.length > availableSlots.length && (
               <p className="text-xs text-gray-400 mt-2">
                 Some time slots are no longer available.
               </p>
@@ -232,11 +255,11 @@ export default function ApprovedQuote() {
         )}
 
         {/* Expiration */}
-        {booking.quoteExpiresAt && (
+        {quote.expiresAt && (
           <div className={`text-center text-sm ${isExpired ? 'text-red-500' : 'text-gray-400'}`}>
             {isExpired
               ? 'This quote has expired. Please contact us for an updated price.'
-              : `Quote valid until ${new Date(booking.quoteExpiresAt).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}`
+              : `Quote valid until ${new Date(quote.expiresAt).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}`
             }
           </div>
         )}
@@ -252,10 +275,10 @@ export default function ApprovedQuote() {
         {!isExpired && (
           <button
             onClick={handleAccept}
-            disabled={!allConfirmed || (availableSlots.length > 0 && !selectedSlot)}
+            disabled={!allConfirmed || (availableSlots.length > 0 && !selectedSlot) || submitting}
             className="w-full bg-green-600 text-white py-4 rounded-xl text-lg font-bold shadow-lg disabled:opacity-40 disabled:shadow-none active:bg-green-700 transition-colors"
           >
-            Accept & Schedule Pickup
+            {submitting ? 'Processing...' : 'Accept & Schedule Pickup'}
           </button>
         )}
 

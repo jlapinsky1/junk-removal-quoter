@@ -7,12 +7,36 @@ import Settings from './pages/Settings';
 import RequestQueue from './pages/RequestQueue';
 import BookingFlow from './pages/BookingFlow';
 import ApprovedQuote from './pages/ApprovedQuote';
+import AdminLogin from './pages/AdminLogin';
 import { getSettings } from './utils/storage';
+import { getRepo } from './utils/repository';
 
 function AdminDashboard() {
+  const [user, setUser] = useState(undefined); // undefined = loading
   const [activeTab, setActiveTab] = useState('requests');
   const [settings, setSettings] = useState(getSettings);
   const [duplicateData, setDuplicateData] = useState(null);
+
+  useEffect(() => {
+    let unsub;
+    (async () => {
+      const repo = await getRepo();
+      const session = await repo.getSession();
+      setUser(session || null);
+
+      if (repo.onAuthStateChange) {
+        const { data } = repo.onAuthStateChange((u) => setUser(u || null));
+        unsub = data?.subscription;
+      }
+    })();
+    return () => unsub?.unsubscribe?.();
+  }, []);
+
+  async function handleSignOut() {
+    const repo = await getRepo();
+    await repo.signOut();
+    setUser(null);
+  }
 
   function handleDuplicate(formData) {
     setDuplicateData(formData);
@@ -26,9 +50,23 @@ function AdminDashboard() {
     }
   }, [duplicateData, activeTab]);
 
+  // Loading state
+  if (user === undefined) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full" />
+      </div>
+    );
+  }
+
+  // Not authenticated
+  if (!user) {
+    return <AdminLogin onLogin={() => getRepo().then(r => r.getSession()).then(s => setUser(s))} />;
+  }
+
   return (
     <div className="min-h-screen bg-gray-100">
-      <Navigation activeTab={activeTab} onTabChange={setActiveTab} />
+      <Navigation activeTab={activeTab} onTabChange={setActiveTab} onSignOut={handleSignOut} />
       <main className="max-w-lg mx-auto px-4 py-4">
         {activeTab === 'requests' && <RequestQueue />}
         {activeTab === 'quote' && (

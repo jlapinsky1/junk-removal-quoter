@@ -1,27 +1,42 @@
+import {
+  getServiceClient, getClientIp, checkRateLimit,
+  jsonResponse, errorResponse,
+} from './_shared/supabase.js';
+
 export default async function handler(req) {
-  if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
-      status: 405,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
+  if (req.method !== 'POST') return errorResponse('Method not allowed', 405);
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
-    return new Response(JSON.stringify({ error: 'AI analysis not configured' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return errorResponse('AI analysis not configured', 500);
   }
 
   try {
-    const { images } = await req.json();
+    const { sessionId, images } = await req.json();
+    const ip = getClientIp(req);
+    const supabase = getServiceClient();
+
+    // Rate limit: 10 analyses per IP per hour
+    const allowed = await checkRateLimit(supabase, ip, 'analyze-photos', 3600, 10);
+    if (!allowed) {
+      return errorResponse('Too many analysis requests. Please wait.', 429);
+    }
+
+    // Verify upload session if provided
+    if (sessionId) {
+      const { data: session } = await supabase
+        .from('upload_sessions')
+        .select('id, status, expires_at')
+        .eq('id', sessionId)
+        .single();
+
+      if (!session || session.status !== 'active' || new Date(session.expires_at) < new Date()) {
+        return errorResponse('Invalid or expired upload session');
+      }
+    }
 
     if (!images || !images.length) {
-      return new Response(JSON.stringify({ error: 'No images provided' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      return errorResponse('No images provided');
     }
 
     const imageContent = images.slice(0, 10).map(img => ({
@@ -66,10 +81,7 @@ Be specific but concise. Estimate quantities. Only return the JSON array, nothin
     if (!response.ok) {
       const err = await response.text();
       console.error('Claude API error:', err);
-      return new Response(JSON.stringify({ error: 'AI analysis failed' }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      return errorResponse('AI analysis failed', 500);
     }
 
     const data = await response.json();
@@ -83,19 +95,11 @@ Be specific but concise. Estimate quantities. Only return the JSON array, nothin
       items = match ? JSON.parse(match[0]) : [];
     }
 
-    return new Response(JSON.stringify({ items }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return jsonResponse({ items });
   } catch (e) {
-    console.error('Analyze photos error:', e);
-    return new Response(JSON.stringify({ error: 'Analysis failed' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    console.error('analyze-photos error:', e);
+    return errorResponse('Analysis failed', 500);
   }
 }
 
-export const config = {
-  path: '/api/analyze-photos',
-};
+export const config = { path: '/api/analyze-photos' };

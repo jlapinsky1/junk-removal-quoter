@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { saveBooking } from '../utils/bookings';
+import { getRepo } from '../utils/repository';
 
 const STEPS = ['Contact', 'Address', 'Photos', 'Details', 'Schedule'];
 
@@ -188,30 +188,46 @@ export default function BookingFlow() {
     });
   }
 
-  function handleSubmit() {
-    const id = saveBooking({
-      customerName: `${form.firstName} ${form.lastName}`.trim(),
-      customerPhone: form.phone,
-      customerEmail: form.email,
-      address: form.address,
-      city: form.city,
-      state: form.state,
-      zip: form.zip,
-      fullAddress: `${form.address}, ${form.city}, ${form.state} ${form.zip}`,
-      photoCount: form.photos.length,
-      photos: form.photos,
-      detectedItems: form.detectedItems,
-      description: form.description,
-      quantity: form.quantity,
-      accessType: form.accessType,
-      stairs: form.stairs,
-      elevator: form.elevator,
-      preferredDate: form.preferredDate,
-      secondChoiceDate: form.secondChoiceDate,
-      timePreference: form.timePreference,
-    });
-    setBookingId(id);
-    setSubmitted(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState(null);
+
+  async function handleSubmit() {
+    setSubmitting(true);
+    setSubmitError(null);
+
+    try {
+      const repo = await getRepo();
+      const result = await repo.createBooking({
+        customerName: `${form.firstName} ${form.lastName}`.trim(),
+        customerPhone: form.phone,
+        customerEmail: form.email,
+        address: form.address,
+        city: form.city,
+        state: form.state,
+        zip: form.zip,
+        fullAddress: `${form.address}, ${form.city}, ${form.state} ${form.zip}`,
+        photoCount: form.photos.length,
+        photos: form.photos,
+        detectedItems: form.detectedItems,
+        aiDetectedItems: form.detectedItems,
+        description: form.description,
+        quantity: form.quantity,
+        accessType: form.accessType,
+        stairs: form.stairs,
+        elevator: form.elevator,
+        preferredDate: form.preferredDate,
+        secondChoiceDate: form.secondChoiceDate,
+        timePreference: form.timePreference,
+        sessionId: form.sessionId,
+        idempotencyKey: form.idempotencyKey,
+      });
+      setBookingId(result.bookingId || result.id);
+      setSubmitted(true);
+    } catch (err) {
+      setSubmitError(err.message || 'Submission failed. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   if (submitted) {
@@ -568,6 +584,12 @@ export default function BookingFlow() {
           </StepCard>
         )}
 
+        {submitError && (
+          <div className="mt-4 bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700 text-center">
+            {submitError}
+          </div>
+        )}
+
         {/* Navigation buttons */}
         <div className="mt-6 space-y-3">
           {step < STEPS.length - 1 ? (
@@ -581,10 +603,10 @@ export default function BookingFlow() {
           ) : (
             <button
               onClick={handleSubmit}
-              disabled={!canProceed()}
+              disabled={!canProceed() || submitting}
               className="w-full bg-green-600 text-white py-4 rounded-xl text-base font-bold shadow-lg disabled:opacity-40 disabled:shadow-none active:bg-green-700 transition-colors"
             >
-              Submit Request
+              {submitting ? 'Submitting...' : 'Submit Request'}
             </button>
           )}
 

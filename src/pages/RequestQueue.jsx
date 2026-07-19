@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getBookings, updateBooking, approveBooking, deleteBooking, completeBooking, appendAuditEntry, STATUS_LABELS, STATUS_COLORS } from '../utils/bookings';
+import { STATUS_LABELS, STATUS_COLORS } from '../utils/bookings';
 import { getSettings } from '../utils/storage';
 import { buildEstimate } from '../utils/estimateBuilder';
 import { detectRiskFlags, checkPriceFlags, calculateConfidence, hasBlockers, SEVERITY_COLORS } from '../utils/riskFlags';
@@ -7,6 +7,7 @@ import { rateJob, RATING_COLORS, RATING_LABELS, CONFIDENCE_COLORS } from '../uti
 import { createQuoteSnapshot, createPriceOverrideAudit, CUSTOMER_TERMS } from '../utils/quoteSnapshot';
 import { calculateActuals, emptyActuals } from '../utils/completion';
 import { validateCompletionData } from '../utils/validation';
+import { getRepo } from '../utils/repository';
 
 const TIME_PREF_LABELS = {
   morning: 'Morning (8am-12pm)',
@@ -28,9 +29,15 @@ export default function RequestQueue() {
   const [selected, setSelected] = useState(null);
   const [filter, setFilter] = useState('all');
 
-  useEffect(() => { setBookings(getBookings()); }, []);
+  async function loadBookings() {
+    const repo = await getRepo();
+    const data = await repo.getBookings();
+    setBookings(data);
+  }
 
-  function refresh() { setBookings(getBookings()); }
+  useEffect(() => { loadBookings(); }, []);
+
+  function refresh() { loadBookings(); }
 
   const filtered = filter === 'all' ? bookings : bookings.filter(b => b.status === filter);
 
@@ -133,13 +140,14 @@ function RequestDetail({ booking, onBack }) {
   const allApprovalFlags = [...riskFlags, ...priceFlags];
   const activeBlockers = allApprovalFlags.filter(f => f.severity === 'blocker' && !blockerOverrides[f.flag]);
 
-  function handleApprove() {
+  async function handleApprove() {
     if (!quotePrice) return;
     if (activeBlockers.length > 0) {
       alert('Resolve or override all blockers before approving.');
       return;
     }
 
+    const repo = await getRepo();
     const expDate = new Date();
     expDate.setDate(expDate.getDate() + expiresIn);
     const availableSlots = slots.split('\n').map(s => s.trim()).filter(Boolean);
@@ -148,72 +156,71 @@ function RequestDetail({ booking, onBack }) {
     // Create override audit if price differs from recommended
     let adminOverride = null;
     if (approvedPrice !== estimate.recommendedPrice) {
-      const audit = createPriceOverrideAudit({
+      adminOverride = createPriceOverrideAudit({
         bookingId: data.id,
         recommendedPrice: estimate.recommendedPrice,
         approvedPrice,
         reason: overrideReason,
       });
-      adminOverride = audit;
-      appendAuditEntry(audit);
     }
 
-    // Create immutable snapshot
-    const snapshot = createQuoteSnapshot({
-      bookingId: data.id,
-      version: (data.quoteVersion || 0) + 1,
-      approvedPrice,
-      recommendedPrice: estimate.recommendedPrice,
-      estimate,
-      settings,
-      availableSlots,
-      expiresAt: expDate.toISOString(),
-      adminOverride,
-    });
+    try {
+      const result = await repo.approveBooking(data.id, {
+        approvedPrice,
+        recommendedPrice: estimate.recommendedPrice,
+        estimateSnapshot: estimate,
+        settingsSnapshot: settings,
+        availableSlots,
+        expiresAt: expDate.toISOString(),
+        customerTerms: CUSTOMER_TERMS,
+        adminOverride,
+      });
 
-    approveBooking(data.id, {
-      approvedQuote: approvedPrice,
-      quoteExpiresAt: expDate.toISOString(),
-      availableSlots,
-      quoteSnapshot: snapshot,
-    });
+      if (internalNotes !== data.internalNotes) {
+        await repo.updateBooking(data.id, { internal_notes: internalNotes });
+      }
 
-    if (internalNotes !== data.internalNotes) {
-      updateBooking(data.id, { internalNotes });
+      if (Object.keys(blockerOverrides).length > 0) {
+        await repo.updateBooking(data.id, { blocker_overrides: blockerOverrides });
+      }
+
+      const quoteUrl = result.quoteToken
+        ? `${window.location.origin}/quote/${result.quoteToken}`
+        : `${window.location.origin}/quote/${data.id}`;
+      alert(`Quote approved! Customer quote link: ${quoteUrl}`);
+      onBack();
+    } catch (err) {
+      alert(`Approval failed: ${err.message}`);
     }
-
-    // Store blocker overrides
-    if (Object.keys(blockerOverrides).length > 0) {
-      updateBooking(data.id, { blockerOverrides });
-    }
-
-    alert(`Quote approved! Customer quote page: ${window.location.origin}/quote/${data.id}`);
-    onBack();
   }
 
-  function handleStatusChange(status) {
-    updateBooking(data.id, { status });
+  async function handleStatusChange(status) {
+    const repo = await getRepo();
+    await repo.updateBooking(data.id, { status });
     setData(prev => ({ ...prev, status }));
   }
 
-  function handleDelete() {
+  async function handleDelete() {
     if (!confirm('Delete this request permanently?')) return;
-    deleteBooking(data.id);
+    const repo = await getRepo();
+    await repo.deleteBooking(data.id);
     onBack();
   }
 
-  function handleSaveNotes() {
-    updateBooking(data.id, { internalNotes });
+  async function handleSaveNotes() {
+    const repo = await getRepo();
+    await repo.updateBooking(data.id, { internal_notes: internalNotes });
     alert('Notes saved');
   }
 
-  function handleComplete() {
+  async function handleComplete() {
     const errors = validateCompletionData(completionData);
     if (errors) {
       setCompletionErrors(errors);
       return;
     }
-    completeBooking(data.id, completionData);
+    const repo = await getRepo();
+    await repo.completeBooking(data.id, completionData);
     setData(prev => ({ ...prev, status: 'completed', actuals: completionData }));
     setShowCompletion(false);
   }
