@@ -237,6 +237,136 @@ const supabaseRepo = {
     }));
   },
 
+  // ── Business Goals ──
+  async getActiveGoal(goalType = 'cash_profit') {
+    const { data, error } = await supabase
+      .from('business_goals')
+      .select('*')
+      .eq('goal_type', goalType)
+      .eq('active', true)
+      .maybeSingle();
+    if (error) throw error;
+    return data;
+  },
+
+  async upsertGoal(goalData) {
+    // Deactivate existing active goal of same type first
+    if (goalData.active !== false) {
+      await supabase
+        .from('business_goals')
+        .update({ active: false, updated_at: new Date().toISOString() })
+        .eq('goal_type', goalData.goal_type)
+        .eq('active', true);
+    }
+    const { data, error } = await supabase
+      .from('business_goals')
+      .upsert(goalData)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
+  async saveGoalSnapshot(snapshot) {
+    const { error } = await supabase
+      .from('goal_snapshots')
+      .upsert(snapshot, { onConflict: 'goal_id,snapshot_date' });
+    if (error) throw error;
+  },
+
+  async getCompletedBookingsInRange(startDate, endDate) {
+    const { data, error } = await supabase
+      .from('bookings')
+      .select('id, approved_quote, actuals, internal_estimate, completed_at, status')
+      .eq('status', 'completed')
+      .gte('completed_at', startDate)
+      .lte('completed_at', endDate + 'T23:59:59Z');
+    if (error) throw error;
+    return data || [];
+  },
+
+  async getActiveBookingsByStatus(statuses) {
+    const { data, error } = await supabase
+      .from('bookings')
+      .select('id, status, approved_quote, internal_estimate, created_at')
+      .in('status', statuses)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  },
+
+  async getScheduledBookingsForDateRange(startDate, endDate) {
+    const { data, error } = await supabase
+      .from('slot_reservations')
+      .select(`
+        booking_id, pickup_date, start_time, end_time, resource_id, status,
+        bookings:booking_id (id, status, approved_quote, internal_estimate, actuals, full_address, quantity, access_type, completed_at)
+      `)
+      .gte('pickup_date', startDate)
+      .lte('pickup_date', endDate)
+      .in('status', ['reserved', 'confirmed', 'completed']);
+    if (error) throw error;
+    return data || [];
+  },
+
+  // ── Calibration ──
+  async getCalibrationRecords(status = null) {
+    let query = supabase
+      .from('calibration_records')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (status) query = query.eq('owner_decision', status);
+    const { data, error } = await query;
+    if (error) throw error;
+    return data || [];
+  },
+
+  async upsertCalibrationRecord(record) {
+    const { data, error } = await supabase
+      .from('calibration_records')
+      .upsert(record)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
+  // ── Location / Travel Cache ──
+  async getLocationCache(addressHash) {
+    const { data, error } = await supabase
+      .from('location_cache')
+      .select('*')
+      .eq('address_hash', addressHash)
+      .maybeSingle();
+    if (error) throw error;
+    return data;
+  },
+
+  async upsertLocationCache(entry) {
+    const { error } = await supabase
+      .from('location_cache')
+      .upsert(entry, { onConflict: 'address_hash' });
+    if (error) throw error;
+  },
+
+  async getTravelCache(originHash, destinationHash) {
+    const { data, error } = await supabase
+      .from('travel_cache')
+      .select('*')
+      .eq('origin_hash', originHash)
+      .eq('destination_hash', destinationHash)
+      .maybeSingle();
+    if (error) throw error;
+    return data;
+  },
+
+  async upsertTravelCache(entry) {
+    const { error } = await supabase
+      .from('travel_cache')
+      .upsert(entry, { onConflict: 'origin_hash,destination_hash' });
+    if (error) throw error;
+  },
+
   // ── Audit (admin reads) ──
   async getAuditLog(bookingId) {
     let query = supabase

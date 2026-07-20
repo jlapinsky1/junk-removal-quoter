@@ -8,6 +8,9 @@ import { createQuoteSnapshot, createPriceOverrideAudit, CUSTOMER_TERMS } from '.
 import { calculateActuals, emptyActuals } from '../utils/completion';
 import { validateCompletionData } from '../utils/validation';
 import { getRepo } from '../utils/repository';
+import { evaluateDecision, DECISION_COLORS, DECISION_LABELS } from '../utils/decisionEngine';
+import { calculateGoalProgress } from '../utils/goalEngine';
+import { PACE_STATUS_COLORS, PACE_STATUS_LABELS } from '../utils/goalDefaults';
 
 const TIME_PREF_LABELS = {
   morning: 'Morning (8am-12pm)',
@@ -128,12 +131,46 @@ function RequestDetail({ booking, onBack }) {
   const [showCompletion, setShowCompletion] = useState(false);
   const [completionData, setCompletionData] = useState(data.actuals || emptyActuals());
   const [completionErrors, setCompletionErrors] = useState(null);
+  const [goalProgress, setGoalProgress] = useState(null);
+  const [goal, setGoal] = useState(null);
+  const [showDecisionRules, setShowDecisionRules] = useState(false);
 
   const settings = getSettings();
   const estimate = buildEstimate(data, settings);
   const riskFlags = detectRiskFlags(data, estimate);
   const confidence = calculateConfidence(data, riskFlags);
   const rating = rateJob(estimate, confidence);
+
+  // Load goal context for decision engine
+  useEffect(() => {
+    (async () => {
+      try {
+        const repo = await getRepo();
+        const activeGoal = await repo.getActiveGoal('cash_profit');
+        if (activeGoal) {
+          setGoal(activeGoal);
+          const [completed, scheduled, pipeline] = await Promise.all([
+            repo.getCompletedBookingsInRange(activeGoal.start_date, activeGoal.end_date),
+            repo.getActiveBookingsByStatus(['scheduled']),
+            repo.getActiveBookingsByStatus(['pending_review', 'quote_sent']),
+          ]);
+          setGoalProgress(calculateGoalProgress(activeGoal, completed, scheduled, pipeline));
+        }
+      } catch { /* goal tables may not exist yet */ }
+    })();
+  }, []);
+
+  // Evaluate decision
+  const decision = estimate ? evaluateDecision({
+    estimate,
+    confidence,
+    jobRating: rating,
+    riskFlags,
+    blockerOverrides,
+    goalProgress,
+    goal,
+    scheduleContext: null, // TODO: populate from slot reservations
+  }) : null;
 
   // Price-specific flags (recalculate when price changes)
   const priceFlags = quotePrice ? checkPriceFlags(quotePrice, estimate, settings) : [];
@@ -164,6 +201,18 @@ function RequestDetail({ booking, onBack }) {
       });
     }
 
+    // Capture decision context at approval time
+    const decisionContext = decision ? {
+      recommendation: decision.recommendation,
+      score: decision.score,
+      headline: decision.headline,
+      reasons: decision.reasons,
+      suggestedMinPrice: decision.suggestedMinPrice,
+      goalContext: decision.goalContext,
+      scheduleContext: decision.scheduleContext,
+      evaluatedAt: decision.evaluatedAt,
+    } : null;
+
     try {
       const result = await repo.approveBooking(data.id, {
         approvedPrice,
@@ -174,6 +223,7 @@ function RequestDetail({ booking, onBack }) {
         expiresAt: expDate.toISOString(),
         customerTerms: CUSTOMER_TERMS,
         adminOverride,
+        decisionContext,
       });
 
       if (internalNotes !== data.internalNotes) {
@@ -236,6 +286,56 @@ function RequestDetail({ booking, onBack }) {
         </svg>
         Back to requests
       </button>
+
+      {/* ── Decision engine recommendation ── */}
+      {decision && (
+        <div className={`rounded-xl border-2 p-4 space-y-2 ${DECISION_COLORS[decision.recommendation]}`}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl font-bold">{DECISION_LABELS[decision.recommendation]}</span>
+              <span className="text-sm opacity-70">({decision.score}/100)</span>
+            </div>
+            <div className="flex items-center gap-2">
+              {goalProgress && (
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium border ${PACE_STATUS_COLORS[goalProgress.paceStatus]}`}>
+                  {PACE_STATUS_LABELS[goalProgress.paceStatus]}
+                </span>
+              )}
+            </div>
+          </div>
+          <div className="text-sm">{decision.headline}</div>
+          {decision.reasons.length > 0 && (
+            <div className="text-xs opacity-80">{decision.reasons.slice(0, 4).join(' · ')}</div>
+          )}
+          {decision.suggestedMinPrice && (
+            <div className="text-xs">
+              Min acceptable price: <span className="font-semibold">${decision.suggestedMinPrice}</span>
+              {decision.goalContribution?.dailyPct != null && (
+                <span className="ml-3 opacity-70">Covers {decision.goalContribution.dailyPct}% of daily target</span>
+              )}
+            </div>
+          )}
+          <button onClick={() => setShowDecisionRules(!showDecisionRules)}
+            className="text-xs underline opacity-60 hover:opacity-100">
+            {showDecisionRules ? 'Hide details' : 'Why this recommendation?'}
+          </button>
+          {showDecisionRules && (
+            <div className="space-y-1 pt-1 border-t border-current/10">
+              {decision.ruleResults.map(r => (
+                <div key={r.ruleId} className="flex justify-between text-xs">
+                  <span className="opacity-70">{r.ruleName}</span>
+                  <span className={`font-medium ${
+                    r.result === 'fail' ? 'text-red-700'
+                    : r.result === 'review' ? 'text-amber-700'
+                    : r.result === 'skip' ? 'text-gray-400'
+                    : ''
+                  }`}>{r.message}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── Decision summary card ── */}
       <div className={`rounded-xl border-2 p-4 space-y-3 ${RATING_COLORS[rating.rating]}`}>

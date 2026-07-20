@@ -20,6 +20,7 @@ export default async function handler(req) {
       expiresAt,
       customerTerms,
       adminOverride,
+      decisionContext,
     } = await req.json();
 
     if (!bookingId || approvedPrice == null || !estimateSnapshot || !customerTerms) {
@@ -44,6 +45,7 @@ export default async function handler(req) {
       p_customer_terms: customerTerms,
       p_admin_override: adminOverride || null,
       p_token_hash: tokenHash,
+      p_decision_context: decisionContext || null,
     });
 
     if (error) {

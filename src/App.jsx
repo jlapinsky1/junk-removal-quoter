@@ -5,6 +5,8 @@ import QuoteForm from './pages/QuoteForm';
 import QuoteHistory from './pages/QuoteHistory';
 import Settings from './pages/Settings';
 import RequestQueue from './pages/RequestQueue';
+import Dashboard from './pages/Dashboard';
+import LearningDashboard from './pages/LearningDashboard';
 import BookingFlow from './pages/BookingFlow';
 import ApprovedQuote from './pages/ApprovedQuote';
 import AdminLogin from './pages/AdminLogin';
@@ -13,7 +15,7 @@ import { getRepo } from './utils/repository';
 
 function AdminDashboard() {
   const [user, setUser] = useState(undefined); // undefined = loading
-  const [activeTab, setActiveTab] = useState('requests');
+  const [activeTab, setActiveTab] = useState('dashboard');
   const [settings, setSettings] = useState(getSettings);
   const [duplicateData, setDuplicateData] = useState(null);
 
@@ -67,7 +69,10 @@ function AdminDashboard() {
   return (
     <div className="min-h-screen bg-gray-100">
       <Navigation activeTab={activeTab} onTabChange={setActiveTab} onSignOut={handleSignOut} />
-      <main className="max-w-lg mx-auto px-4 py-4">
+      <main className={`mx-auto px-4 py-4 ${
+        ['dashboard', 'learning'].includes(activeTab) ? 'max-w-5xl' : 'max-w-lg'
+      }`}>
+        {activeTab === 'dashboard' && <Dashboard />}
         {activeTab === 'requests' && <RequestQueue />}
         {activeTab === 'quote' && (
           <QuoteForm
@@ -79,6 +84,7 @@ function AdminDashboard() {
         {activeTab === 'history' && (
           <QuoteHistory onDuplicate={handleDuplicate} />
         )}
+        {activeTab === 'learning' && <LearningDashboard />}
         {activeTab === 'settings' && (
           <Settings settings={settings} onSettingsChange={setSettings} />
         )}

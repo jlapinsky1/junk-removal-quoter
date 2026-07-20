@@ -1,9 +1,11 @@
 import React from 'react';
 
 const tabs = [
+  { id: 'dashboard', label: 'Dashboard' },
   { id: 'requests', label: 'Requests' },
   { id: 'quote', label: 'New Quote' },
   { id: 'history', label: 'History' },
+  { id: 'learning', label: 'Learning' },
   { id: 'settings', label: 'Settings' },
 ];
 
