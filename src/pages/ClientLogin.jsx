@@ -36,13 +36,19 @@ export default function ClientLogin() {
           password,
           options: {
             data: { contact_name: contactName },
+            emailRedirectTo: `${window.location.origin}/portal/login`,
           },
         });
         if (error) throw error;
         setSignupSuccess(true);
       }
     } catch (err) {
-      setError(err.message || "Something went wrong.");
+      const msg = err.message || "Something went wrong.";
+      if (msg.includes("<!DOCTYPE") || msg.includes("is not valid JSON")) {
+        setError("Unable to reach the authentication service. Please try again in a moment.");
+      } else {
+        setError(msg);
+      }
     } finally {
       setLoading(false);
     }
