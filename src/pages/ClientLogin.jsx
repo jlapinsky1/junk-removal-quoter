@@ -11,7 +11,6 @@ export default function ClientLogin() {
   const [contactName, setContactName] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [signupSuccess, setSignupSuccess] = useState(false);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -31,43 +30,25 @@ export default function ClientLogin() {
         if (password.length < 8) {
           throw new Error("Password must be at least 8 characters.");
         }
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: { contact_name: contactName },
-          },
+        // Server-side signup with auto-confirm
+        const res = await fetch("/.netlify/functions/client-signup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password, contactName }),
         });
-        if (error) throw error;
-        setSignupSuccess(true);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Signup failed");
+
+        // Auto-login after successful signup
+        const { error: loginErr } = await supabase.auth.signInWithPassword({ email, password });
+        if (loginErr) throw loginErr;
+        navigate("/portal");
       }
     } catch (err) {
       setError(err.message || "Something went wrong.");
     } finally {
       setLoading(false);
     }
-  }
-
-  if (signupSuccess) {
-    return (
-      <div className="min-h-screen bg-[#0a0f0d] flex items-center justify-center px-5">
-        <div className="w-full max-w-md text-center space-y-6">
-          <div className="w-14 h-14 rounded-full bg-[#22c55e]/15 border border-[#22c55e]/30 flex items-center justify-center mx-auto">
-            <Mail className="w-7 h-7 text-[#22c55e]" />
-          </div>
-          <h2 className="text-2xl font-black text-white">Check your email</h2>
-          <p className="text-white/55 text-sm max-w-sm mx-auto">
-            We sent a confirmation link to <strong className="text-white">{email}</strong>. Click the link to activate your account, then come back here to log in.
-          </p>
-          <button
-            onClick={() => { setSignupSuccess(false); setMode("login"); }}
-            className="text-sm text-[#22c55e] font-semibold hover:underline"
-          >
-            Back to log in
-          </button>
-        </div>
-      </div>
-    );
   }
 
   return (
