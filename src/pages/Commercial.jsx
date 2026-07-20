@@ -243,49 +243,64 @@ export default function Commercial() {
         </div>
 
         <div className="max-w-7xl mx-auto px-5 py-20 md:py-28">
-          <div className="max-w-3xl space-y-8">
-            <div className="inline-flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-4 py-2 text-sm">
-              <Building2 className="w-4 h-4 text-[#22c55e]" />
-              <span className="text-white/80 font-medium">For Property Managers & Commercial Accounts</span>
+          <div className="lg:flex lg:items-center lg:gap-12">
+            <div className="lg:w-1/2 space-y-8">
+              <div className="inline-flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-4 py-2 text-sm">
+                <Building2 className="w-4 h-4 text-[#22c55e]" />
+                <span className="text-white/80 font-medium">For Property Managers & Commercial Accounts</span>
+              </div>
+
+              <div>
+                <h1 className="text-4xl md:text-6xl font-black leading-[1.05] tracking-tight text-white">
+                  Junk Removal for
+                </h1>
+                <h1 className="text-4xl md:text-6xl font-black leading-[1.05] tracking-tight text-[#22c55e]">
+                  Property Managers
+                </h1>
+                <p className="mt-6 text-xl md:text-2xl font-semibold text-white/80">
+                  Fast cleanouts. Clear documentation. One reliable crew.
+                </p>
+                <p className="mt-4 text-base text-white/55 leading-relaxed max-w-2xl">
+                  Squatterz handles tenant move-outs, abandoned belongings, bulk-item pickups, property cleanups, and recurring removal services for apartments and rental properties.
+                </p>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button
+                  onClick={() => navigate("/portal/login")}
+                  className="bg-[#22c55e] hover:bg-[#16a34a] active:scale-[0.98] text-black font-bold text-base px-8 py-4 rounded-full flex items-center justify-center gap-2 transition-all"
+                >
+                  Set Up a Commercial Account <ArrowRight className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => navigate("/portal/login")}
+                  className="border border-white/15 hover:border-white/30 text-white font-semibold text-base px-8 py-4 rounded-full flex items-center justify-center gap-2 transition-colors"
+                >
+                  <LogIn className="w-4 h-4" /> Client Portal Log In
+                </button>
+              </div>
+
+              <div className="flex flex-wrap gap-x-6 gap-y-2 pt-2">
+                {["Our crew — not independent haulers", "Insured & COI-ready", "Documentation on every job"].map((t) => (
+                  <div key={t} className="flex items-center gap-2 text-sm text-white/45">
+                    <CheckCircle className="w-4 h-4 text-[#22c55e]" />
+                    {t}
+                  </div>
+                ))}
+              </div>
             </div>
 
-            <div>
-              <h1 className="text-4xl md:text-6xl font-black leading-[1.05] tracking-tight text-white">
-                Junk Removal for
-              </h1>
-              <h1 className="text-4xl md:text-6xl font-black leading-[1.05] tracking-tight text-[#22c55e]">
-                Property Managers
-              </h1>
-              <p className="mt-6 text-xl md:text-2xl font-semibold text-white/80">
-                Fast cleanouts. Clear documentation. One reliable crew.
-              </p>
-              <p className="mt-4 text-base text-white/55 leading-relaxed max-w-2xl">
-                Squatterz handles tenant move-outs, abandoned belongings, bulk-item pickups, property cleanups, and recurring removal services for apartments and rental properties.
-              </p>
-            </div>
-
-            <div className="flex flex-col sm:flex-row gap-3">
-              <button
-                onClick={() => navigate("/portal/login")}
-                className="bg-[#22c55e] hover:bg-[#16a34a] active:scale-[0.98] text-black font-bold text-base px-8 py-4 rounded-full flex items-center justify-center gap-2 transition-all"
-              >
-                Set Up a Commercial Account <ArrowRight className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => navigate("/portal/login")}
-                className="border border-white/15 hover:border-white/30 text-white font-semibold text-base px-8 py-4 rounded-full flex items-center justify-center gap-2 transition-colors"
-              >
-                <LogIn className="w-4 h-4" /> Client Portal Log In
-              </button>
-            </div>
-
-            <div className="flex flex-wrap gap-x-6 gap-y-2 pt-2">
-              {["Our crew — not independent haulers", "Insured & COI-ready", "Documentation on every job"].map((t) => (
-                <div key={t} className="flex items-center gap-2 text-sm text-white/45">
-                  <CheckCircle className="w-4 h-4 text-[#22c55e]" />
-                  {t}
-                </div>
-              ))}
+            <div className="lg:w-1/2 mt-10 lg:mt-0 flex justify-center lg:justify-end">
+              <img
+                src="/trailer-hero.png"
+                alt="Squatterz dump trailer ready for commercial cleanouts"
+                style={{
+                  display: 'block',
+                  width: 'min(90%, 600px)',
+                  height: 'auto',
+                  filter: 'drop-shadow(0 20px 40px rgba(34, 197, 94, 0.15))',
+                }}
+              />
             </div>
           </div>
         </div>
