@@ -396,7 +396,7 @@ export default function BookingFlow() {
                   <span className="text-green-400">On your schedule.</span>
                 </h1>
                 <p className="text-gray-400 text-lg lg:text-xl leading-relaxed mb-10 max-w-lg">
-                  Fast, friendly pickup from a real local crew — no phone tag, no hidden fees.
+                  Fast, reliable junk removal for homes and businesses.
                 </p>
 
                 {/* ZIP input card */}
