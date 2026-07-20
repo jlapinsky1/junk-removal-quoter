@@ -89,9 +89,29 @@ const local = {
   async getAcceptanceForBooking() { return null; },
   async getReservationsForBooking() { return []; },
 
-  // ── Goal tracking (stubs for local) ──
-  async getActiveGoal() { return null; },
-  async upsertGoal(goal) { return goal; },
+  // ── Goal tracking (localStorage for local dev) ──
+  async getActiveGoal(goalType = 'cash_profit') {
+    try {
+      const stored = localStorage.getItem('junkremoval_goals');
+      const goals = stored ? JSON.parse(stored) : [];
+      return goals.find(g => g.goal_type === goalType && g.active) || null;
+    } catch { return null; }
+  },
+  async upsertGoal(goalData) {
+    try {
+      const stored = localStorage.getItem('junkremoval_goals');
+      let goals = stored ? JSON.parse(stored) : [];
+      // Deactivate existing active goals of same type
+      goals = goals.map(g =>
+        g.goal_type === goalData.goal_type && g.active ? { ...g, active: false } : g
+      );
+      const saved = { ...goalData, id: goalData.id || crypto.randomUUID() };
+      const idx = goals.findIndex(g => g.id === saved.id);
+      if (idx >= 0) { goals[idx] = saved; } else { goals.push(saved); }
+      localStorage.setItem('junkremoval_goals', JSON.stringify(goals));
+      return saved;
+    } catch { return goalData; }
+  },
   async saveGoalSnapshot() {},
   async getCompletedBookingsInRange() { return []; },
   async getActiveBookingsByStatus() { return []; },
