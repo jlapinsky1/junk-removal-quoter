@@ -1056,7 +1056,7 @@ function BrandHeader() {
       <div className="max-w-7xl mx-auto px-5 lg:px-8 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <img
-            src="/logo-squatterz.webp"
+            src="/logo-squatterz.png"
             alt="Squatterz – We Haul It All"
             className="w-[100px] lg:w-[130px] h-auto object-contain"
           />
