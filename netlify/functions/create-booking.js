@@ -11,8 +11,8 @@ export default async function handler(req) {
     const ip = getClientIp(req);
     const supabase = getServiceClient();
 
-    // Rate limit: 5 bookings per IP per hour
-    const allowed = await checkRateLimit(supabase, ip, 'create-booking', 3600, 5);
+    // Rate limit: 20 bookings per IP per hour
+    const allowed = await checkRateLimit(supabase, ip, 'create-booking', 3600, 20);
     if (!allowed) {
       return errorResponse('Too many submissions. Please wait.', 429);
     }

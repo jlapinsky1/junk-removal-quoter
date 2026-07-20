@@ -11,8 +11,8 @@ export default async function handler(req) {
     const ip = getClientIp(req);
     const supabase = getServiceClient();
 
-    // Rate limit: 5 sessions per IP per 10 minutes
-    const allowed = await checkRateLimit(supabase, ip, 'create-upload-session', 600, 5);
+    // Rate limit: 20 sessions per IP per 10 minutes
+    const allowed = await checkRateLimit(supabase, ip, 'create-upload-session', 600, 20);
     if (!allowed) {
       return errorResponse('Too many requests. Please wait a few minutes.', 429);
     }
