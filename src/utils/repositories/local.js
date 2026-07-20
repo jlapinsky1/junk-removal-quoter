@@ -88,6 +88,24 @@ const local = {
   async getSnapshotsForBooking() { return []; },
   async getAcceptanceForBooking() { return null; },
   async getReservationsForBooking() { return []; },
+
+  // ── Goal tracking (stubs for local) ──
+  async getActiveGoal() { return null; },
+  async upsertGoal(goal) { return goal; },
+  async saveGoalSnapshot() {},
+  async getCompletedBookingsInRange() { return []; },
+  async getActiveBookingsByStatus() { return []; },
+  async getScheduledBookingsForDateRange() { return []; },
+
+  // ── Calibration (stubs for local) ──
+  async getCalibrationRecords() { return []; },
+  async upsertCalibrationRecord(record) { return record; },
+
+  // ── Location / Travel cache (stubs for local) ──
+  async getLocationCache() { return null; },
+  async upsertLocationCache() {},
+  async getTravelCache() { return null; },
+  async upsertTravelCache() {},
 };
 
 export default local;
