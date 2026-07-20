@@ -280,30 +280,117 @@ function PropertiesView({ go }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [props, setProps] = useState([]);
+  const [showAdd, setShowAdd] = useState(false);
+  const [addForm, setAddForm] = useState({ name: "", address: "", primary_contact_name: "", primary_contact_phone: "", primary_contact_email: "", notes: "" });
+  const [addError, setAddError] = useState(null);
+  const [addSubmitting, setAddSubmitting] = useState(false);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const { data, error } = await supabase.from("properties").select("*, jobs(count)").order("name");
-        if (error) throw error;
-        setProps((data ?? []).map((p) => ({ ...p, job_count: p.jobs?.[0]?.count ?? 0 })));
-      } catch (e) {
-        setError(e.message ?? "Failed to load properties");
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
+  const loadProperties = async () => {
+    try {
+      const { data, error } = await supabase.from("properties").select("*, jobs(count)").order("name");
+      if (error) throw error;
+      setProps((data ?? []).map((p) => ({ ...p, job_count: p.jobs?.[0]?.count ?? 0 })));
+    } catch (e) {
+      setError(e.message ?? "Failed to load properties");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { loadProperties(); }, []);
+
+  const submitAdd = async (e) => {
+    e.preventDefault();
+    if (!addForm.name || !addForm.address) return;
+    setAddSubmitting(true);
+    setAddError(null);
+    try {
+      const { error } = await supabase.from("properties").insert({
+        name: addForm.name,
+        address: addForm.address,
+        primary_contact_name: addForm.primary_contact_name || null,
+        primary_contact_phone: addForm.primary_contact_phone || null,
+        primary_contact_email: addForm.primary_contact_email || null,
+        notes: addForm.notes || null,
+      });
+      if (error) throw error;
+      setShowAdd(false);
+      setAddForm({ name: "", address: "", primary_contact_name: "", primary_contact_phone: "", primary_contact_email: "", notes: "" });
+      setLoading(true);
+      loadProperties();
+    } catch (e) {
+      setAddError(e.message ?? "Failed to add property");
+    } finally {
+      setAddSubmitting(false);
+    }
+  };
 
   if (loading) return <Spinner />;
   if (error) return <ErrorState message={error} />;
 
   return (
     <div className="space-y-6">
-      <SectionHeader title="Properties" subtitle="Your managed properties and their recent jobs." />
-      {props.length === 0 ? (
+      <div className="flex items-center justify-between">
+        <SectionHeader title="Properties" subtitle="Your managed properties and their recent jobs." />
+        <button
+          onClick={() => setShowAdd(true)}
+          className="bg-[#22c55e] hover:bg-[#16a34a] text-black font-bold text-sm px-4 py-2.5 rounded-full flex items-center gap-1.5 transition-colors shrink-0"
+        >
+          <Plus className="w-4 h-4" /> Add Property
+        </button>
+      </div>
+
+      {showAdd && (
+        <Card>
+          <div className="p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold text-white">New Property</h3>
+              <button onClick={() => { setShowAdd(false); setAddError(null); }} className="text-white/40 hover:text-white transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            {addError && (
+              <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-sm rounded-xl px-4 py-3 flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" /> {addError}
+              </div>
+            )}
+            <form onSubmit={submitAdd} className="space-y-4">
+              <div className="grid sm:grid-cols-2 gap-4">
+                <FormField label="Property name" required>
+                  <input required value={addForm.name} onChange={(e) => setAddForm({ ...addForm, name: e.target.value })} placeholder="Lakeside Apartments" className="w-full bg-transparent text-sm text-white placeholder:text-white/30 outline-none" />
+                </FormField>
+                <FormField label="Address" required>
+                  <input required value={addForm.address} onChange={(e) => setAddForm({ ...addForm, address: e.target.value })} placeholder="123 Main St, Gainesville, GA" className="w-full bg-transparent text-sm text-white placeholder:text-white/30 outline-none" />
+                </FormField>
+              </div>
+              <div className="grid sm:grid-cols-3 gap-4">
+                <FormField label="Contact name">
+                  <input value={addForm.primary_contact_name} onChange={(e) => setAddForm({ ...addForm, primary_contact_name: e.target.value })} placeholder="Jane Smith" className="w-full bg-transparent text-sm text-white placeholder:text-white/30 outline-none" />
+                </FormField>
+                <FormField label="Contact phone">
+                  <input value={addForm.primary_contact_phone} onChange={(e) => setAddForm({ ...addForm, primary_contact_phone: e.target.value })} placeholder="(770) 555-1234" className="w-full bg-transparent text-sm text-white placeholder:text-white/30 outline-none" />
+                </FormField>
+                <FormField label="Contact email">
+                  <input type="email" value={addForm.primary_contact_email} onChange={(e) => setAddForm({ ...addForm, primary_contact_email: e.target.value })} placeholder="jane@example.com" className="w-full bg-transparent text-sm text-white placeholder:text-white/30 outline-none" />
+                </FormField>
+              </div>
+              <FormField label="Notes">
+                <textarea value={addForm.notes} onChange={(e) => setAddForm({ ...addForm, notes: e.target.value })} placeholder="Gate codes, special instructions..." rows={2} className="w-full bg-transparent text-sm text-white placeholder:text-white/30 outline-none resize-none" />
+              </FormField>
+              <div className="flex justify-end gap-3">
+                <button type="button" onClick={() => { setShowAdd(false); setAddError(null); }} className="text-sm text-white/50 hover:text-white px-4 py-2.5 transition-colors">Cancel</button>
+                <button type="submit" disabled={addSubmitting} className="bg-[#22c55e] hover:bg-[#16a34a] disabled:opacity-50 text-black font-bold text-sm px-6 py-2.5 rounded-full transition-colors">
+                  {addSubmitting ? "Adding..." : "Add Property"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </Card>
+      )}
+
+      {props.length === 0 && !showAdd ? (
         <Card><EmptyState icon={Building2} title="No properties yet" /></Card>
-      ) : (
+      ) : props.length > 0 && (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {props.map((p) => (
             <button key={p.id} onClick={() => go({ name: "property", id: p.id })} className="text-left bg-white/[0.04] border border-white/8 rounded-2xl p-5 hover:border-[#22c55e]/40 hover:bg-white/[0.06] transition-all">
