@@ -476,7 +476,7 @@ export default function BookingFlow() {
         </section>
 
         {/* ── SECTION 3: How It Works ── */}
-        <section className="border-t border-gray-800/30">
+        <section id="how-it-works" className="border-t border-gray-800/30 scroll-mt-16">
           <div className="max-w-6xl mx-auto px-5 py-20 lg:py-28">
             <div className="text-center mb-14">
               <p className="text-green-400 text-xs font-bold tracking-[0.2em] uppercase mb-3">Simple Process</p>
@@ -529,7 +529,7 @@ export default function BookingFlow() {
         </section>
 
         {/* ── SECTION 4: Pricing ── */}
-        <section className="border-t border-gray-800/30">
+        <section id="pricing" className="border-t border-gray-800/30 scroll-mt-16">
           <div className="max-w-6xl mx-auto px-5 py-20 lg:py-28">
             <div className="text-center mb-14">
               <p className="text-green-400 text-xs font-bold tracking-[0.2em] uppercase mb-3">Transparent Pricing</p>
@@ -1116,6 +1116,13 @@ function BrandHeader() {
             <span className="text-gray-500 text-[10px] font-bold tracking-[0.15em] uppercase block">We Haul It All</span>
           </div>
         </div>
+
+        {/* Center nav links */}
+        <nav className="hidden lg:flex items-center gap-8">
+          <a href="#how-it-works" className="text-gray-400 hover:text-white text-sm font-medium transition-colors">How It Works</a>
+          <a href="#pricing" className="text-gray-400 hover:text-white text-sm font-medium transition-colors">Pricing</a>
+          <a href="/commercial" className="text-gray-400 hover:text-white text-sm font-medium transition-colors">Property Managers/Commercial</a>
+        </nav>
 
         {/* Right side */}
         <div className="flex items-center gap-6">
