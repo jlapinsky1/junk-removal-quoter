@@ -10,6 +10,7 @@ import {
   generateAlerts,
   getTodayProgress,
   getWeekProgress,
+  calculateDynamicTargets,
 } from '../goalEngine';
 
 // ── Helpers ──
@@ -435,5 +436,104 @@ describe('getWeekProgress', () => {
     expect(result.weeklyTarget).toBe(3000);
     expect(result.completedThisWeek).toBe(298);
     expect(result.remainingWeekly).toBeCloseTo(2702, 0);
+  });
+});
+
+// ── calculateDynamicTargets ──
+
+describe('calculateDynamicTargets', () => {
+  function makeProgress(overrides = {}) {
+    return {
+      requiredDailyProfit: 400,
+      paceStatus: 'on_pace',
+      remaining: 2000,
+      workingDaysRemaining: 5,
+      ...overrides,
+    };
+  }
+
+  function makeTodayProgress(overrides = {}) {
+    return {
+      remainingDaily: 300,
+      capacityBooked: 2,
+      capacityLimit: 4,
+      ...overrides,
+    };
+  }
+
+  it('calculates suggested per-slot from remaining profit and open slots', () => {
+    const result = calculateDynamicTargets(
+      makeProgress(),
+      makeTodayProgress({ remainingDaily: 300 }),
+      makeGoal()
+    );
+    expect(result.openSlots).toBe(2);
+    expect(result.suggestedPerSlot).toBe(150);
+  });
+
+  it('returns todayCovered=true when remaining daily is zero', () => {
+    const result = calculateDynamicTargets(
+      makeProgress(),
+      makeTodayProgress({ remainingDaily: 0 }),
+      makeGoal()
+    );
+    expect(result.todayCovered).toBe(true);
+  });
+
+  it('returns high urgency when behind pace', () => {
+    const result = calculateDynamicTargets(
+      makeProgress({ paceStatus: 'behind' }),
+      makeTodayProgress(),
+      makeGoal()
+    );
+    expect(result.urgency).toBe(0.9);
+  });
+
+  it('returns low urgency when ahead of pace', () => {
+    const result = calculateDynamicTargets(
+      makeProgress({ paceStatus: 'ahead' }),
+      makeTodayProgress(),
+      makeGoal()
+    );
+    expect(result.urgency).toBe(0.1);
+  });
+
+  it('returns zero urgency when goal is achieved', () => {
+    const result = calculateDynamicTargets(
+      makeProgress({ paceStatus: 'achieved' }),
+      makeTodayProgress(),
+      makeGoal()
+    );
+    expect(result.urgency).toBe(0);
+  });
+
+  it('calculates capacity scarcity', () => {
+    const result = calculateDynamicTargets(
+      makeProgress(),
+      makeTodayProgress({ capacityBooked: 3, capacityLimit: 4 }),
+      makeGoal()
+    );
+    expect(result.capacityScarcity).toBe(0.75);
+  });
+
+  it('handles zero open slots gracefully', () => {
+    const result = calculateDynamicTargets(
+      makeProgress(),
+      makeTodayProgress({ capacityBooked: 4, capacityLimit: 4 }),
+      makeGoal()
+    );
+    expect(result.openSlots).toBe(0);
+    expect(result.suggestedPerSlot).toBe(300); // falls back to remainingDaily
+  });
+
+  it('uses goalProgress.requiredDailyProfit when todayProgress is null', () => {
+    const result = calculateDynamicTargets(
+      makeProgress({ requiredDailyProfit: 500 }),
+      null,
+      makeGoal()
+    );
+    expect(result.remainingDailyProfit).toBe(500);
+    expect(result.openSlots).toBe(4);
+    expect(result.suggestedPerSlot).toBe(125);
   });
 });

@@ -334,6 +334,59 @@ export function generateAlerts(progress, goal) {
   return alerts;
 }
 
+/**
+ * Calculate dynamic profit targets based on current goal progress and today's schedule.
+ *
+ * These are advisory targets — "what profit should the next job contribute given
+ * where we stand?" — not hard guardrails.
+ *
+ * @param {Object} goalProgress - from calculateGoalProgress()
+ * @param {Object} todayProgress - from getTodayProgress()
+ * @param {Object} goal - active business_goals row
+ * @returns {Object} DynamicTargets
+ */
+export function calculateDynamicTargets(goalProgress, todayProgress, goal) {
+  const remainingDailyProfit = todayProgress?.remainingDaily ?? goalProgress.requiredDailyProfit;
+  const capacityLimit = todayProgress?.capacityLimit ?? (goal.daily_capacity_limit || 4);
+  const capacityBooked = todayProgress?.capacityBooked ?? 0;
+  const openSlots = Math.max(0, capacityLimit - capacityBooked);
+
+  // Suggested profit per remaining slot
+  const suggestedPerSlot = openSlots > 0
+    ? round2(remainingDailyProfit / openSlots)
+    : round2(remainingDailyProfit);
+
+  // How urgently do we need profit? (0 = relaxed, 1 = critical)
+  let urgency = 0;
+  if (goalProgress.paceStatus === 'behind') urgency = 0.9;
+  else if (goalProgress.paceStatus === 'at_risk') urgency = 0.6;
+  else if (goalProgress.paceStatus === 'on_pace') urgency = 0.3;
+  else if (goalProgress.paceStatus === 'ahead') urgency = 0.1;
+  else if (goalProgress.paceStatus === 'achieved') urgency = 0;
+
+  // Capacity scarcity: how precious are remaining slots? (0 = plenty, 1 = last slot)
+  const capacityScarcity = capacityLimit > 0
+    ? round2(capacityBooked / capacityLimit)
+    : 0;
+
+  // Is today's remaining target already covered by booked work?
+  const todayCovered = remainingDailyProfit <= 0;
+
+  return {
+    remainingDailyProfit: round2(remainingDailyProfit),
+    openSlots,
+    capacityLimit,
+    capacityBooked,
+    suggestedPerSlot,
+    urgency,
+    capacityScarcity,
+    todayCovered,
+    paceStatus: goalProgress.paceStatus,
+    workingDaysRemaining: goalProgress.workingDaysRemaining,
+    periodRemaining: round2(goalProgress.remaining),
+  };
+}
+
 function round2(n) { return Math.round(n * 100) / 100; }
 function round1(n) { return Math.round(n * 10) / 10; }
 function fmt(n) { return Number(n).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }); }

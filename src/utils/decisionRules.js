@@ -5,6 +5,13 @@
  *   hard  — failure = automatic Pass (loss protection, true blockers)
  *   gate  — failure = forced Review (operational concern, not an auto-reject)
  *   soft  — contributes to the composite score via bonuses/penalties
+ *
+ * Safety guardrails (minimum_job_profit, minimum_margin) are now named
+ * "Absolute Profit Floor" and "Absolute Margin Floor" — owner-configured
+ * hard limits that do not change dynamically.
+ *
+ * Dynamic rules use context.dynamicTargets (from calculateDynamicTargets)
+ * to evaluate jobs relative to the current business situation.
  */
 
 export const DECISION_RULES = [
@@ -36,7 +43,7 @@ export const DECISION_RULES = [
   },
   {
     id: 'dual_floor',
-    name: 'Dual Floor (Low Margin + Low Profit)',
+    name: 'Dual Floor (Below Both Safety Guardrails)',
     type: 'hard',
     evaluate(ctx) {
       const profit = ctx.estimate?.estimatedProfit;
@@ -49,7 +56,7 @@ export const DECISION_RULES = [
       if (profit < minProfit && margin < minMargin) {
         return {
           result: 'fail',
-          message: `Both profit ($${Math.round(profit)}) and margin (${(margin * 100).toFixed(0)}%) are below minimums`,
+          message: `Both profit ($${Math.round(profit)}) and margin (${(margin * 100).toFixed(0)}%) are below absolute floors`,
         };
       }
       return { result: 'pass', message: 'Passes dual floor check' };
@@ -58,31 +65,31 @@ export const DECISION_RULES = [
 
   // ── Gate rules (force Review, not Pass) ──
   {
-    id: 'below_min_profit',
-    name: 'Below Minimum Profit',
+    id: 'below_profit_floor',
+    name: 'Below Absolute Profit Floor',
     type: 'gate',
     evaluate(ctx) {
       const profit = ctx.estimate?.estimatedProfit;
       const minProfit = ctx.goal?.minimum_job_profit ?? 75;
       if (profit == null) return { result: 'skip', message: 'No profit estimate' };
       if (profit < minProfit) {
-        return { result: 'review', message: `Profit $${Math.round(profit)} below $${minProfit} minimum` };
+        return { result: 'review', message: `Profit $${Math.round(profit)} below $${minProfit} safety floor` };
       }
-      return { result: 'pass', message: `Profit $${Math.round(profit)} meets minimum` };
+      return { result: 'pass', message: `Profit $${Math.round(profit)} above $${minProfit} safety floor` };
     },
   },
   {
-    id: 'below_target_margin',
-    name: 'Below Target Margin',
+    id: 'below_margin_floor',
+    name: 'Below Absolute Margin Floor',
     type: 'gate',
     evaluate(ctx) {
       const margin = ctx.estimate?.estimatedMargin;
       const minMargin = ctx.goal?.minimum_margin ?? 0.55;
       if (margin == null) return { result: 'skip', message: 'No margin estimate' };
       if (margin < minMargin) {
-        return { result: 'review', message: `Margin ${(margin * 100).toFixed(0)}% below ${(minMargin * 100).toFixed(0)}% target` };
+        return { result: 'review', message: `Margin ${(margin * 100).toFixed(0)}% below ${(minMargin * 100).toFixed(0)}% safety floor` };
       }
-      return { result: 'pass', message: `Margin ${(margin * 100).toFixed(0)}% meets target` };
+      return { result: 'pass', message: `Margin ${(margin * 100).toFixed(0)}% above ${(minMargin * 100).toFixed(0)}% safety floor` };
     },
   },
   {
@@ -116,7 +123,7 @@ export const DECISION_RULES = [
     id: 'goal_pace',
     name: 'Goal Pace Impact',
     type: 'soft',
-    weight: 0.20,
+    weight: 0.15,
     evaluate(ctx) {
       if (!ctx.goalProgress) return { result: 'skip', message: 'No active goal' };
       const pace = ctx.goalProgress.paceStatus;
@@ -131,7 +138,7 @@ export const DECISION_RULES = [
     id: 'job_rating',
     name: 'Job Quality Rating',
     type: 'soft',
-    weight: 0.25,
+    weight: 0.20,
     evaluate(ctx) {
       if (!ctx.jobRating) return { result: 'skip', message: 'No rating' };
       const r = ctx.jobRating.rating;
@@ -145,7 +152,7 @@ export const DECISION_RULES = [
     id: 'confidence_score',
     name: 'Estimate Confidence',
     type: 'soft',
-    weight: 0.15,
+    weight: 0.10,
     evaluate(ctx) {
       if (!ctx.confidence) return { result: 'skip', message: 'No confidence data' };
       if (ctx.confidence.level === 'high') return { result: 'pass', message: 'High confidence', data: { bonus: 0.05 } };
@@ -157,7 +164,7 @@ export const DECISION_RULES = [
     id: 'profit_vs_daily_target',
     name: 'Profit vs Daily Target',
     type: 'soft',
-    weight: 0.15,
+    weight: 0.10,
     evaluate(ctx) {
       if (!ctx.goalProgress) return { result: 'skip', message: 'No goal' };
       const profit = ctx.estimate?.estimatedProfit || 0;
@@ -187,7 +194,7 @@ export const DECISION_RULES = [
     id: 'schedule_utilization',
     name: 'Schedule Utilization',
     type: 'soft',
-    weight: 0.15,
+    weight: 0.10,
     evaluate(ctx) {
       if (!ctx.scheduleContext) return { result: 'skip', message: 'No schedule data' };
       const { jobsToday, capacityLimit } = ctx.scheduleContext;
@@ -198,4 +205,81 @@ export const DECISION_RULES = [
       return { result: 'pass', message: 'Moderate schedule', data: { bonus: 0 } };
     },
   },
+
+  // ── Dynamic rules (use dynamicTargets from calculateDynamicTargets) ──
+  {
+    id: 'slot_value',
+    name: 'Slot Value Assessment',
+    type: 'soft',
+    weight: 0.15,
+    evaluate(ctx) {
+      if (!ctx.dynamicTargets) return { result: 'skip', message: 'No dynamic targets' };
+      const dt = ctx.dynamicTargets;
+      const profit = ctx.estimate?.estimatedProfit || 0;
+
+      if (dt.todayCovered) {
+        // Today's goal is already met — this slot is bonus capacity
+        return { result: 'pass', message: 'Daily target already covered — bonus capacity', data: { bonus: -0.03 } };
+      }
+
+      if (dt.openSlots <= 0) {
+        return { result: 'pass', message: 'No open slots — would exceed capacity', data: { bonus: -0.10 } };
+      }
+
+      const suggested = dt.suggestedPerSlot;
+      if (suggested <= 0) {
+        return { result: 'pass', message: 'No remaining profit needed', data: { bonus: 0 } };
+      }
+
+      const ratio = profit / suggested;
+      if (ratio >= 1.0) {
+        return { result: 'pass', message: `Meets slot target (${fmtC(profit)} vs ~${fmtC(suggested)}/slot)`, data: { bonus: 0.12 } };
+      }
+      if (ratio >= 0.70) {
+        return { result: 'pass', message: `Close to slot target (${fmtC(profit)} vs ~${fmtC(suggested)}/slot)`, data: { bonus: 0.05 } };
+      }
+      if (ratio >= 0.40) {
+        return { result: 'pass', message: `Below slot target (${fmtC(profit)} vs ~${fmtC(suggested)}/slot)`, data: { bonus: -0.03 } };
+      }
+      return { result: 'pass', message: `Well below slot target (${fmtC(profit)} vs ~${fmtC(suggested)}/slot)`, data: { bonus: -0.08 } };
+    },
+  },
+  {
+    id: 'capacity_scarcity',
+    name: 'Capacity Scarcity',
+    type: 'soft',
+    weight: 0.10,
+    evaluate(ctx) {
+      if (!ctx.dynamicTargets) return { result: 'skip', message: 'No dynamic targets' };
+      const dt = ctx.dynamicTargets;
+      const profit = ctx.estimate?.estimatedProfit || 0;
+      const suggested = dt.suggestedPerSlot;
+
+      // When capacity is scarce, only accept strong jobs
+      if (dt.openSlots === 1 && !dt.todayCovered) {
+        // Last slot — only worth it if the job meaningfully contributes
+        if (suggested > 0 && profit < suggested * 0.60) {
+          return { result: 'pass', message: `Last open slot — ${fmtC(profit)} profit unlikely the best use`, data: { bonus: -0.10 } };
+        }
+        if (suggested > 0 && profit >= suggested) {
+          return { result: 'pass', message: `Last slot and job meets target — good use of capacity`, data: { bonus: 0.08 } };
+        }
+        return { result: 'pass', message: 'Last open slot — consider carefully', data: { bonus: -0.05 } };
+      }
+
+      if (dt.capacityScarcity >= 0.75 && !dt.todayCovered) {
+        // Near capacity — raise the bar slightly
+        return { result: 'pass', message: 'Near capacity — be selective', data: { bonus: -0.03 } };
+      }
+
+      if (dt.openSlots >= 3 && dt.urgency >= 0.6) {
+        // Plenty of room and behind pace — be open to jobs
+        return { result: 'pass', message: 'Open capacity and behind pace — filling slots helps', data: { bonus: 0.05 } };
+      }
+
+      return { result: 'skip', message: 'Normal capacity' };
+    },
+  },
 ];
+
+function fmtC(n) { return '$' + Math.round(n); }

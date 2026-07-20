@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { getRepo } from '../utils/repository';
-import { calculateGoalProgress, generateAlerts, getTodayProgress, getWeekProgress, extractExpectedProfit } from '../utils/goalEngine';
-import { PACE_STATUS_COLORS, PACE_STATUS_LABELS, GOAL_TYPE_LABELS, ALERT_SEVERITY, DEFAULT_WORKING_DAYS } from '../utils/goalDefaults';
+import { calculateGoalProgress, generateAlerts, getTodayProgress, getWeekProgress, extractExpectedProfit, calculateDynamicTargets } from '../utils/goalEngine';
+import { PACE_STATUS_COLORS, PACE_STATUS_LABELS, GOAL_TYPE_LABELS, ALERT_SEVERITY, DEFAULT_WORKING_DAYS, GUARDRAIL_LABELS } from '../utils/goalDefaults';
 import { evaluateDecision, DECISION_COLORS, DECISION_LABELS } from '../utils/decisionEngine';
 import { buildEstimate } from '../utils/estimateBuilder';
 import { detectRiskFlags, calculateConfidence } from '../utils/riskFlags';
@@ -288,16 +288,18 @@ function GoalSetupModal({ onSave, onClose, existingGoal }) {
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Min Margin (%)</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">{GUARDRAIL_LABELS.minimum_margin} (%)</label>
                   <input type="number" value={form.minimum_margin}
                     onChange={e => setForm(f => ({ ...f, minimum_margin: e.target.value }))}
                     className="w-full border rounded-lg px-3 py-2 text-sm" min="0" max="100" />
+                  <p className="text-xs text-gray-400 mt-1">Jobs below this margin are flagged for review. This is a hard safety limit.</p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Min Job Profit ($)</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">{GUARDRAIL_LABELS.minimum_job_profit} ($)</label>
                   <input type="number" value={form.minimum_job_profit}
                     onChange={e => setForm(f => ({ ...f, minimum_job_profit: e.target.value }))}
                     className="w-full border rounded-lg px-3 py-2 text-sm" min="0" />
+                  <p className="text-xs text-gray-400 mt-1">Jobs below this profit are flagged for review. This is a hard safety limit.</p>
                 </div>
               </div>
               <div>
@@ -420,8 +422,9 @@ function ScoreMetric({ label, value, sub, accent }) {
 
 // ── Today's Plan ──
 
-function TodayPlan({ today }) {
+function TodayPlan({ today, dynamicTargets }) {
   const truckPct = today.capacityLimit > 0 ? Math.round((today.capacityBooked / today.capacityLimit) * 100) : 0;
+  const dt = dynamicTargets;
 
   return (
     <div className="bg-white rounded-xl border p-5">
@@ -456,13 +459,40 @@ function TodayPlan({ today }) {
           <div className="font-semibold text-gray-900">{today.estimatedHours}h</div>
         </div>
       </div>
+
+      {/* Dynamic Targets */}
+      {dt && dt.openSlots > 0 && !dt.todayCovered && (
+        <div className="mt-3 pt-3 border-t bg-blue-50 -mx-5 -mb-5 px-5 pb-4 rounded-b-xl">
+          <div className="text-xs font-semibold text-blue-700 uppercase tracking-wider mb-2">Dynamic Targets</div>
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <div className="text-xs text-blue-600">Remaining Profit</div>
+              <div className="text-lg font-bold text-blue-800">{formatCurrency(dt.remainingDailyProfit)}</div>
+            </div>
+            <div>
+              <div className="text-xs text-blue-600">Open Capacity</div>
+              <div className="text-lg font-bold text-blue-800">{dt.openSlots} {dt.openSlots === 1 ? 'Job' : 'Jobs'}</div>
+            </div>
+            <div>
+              <div className="text-xs text-blue-600">Target / Slot</div>
+              <div className="text-lg font-bold text-blue-800">~{formatCurrency(dt.suggestedPerSlot)}</div>
+            </div>
+          </div>
+          <div className="text-xs text-blue-500 mt-1">Advisory targets based on remaining goal and capacity. Not hard rules.</div>
+        </div>
+      )}
+      {dt && dt.todayCovered && (
+        <div className="mt-3 pt-3 border-t">
+          <div className="text-sm text-green-700 font-medium">Today's profit target is covered by booked work.</div>
+        </div>
+      )}
     </div>
   );
 }
 
 // ── Recommended Jobs ──
 
-function RecommendedJobs({ pendingBookings, goalProgress, goal }) {
+function RecommendedJobs({ pendingBookings, goalProgress, goal, dynamicTargets, scheduleContext }) {
   if (!pendingBookings || pendingBookings.length === 0) {
     return (
       <div className="bg-white rounded-xl border p-5">
@@ -494,7 +524,8 @@ function RecommendedJobs({ pendingBookings, goalProgress, goal }) {
           blockerOverrides: {},
           goalProgress,
           goal,
-          scheduleContext: null,
+          scheduleContext: scheduleContext || null,
+          dynamicTargets: dynamicTargets || null,
         });
         return { booking, estimate, decision, confidence };
       } catch {
@@ -541,12 +572,9 @@ function RecommendedJobs({ pendingBookings, goalProgress, goal }) {
                 <span className="font-semibold">{decision.score}/100</span>
               </div>
             </div>
-            {decision.goalContribution?.dailyPct != null && (
-              <div className="text-xs mt-1 opacity-80">
-                Covers {decision.goalContribution.dailyPct}% of daily target
-              </div>
+            {decision.explanation && (
+              <div className="text-xs mt-2 opacity-85 leading-relaxed">{decision.explanation}</div>
             )}
-            <div className="text-xs mt-1 opacity-70">{decision.headline}</div>
           </div>
         ))}
       </div>
@@ -718,6 +746,8 @@ export default function Dashboard({ onNavigate }) {
   const [pendingBookings, setPendingBookings] = useState([]);
   const [scheduledToday, setScheduledToday] = useState([]);
   const [scheduledTomorrow, setScheduledTomorrow] = useState([]);
+  const [dynamicTargets, setDynamicTargets] = useState(null);
+  const [scheduleContext, setScheduleContext] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showGoalModal, setShowGoalModal] = useState(false);
 
@@ -749,6 +779,7 @@ export default function Dashboard({ onNavigate }) {
       });
 
       let todaySlots = [];
+      let todayProg;
       try {
         todaySlots = await repo.getScheduledBookingsForDateRange(todayStr, todayStr);
         const scheduledTodayList = todaySlots
@@ -756,10 +787,19 @@ export default function Dashboard({ onNavigate }) {
           .map(s => ({ ...s.bookings, status: 'scheduled' }));
         setScheduledToday(todaySlots.filter(s => s.bookings));
         const allToday = [...todayBookings, ...scheduledTodayList];
-        setToday(getTodayProgress(activeGoal, allToday, prog));
+        todayProg = getTodayProgress(activeGoal, allToday, prog);
       } catch {
-        setToday(getTodayProgress(activeGoal, todayBookings, prog));
+        todayProg = getTodayProgress(activeGoal, todayBookings, prog);
       }
+      setToday(todayProg);
+
+      // Calculate dynamic targets and schedule context
+      const dt = calculateDynamicTargets(prog, todayProg, activeGoal);
+      setDynamicTargets(dt);
+      setScheduleContext({
+        jobsToday: todayProg.capacityBooked,
+        capacityLimit: todayProg.capacityLimit,
+      });
 
       // Tomorrow's scheduled
       const tomorrow = new Date();
@@ -889,10 +929,10 @@ export default function Dashboard({ onNavigate }) {
           <WeeklyScorecard week={week} progress={progress} goal={goal} />
 
           {/* 2. Today's Plan */}
-          {today && <TodayPlan today={today} />}
+          {today && <TodayPlan today={today} dynamicTargets={dynamicTargets} />}
 
           {/* 3. Recommended Jobs */}
-          <RecommendedJobs pendingBookings={pendingBookings} goalProgress={progress} goal={goal} />
+          <RecommendedJobs pendingBookings={pendingBookings} goalProgress={progress} goal={goal} dynamicTargets={dynamicTargets} scheduleContext={scheduleContext} />
 
           {/* 4. Operational Alerts */}
           <OperationalAlerts alerts={alerts} today={today} progress={progress} />

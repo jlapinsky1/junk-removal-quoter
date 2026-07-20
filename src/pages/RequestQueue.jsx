@@ -9,7 +9,7 @@ import { calculateActuals, emptyActuals } from '../utils/completion';
 import { validateCompletionData } from '../utils/validation';
 import { getRepo } from '../utils/repository';
 import { evaluateDecision, DECISION_COLORS, DECISION_LABELS } from '../utils/decisionEngine';
-import { calculateGoalProgress } from '../utils/goalEngine';
+import { calculateGoalProgress, getTodayProgress, calculateDynamicTargets } from '../utils/goalEngine';
 import { PACE_STATUS_COLORS, PACE_STATUS_LABELS } from '../utils/goalDefaults';
 
 const TIME_PREF_LABELS = {
@@ -133,6 +133,8 @@ function RequestDetail({ booking, onBack }) {
   const [completionErrors, setCompletionErrors] = useState(null);
   const [goalProgress, setGoalProgress] = useState(null);
   const [goal, setGoal] = useState(null);
+  const [dynamicTargets, setDynamicTargets] = useState(null);
+  const [scheduleCtx, setScheduleCtx] = useState(null);
   const [showDecisionRules, setShowDecisionRules] = useState(false);
 
   const settings = getSettings();
@@ -141,7 +143,7 @@ function RequestDetail({ booking, onBack }) {
   const confidence = calculateConfidence(data, riskFlags);
   const rating = rateJob(estimate, confidence);
 
-  // Load goal context for decision engine
+  // Load goal context + dynamic targets for decision engine
   useEffect(() => {
     (async () => {
       try {
@@ -154,7 +156,25 @@ function RequestDetail({ booking, onBack }) {
             repo.getActiveBookingsByStatus(['scheduled']),
             repo.getActiveBookingsByStatus(['pending_review', 'quote_sent']),
           ]);
-          setGoalProgress(calculateGoalProgress(activeGoal, completed, scheduled, pipeline));
+          const prog = calculateGoalProgress(activeGoal, completed, scheduled, pipeline);
+          setGoalProgress(prog);
+
+          // Build today's progress for dynamic targets
+          const todayStr = new Date().toISOString().slice(0, 10);
+          const todayBookings = [...completed, ...scheduled].filter(b => {
+            if (b.status === 'completed' && b.completed_at) return b.completed_at.slice(0, 10) === todayStr;
+            return false;
+          });
+          let scheduledToday = [];
+          try {
+            const todaySlots = await repo.getScheduledBookingsForDateRange(todayStr, todayStr);
+            scheduledToday = todaySlots.filter(s => s.bookings).map(s => ({ ...s.bookings, status: 'scheduled' }));
+          } catch { /* table may not exist */ }
+          const allToday = [...todayBookings, ...scheduledToday];
+          const todayProg = getTodayProgress(activeGoal, allToday, prog);
+          const dt = calculateDynamicTargets(prog, todayProg, activeGoal);
+          setDynamicTargets(dt);
+          setScheduleCtx({ jobsToday: todayProg.capacityBooked, capacityLimit: todayProg.capacityLimit });
         }
       } catch { /* goal tables may not exist yet */ }
     })();
@@ -169,7 +189,8 @@ function RequestDetail({ booking, onBack }) {
     blockerOverrides,
     goalProgress,
     goal,
-    scheduleContext: null, // TODO: populate from slot reservations
+    scheduleContext: scheduleCtx,
+    dynamicTargets,
   }) : null;
 
   // Price-specific flags (recalculate when price changes)
@@ -303,12 +324,12 @@ function RequestDetail({ booking, onBack }) {
               )}
             </div>
           </div>
-          <div className="text-sm">{decision.headline}</div>
-          {decision.reasons.length > 0 && (
-            <div className="text-xs opacity-80">{decision.reasons.slice(0, 4).join(' · ')}</div>
+          <div className="text-sm font-medium">{decision.headline}</div>
+          {decision.explanation && (
+            <div className="text-sm opacity-90 leading-relaxed mt-1">{decision.explanation}</div>
           )}
           {decision.suggestedMinPrice && (
-            <div className="text-xs">
+            <div className="text-xs mt-1">
               Min acceptable price: <span className="font-semibold">${decision.suggestedMinPrice}</span>
               {decision.goalContribution?.dailyPct != null && (
                 <span className="ml-3 opacity-70">Covers {decision.goalContribution.dailyPct}% of daily target</span>

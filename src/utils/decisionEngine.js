@@ -2,7 +2,7 @@ import { DECISION_RULES } from './decisionRules.js';
 
 /**
  * Evaluate a quote/booking against all decision rules and produce
- * a Take / Review / Pass recommendation.
+ * a Take / Review / Pass recommendation with a human-readable explanation.
  *
  * @param {Object} context
  * @param {Object} context.estimate      - from buildEstimate()
@@ -13,6 +13,7 @@ import { DECISION_RULES } from './decisionRules.js';
  * @param {Object|null} context.goalProgress  - from calculateGoalProgress()
  * @param {Object|null} context.goal          - active business_goals row
  * @param {Object|null} context.scheduleContext - { jobsToday, capacityLimit, nearbyJobs }
+ * @param {Object|null} context.dynamicTargets  - from calculateDynamicTargets()
  * @returns {Decision}
  */
 export function evaluateDecision(context) {
@@ -58,7 +59,6 @@ export function evaluateDecision(context) {
     const failedHard = ruleResults.filter(r => r.type === 'hard' && r.result === 'fail');
     headline = failedHard.map(r => r.message).join('; ');
   } else if (hasGateReview) {
-    // Gate rules force Review regardless of score
     recommendation = 'review';
     const gateIssues = ruleResults.filter(r => r.type === 'gate' && r.result === 'review');
     headline = gateIssues.map(r => r.message).join('; ');
@@ -119,15 +119,20 @@ export function evaluateDecision(context) {
       directCosts + minProfit,
       priceForTargetMargin || 0
     );
-    // Round to nearest $5
     suggestedMinPrice = Math.ceil(suggestedMinPrice / 5) * 5;
     if (priceForTargetMargin) priceForTargetMargin = Math.ceil(priceForTargetMargin / 5) * 5;
   }
+
+  // Build human-readable explanation
+  const explanation = buildExplanation(
+    recommendation, context, ruleResults, goalContribution
+  );
 
   return {
     recommendation,
     score,
     headline,
+    explanation,
     reasons,
     positiveFactors,
     negativeFactors,
@@ -142,9 +147,96 @@ export function evaluateDecision(context) {
       pctAchieved: context.goalProgress.pctAchieved,
       requiredDailyProfit: context.goalProgress.requiredDailyProfit,
     } : null,
+    dynamicTargets: context.dynamicTargets || null,
     scheduleContext: context.scheduleContext || null,
     evaluatedAt: new Date().toISOString(),
   };
+}
+
+/**
+ * Build a human-readable explanation paragraph for why a recommendation was made.
+ */
+function buildExplanation(recommendation, context, ruleResults, goalContribution) {
+  const profit = context.estimate?.estimatedProfit;
+  const margin = context.estimate?.estimatedMargin;
+  const dt = context.dynamicTargets;
+  const goal = context.goal;
+  const gp = context.goalProgress;
+
+  const parts = [];
+
+  // Opening: state the profit
+  if (profit != null) {
+    parts.push(`Expected owner-adjusted profit is $${Math.round(profit)} (${margin != null ? (margin * 100).toFixed(0) + '% margin' : 'margin unknown'}).`);
+  }
+
+  // Hard fail explanation
+  const hardFails = ruleResults.filter(r => r.type === 'hard' && r.result === 'fail');
+  if (hardFails.length > 0) {
+    parts.push(hardFails.map(r => r.message).join('. ') + '.');
+    return parts.join(' ');
+  }
+
+  // Safety floor context
+  const minProfit = goal?.minimum_job_profit ?? 75;
+  const minMargin = goal?.minimum_margin ?? 0.55;
+  if (profit != null && profit >= minProfit && margin != null && margin >= minMargin) {
+    parts.push(`This is above your safety floors ($${minProfit} profit, ${(minMargin * 100).toFixed(0)}% margin).`);
+  } else if (profit != null && profit < minProfit) {
+    parts.push(`This is below your $${minProfit} absolute profit floor.`);
+  } else if (margin != null && margin < minMargin) {
+    parts.push(`Margin is below your ${(minMargin * 100).toFixed(0)}% absolute margin floor.`);
+  }
+
+  // Dynamic targets context
+  if (dt) {
+    if (dt.todayCovered) {
+      parts.push("Today's profit target is already covered by booked work.");
+    } else if (dt.openSlots > 0 && dt.suggestedPerSlot > 0) {
+      const slotWord = dt.openSlots === 1 ? 'slot' : 'slots';
+      parts.push(`Today has ${dt.openSlots} remaining schedule ${slotWord} and your target contribution per remaining job is approximately $${Math.round(dt.suggestedPerSlot)}.`);
+
+      if (profit != null) {
+        if (profit >= dt.suggestedPerSlot) {
+          parts.push('This job meets or exceeds that target.');
+        } else if (profit >= dt.suggestedPerSlot * 0.70) {
+          parts.push('This job is close to the suggested slot target.');
+        } else {
+          parts.push('This job is below the suggested slot target.');
+        }
+      }
+    }
+
+    // Capacity scarcity
+    if (dt.openSlots === 1 && !dt.todayCovered) {
+      parts.push('This is the last open slot today — consider whether a stronger job might fill it.');
+    } else if (dt.openSlots === 0) {
+      parts.push('Schedule is at capacity. Taking this job would exceed the daily limit.');
+    }
+  }
+
+  // Pace context
+  if (gp) {
+    if (gp.paceStatus === 'behind') {
+      parts.push('You are behind pace — profitable work helps close the gap.');
+    } else if (gp.paceStatus === 'at_risk') {
+      parts.push('You are at risk of falling behind — prioritize strong jobs.');
+    } else if (gp.paceStatus === 'ahead' || gp.paceStatus === 'achieved') {
+      parts.push('You are ahead of pace — you can afford to be selective.');
+    }
+  }
+
+  // Goal contribution
+  if (goalContribution?.dailyPct != null && goalContribution.dailyPct > 0) {
+    parts.push(`This job covers ${goalContribution.dailyPct}% of your daily target.`);
+  }
+
+  // Suggestion based on recommendation
+  if (recommendation === 'review' && dt && !dt.todayCovered && dt.openSlots > 0) {
+    parts.push('Consider scheduling this on another day or batching it with nearby work.');
+  }
+
+  return parts.join(' ');
 }
 
 export const DECISION_COLORS = {

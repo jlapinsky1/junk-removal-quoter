@@ -29,6 +29,11 @@ export const GOAL_TYPE_LABELS = {
   revenue: 'Revenue',
 };
 
+export const GUARDRAIL_LABELS = {
+  minimum_job_profit: 'Absolute Job Profit Floor',
+  minimum_margin: 'Absolute Margin Floor',
+};
+
 export const ALERT_SEVERITY = {
   success: 'bg-green-50 border-green-200 text-green-800',
   info: 'bg-blue-50 border-blue-200 text-blue-800',
