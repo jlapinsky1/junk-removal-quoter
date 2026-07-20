@@ -167,25 +167,8 @@ function FaqItem({ q, a }) {
   );
 }
 
-function Field({ icon: Icon, label, children }) {
-  return (
-    <label className="block space-y-2">
-      <span className="block text-xs text-white/50 font-medium uppercase tracking-wider">
-        {label}
-      </span>
-      <div className="flex items-start gap-3 bg-[#111a14] border border-white/10 rounded-xl px-4 py-3 focus-within:border-[#22c55e]/40 transition-colors">
-        <Icon className="w-4 h-4 text-[#22c55e] shrink-0 mt-0.5" />
-        {children}
-      </div>
-    </label>
-  );
-}
-
 export default function Commercial() {
   const navigate = useNavigate();
-  const [form, setForm] = useState({ name: "", property: "", email: "", phone: "", notes: "" });
-  const [submitted, setSubmitted] = useState(false);
-
   return (
     <div className="min-h-screen bg-[#0a0f0d] text-white font-sans antialiased">
       {/* NAV */}
@@ -227,12 +210,12 @@ export default function Commercial() {
               <LogIn className="w-4 h-4" />
               Log In
             </button>
-            <a
-              href="#account-setup"
+            <button
+              onClick={() => navigate("/portal/login")}
               className="bg-[#22c55e] hover:bg-[#16a34a] text-black font-bold text-sm px-5 py-2.5 rounded-full transition-colors"
             >
               Set Up Account
-            </a>
+            </button>
           </div>
 
           <div className="md:hidden flex items-center gap-2">
@@ -243,9 +226,12 @@ export default function Commercial() {
               <LogIn className="w-3.5 h-3.5" />
               Log In
             </button>
-            <a href="#account-setup" className="bg-[#22c55e] text-black font-bold text-xs px-4 py-2 rounded-full">
+            <button
+              onClick={() => navigate("/portal/login")}
+              className="bg-[#22c55e] text-black font-bold text-xs px-4 py-2 rounded-full"
+            >
               Set Up
-            </a>
+            </button>
           </div>
         </div>
       </header>
@@ -279,18 +265,12 @@ export default function Commercial() {
             </div>
 
             <div className="flex flex-col sm:flex-row gap-3">
-              <a
-                href="#account-setup"
+              <button
+                onClick={() => navigate("/portal/login")}
                 className="bg-[#22c55e] hover:bg-[#16a34a] active:scale-[0.98] text-black font-bold text-base px-8 py-4 rounded-full flex items-center justify-center gap-2 transition-all"
               >
-                Request Property Service <ArrowRight className="w-4 h-4" />
-              </a>
-              <a
-                href="#account"
-                className="border border-white/15 hover:border-white/30 text-white font-semibold text-base px-8 py-4 rounded-full flex items-center justify-center gap-2 transition-colors"
-              >
-                Set Up a Commercial Account
-              </a>
+                Set Up a Commercial Account <ArrowRight className="w-4 h-4" />
+              </button>
               <button
                 onClick={() => navigate("/portal/login")}
                 className="border border-white/15 hover:border-white/30 text-white font-semibold text-base px-8 py-4 rounded-full flex items-center justify-center gap-2 transition-colors"
@@ -529,113 +509,6 @@ export default function Commercial() {
         </div>
       </section>
 
-      {/* ACCOUNT SETUP FORM */}
-      <section id="account-setup" className="py-24 border-t border-white/5 bg-white/[0.02]">
-        <div className="max-w-3xl mx-auto px-5">
-          <div className="text-center mb-12">
-            <p className="text-[#22c55e] text-sm font-semibold uppercase tracking-widest mb-3">
-              Get started
-            </p>
-            <h2 className="text-3xl md:text-4xl font-black text-white">
-              Let's get your account set up
-            </h2>
-            <p className="mt-3 text-white/45 text-base max-w-lg mx-auto">
-              Tell us about your portfolio and we'll reach out with onboarding documents — COI, W-9, and a service agreement tailored to your properties.
-            </p>
-          </div>
-
-          {submitted ? (
-            <div className="bg-white/4 border border-[#22c55e]/30 rounded-2xl p-10 text-center space-y-4">
-              <div className="w-14 h-14 rounded-full bg-[#22c55e]/15 border border-[#22c55e]/30 flex items-center justify-center mx-auto">
-                <CheckCircle className="w-7 h-7 text-[#22c55e]" />
-              </div>
-              <h3 className="text-xl font-bold text-white">Request received</h3>
-              <p className="text-white/55 text-sm max-w-md mx-auto">
-                Thanks{form.name ? `, ${form.name.split(" ")[0]}` : ""} — our account manager will reach out within one business day with onboarding paperwork.
-              </p>
-              <button
-                onClick={() => {
-                  setSubmitted(false);
-                  setForm({ name: "", property: "", email: "", phone: "", notes: "" });
-                }}
-                className="text-sm text-[#22c55e] font-semibold hover:underline"
-              >
-                Submit another request
-              </button>
-            </div>
-          ) : (
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                setSubmitted(true);
-              }}
-              className="bg-white/4 border border-white/8 rounded-2xl p-6 md:p-8 space-y-5"
-            >
-              <div className="grid sm:grid-cols-2 gap-4">
-                <Field icon={User} label="Your name">
-                  <input
-                    required
-                    value={form.name}
-                    onChange={(e) => setForm({ ...form, name: e.target.value })}
-                    placeholder="Jordan Rivera"
-                    className="w-full bg-transparent text-sm text-white placeholder:text-white/30 outline-none"
-                  />
-                </Field>
-                <Field icon={Building2} label="Property / portfolio name">
-                  <input
-                    required
-                    value={form.property}
-                    onChange={(e) => setForm({ ...form, property: e.target.value })}
-                    placeholder="Bayshore Apartments"
-                    className="w-full bg-transparent text-sm text-white placeholder:text-white/30 outline-none"
-                  />
-                </Field>
-                <Field icon={Mail} label="Email">
-                  <input
-                    required
-                    type="email"
-                    value={form.email}
-                    onChange={(e) => setForm({ ...form, email: e.target.value })}
-                    placeholder="jordan@managementco.com"
-                    className="w-full bg-transparent text-sm text-white placeholder:text-white/30 outline-none"
-                  />
-                </Field>
-                <Field icon={Phone} label="Phone">
-                  <input
-                    required
-                    type="tel"
-                    value={form.phone}
-                    onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                    placeholder="(813) 555-0123"
-                    className="w-full bg-transparent text-sm text-white placeholder:text-white/30 outline-none"
-                  />
-                </Field>
-              </div>
-
-              <Field icon={ClipboardList} label="Tell us about your needs">
-                <textarea
-                  value={form.notes}
-                  onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                  placeholder="Number of properties, typical turnaround needs, recurring pickup interest..."
-                  rows={4}
-                  className="w-full bg-transparent text-sm text-white placeholder:text-white/30 outline-none resize-none"
-                />
-              </Field>
-
-              <button
-                type="submit"
-                className="w-full bg-[#22c55e] hover:bg-[#16a34a] active:scale-[0.98] text-black font-bold text-base py-4 rounded-xl flex items-center justify-center gap-2 transition-all"
-              >
-                Request Property Service <ArrowRight className="w-4 h-4" />
-              </button>
-              <p className="text-center text-xs text-white/30">
-                We'll respond within one business day · No obligation to start service
-              </p>
-            </form>
-          )}
-        </div>
-      </section>
-
       {/* FAQ */}
       <section id="faq" className="py-24 border-t border-white/5">
         <div className="max-w-3xl mx-auto px-5">
@@ -669,12 +542,12 @@ export default function Commercial() {
               >
                 <Phone className="w-4 h-4" /> (813) 555-0123
               </a>
-              <a
-                href="#account-setup"
+              <button
+                onClick={() => navigate("/portal/login")}
                 className="border border-white/15 hover:border-white/30 text-white font-semibold px-7 py-3.5 rounded-full text-sm transition-colors flex items-center justify-center gap-2"
               >
                 Set Up Account <ArrowRight className="w-4 h-4" />
-              </a>
+              </button>
             </div>
           </div>
         </div>
