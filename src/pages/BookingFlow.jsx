@@ -398,7 +398,7 @@ export default function BookingFlow() {
             <div className="absolute bottom-[10%] left-1/2 -translate-x-1/2 w-[80%] h-[40%] bg-green-500/[0.06] rounded-full blur-[80px]" />
             <img
               src="/truck-hero.webp"
-              alt="Professional junk pickup truck"
+              alt="Squatterz truck ready for pickup"
               className="relative w-full object-contain"
               style={{ filter: 'drop-shadow(0 30px 60px rgba(0,0,0,0.6)) drop-shadow(0 8px 20px rgba(0,0,0,0.4))' }}
             />
@@ -461,7 +461,7 @@ export default function BookingFlow() {
             <div className="absolute bottom-[15%] left-1/2 -translate-x-1/4 w-[70%] h-[30%] bg-green-500/[0.05] rounded-full blur-[60px]" />
             <img
               src="/truck-hero.webp"
-              alt="Professional junk pickup truck"
+              alt="Squatterz truck ready for pickup"
               className="relative w-full max-w-lg object-contain"
               style={{ filter: 'drop-shadow(0 16px 40px rgba(0,0,0,0.5))' }}
             />
@@ -1050,14 +1050,12 @@ function BrandHeader() {
   return (
     <header className="bg-gray-950/80 backdrop-blur-xl border-b border-gray-800/40 sticky top-0 z-40 lg:relative">
       <div className="max-w-7xl mx-auto px-5 lg:px-8 h-[65px] flex items-center justify-between">
-        <div className="flex items-center gap-3.5">
-          <div className="w-10 h-10 bg-green-500 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg shadow-green-500/20">
-            <TruckIcon className="w-5.5 h-5.5 text-gray-950" />
-          </div>
-          <div className="flex flex-col">
-            <span className="text-white font-black text-[17px] leading-tight tracking-tight">Junk Pickup</span>
-            <span className="text-gray-500 text-[10px] font-bold tracking-[0.15em] uppercase leading-tight">We Haul It All</span>
-          </div>
+        <div className="flex items-center gap-3">
+          <img
+            src="/logo-squatterz.webp"
+            alt="Squatterz"
+            className="h-10 w-auto object-contain"
+          />
         </div>
         <a
           href="tel:+15555555555"
