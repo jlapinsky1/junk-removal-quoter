@@ -43,16 +43,23 @@ $$;
 -- Auto-create client profile on signup
 CREATE OR REPLACE FUNCTION handle_new_client()
 RETURNS trigger
-LANGUAGE plpgsql SECURITY DEFINER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
 AS $$
 BEGIN
-  INSERT INTO commercial_clients (user_id, contact_name)
+  INSERT INTO public.commercial_clients (user_id, contact_name)
   VALUES (NEW.id, COALESCE(NEW.raw_user_meta_data->>'contact_name', ''))
   ON CONFLICT (user_id) DO UPDATE
     SET contact_name = EXCLUDED.contact_name;
   RETURN NEW;
 END;
 $$;
+
+ALTER FUNCTION handle_new_client() OWNER TO postgres;
+GRANT USAGE ON SCHEMA public TO supabase_auth_admin;
+GRANT INSERT, UPDATE ON commercial_clients TO supabase_auth_admin;
+GRANT EXECUTE ON FUNCTION handle_new_client() TO supabase_auth_admin;
 
 DROP TRIGGER IF EXISTS on_auth_user_created_client ON auth.users;
 CREATE TRIGGER on_auth_user_created_client
