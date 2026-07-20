@@ -110,8 +110,6 @@ function GoalSetupModal({ onSave, onClose, existingGoal }) {
     active: true,
   });
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [saveError, setSaveError] = useState(null);
 
   // Update dates when period/month/quarter changes (but not for custom)
   useEffect(() => {
@@ -132,32 +130,30 @@ function GoalSetupModal({ onSave, onClose, existingGoal }) {
     setForm(f => ({ ...f, working_days_config: { days } }));
   }
 
-  async function handleSave() {
+  function handleSave() {
     if (!form.target_amount || Number(form.target_amount) <= 0) return;
-    setSaving(true);
-    setSaveError(null);
-    try {
-      const repo = await getRepo();
-      const goalData = {
-        ...(existingGoal?.id ? { id: existingGoal.id } : { id: crypto.randomUUID() }),
-        goal_type: form.goal_type,
-        target_amount: Number(form.target_amount),
-        start_date: form.start_date,
-        end_date: form.end_date,
-        working_days_config: form.working_days_config,
-        daily_capacity_limit: Number(form.daily_capacity_limit) || 4,
-        minimum_margin: Number(form.minimum_margin) / 100,
-        minimum_job_profit: Number(form.minimum_job_profit) || 75,
-        active: true,
-      };
-      const saved = await repo.upsertGoal(goalData);
-      onSave(saved);
-    } catch (err) {
-      console.error('Failed to save goal:', err);
-      setSaveError(err.message || 'Failed to save goal. Please try again.');
-    } finally {
-      setSaving(false);
-    }
+
+    // Build goal data synchronously
+    const goalData = {
+      id: existingGoal?.id || crypto.randomUUID(),
+      goal_type: form.goal_type,
+      target_amount: Number(form.target_amount),
+      start_date: form.start_date,
+      end_date: form.end_date,
+      working_days_config: form.working_days_config,
+      daily_capacity_limit: Number(form.daily_capacity_limit) || 4,
+      minimum_margin: Number(form.minimum_margin) / 100,
+      minimum_job_profit: Number(form.minimum_job_profit) || 75,
+      active: true,
+    };
+
+    // Close modal and update state immediately (optimistic)
+    onSave(goalData);
+
+    // Persist in background — failures are non-critical since goal is already in state
+    getRepo().then(repo => repo.upsertGoal(goalData)).catch(err => {
+      console.error('Failed to persist goal:', err);
+    });
   }
 
   return (
@@ -341,15 +337,9 @@ function GoalSetupModal({ onSave, onClose, existingGoal }) {
             )}
           </div>
 
-          {saveError && (
-            <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm text-red-700">
-              {saveError}
-            </div>
-          )}
-
-          <button onClick={handleSave} disabled={saving || !form.target_amount}
+          <button type="button" onClick={handleSave} disabled={!form.target_amount}
             className="w-full bg-blue-600 text-white py-2.5 rounded-lg font-medium text-sm hover:bg-blue-700 disabled:opacity-50">
-            {saving ? 'Saving...' : (existingGoal ? 'Update Goal' : 'Set Goal')}
+            {existingGoal ? 'Update Goal' : 'Set Goal'}
           </button>
         </div>
       </div>
