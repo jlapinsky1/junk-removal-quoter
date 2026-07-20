@@ -504,48 +504,6 @@ export default function Commercial() {
         </div>
       </section>
 
-      {/* BEFORE & AFTER PROOF */}
-      <section className="py-24 border-t border-white/5">
-        <div className="max-w-6xl mx-auto px-5">
-          <div className="text-center mb-14">
-            <p className="text-[#22c55e] text-sm font-semibold uppercase tracking-widest mb-3">
-              Proof of work
-            </p>
-            <h2 className="text-3xl md:text-4xl font-black text-white">
-              Before-and-after, from real jobs
-            </h2>
-            <p className="mt-3 text-white/45 text-base max-w-xl mx-auto">
-              Every packet is delivered to the manager. Here's a sample of what that looks like.
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-2 gap-6">
-            {BEFORE_AFTERS.map((job) => (
-              <div key={job.title} className="bg-white/4 border border-white/8 rounded-2xl overflow-hidden">
-                <div className="grid grid-cols-2 gap-px bg-white/8">
-                  <div className="relative aspect-[4/3] bg-[#0d1410]">
-                    <img src={job.before} alt="Before" className="w-full h-full object-cover" />
-                    <span className="absolute top-3 left-3 text-[10px] font-bold uppercase tracking-wider bg-black/70 text-white px-2 py-1 rounded">
-                      Before
-                    </span>
-                  </div>
-                  <div className="relative aspect-[4/3] bg-[#0d1410]">
-                    <img src={job.after} alt="After" className="w-full h-full object-cover" />
-                    <span className="absolute top-3 left-3 text-[10px] font-bold uppercase tracking-wider bg-[#22c55e] text-black px-2 py-1 rounded">
-                      After
-                    </span>
-                  </div>
-                </div>
-                <div className="p-6">
-                  <h3 className="font-bold text-white text-lg">{job.title}</h3>
-                  <p className="mt-1.5 text-sm text-white/45 leading-relaxed">{job.desc}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* ACCOUNT SETUP FORM */}
       <section id="account-setup" className="py-24 border-t border-white/5 bg-white/[0.02]">
         <div className="max-w-3xl mx-auto px-5">
