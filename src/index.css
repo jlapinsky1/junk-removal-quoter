@@ -2,56 +2,8 @@
 @tailwind components;
 @tailwind utilities;
 
-@page {
-  margin: 0.5in;
-  size: letter;
-}
-
 @media print {
   .no-print {
     display: none !important;
-  }
-
-  html, body {
-    background: white !important;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-
-  /* Collapse everything to zero height so no extra pages */
-  body * {
-    visibility: hidden;
-    height: 0;
-    overflow: hidden;
-    margin: 0;
-    padding: 0;
-    border: none;
-  }
-
-  /* Restore the quote and all ancestors in the DOM path */
-  .no-print-overlay,
-  .no-print-overlay > div,
-  .print-quote {
-    visibility: visible !important;
-    height: auto !important;
-    overflow: visible !important;
-    position: static !important;
-    background: white !important;
-    box-shadow: none !important;
-    border-radius: 0 !important;
-    max-height: none !important;
-    max-width: none !important;
-    width: 100% !important;
-    padding: 0 !important;
-    inset: auto !important;
-    display: block !important;
-  }
-
-  .print-quote * {
-    visibility: visible !important;
-    height: auto !important;
-    overflow: visible !important;
-    margin: revert !important;
-    padding: revert !important;
   }
 }
