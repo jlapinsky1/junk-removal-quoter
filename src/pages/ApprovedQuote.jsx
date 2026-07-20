@@ -145,34 +145,30 @@ export default function ApprovedQuote() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
+    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
       <div className="max-w-md mx-auto px-4 py-8 space-y-6">
         {/* Header */}
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900">Your Junk Removal Quote</h1>
-          <p className="text-gray-500 mt-1">Hi {booking.customerName?.split(' ')[0]}, here's your personalized quote</p>
+          <h1 className="text-2xl font-extrabold tracking-tight text-gray-900">Junk Pickup</h1>
+          <p className="text-xs text-gray-400 tracking-widest uppercase">We Haul It All</p>
+          <p className="text-gray-500 mt-3">Hi {booking.customerName?.split(' ')[0]}, here's your estimate</p>
         </div>
 
         {/* Price card */}
-        <div className="bg-white rounded-2xl shadow-lg p-6 text-center">
-          <div className="text-sm text-gray-500 mb-1">Total Price</div>
-          <div className="text-4xl font-bold text-gray-900">${quote.price}</div>
+        <div className="bg-gray-900 rounded-2xl shadow-lg px-6 py-6 text-center">
+          <div className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">Estimated Price</div>
+          <div className="text-4xl font-extrabold text-white">${quote.price}</div>
           <div className="text-sm text-gray-400 mt-2">No hidden fees</div>
-        </div>
-
-        {/* Quote protection notice */}
-        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-sm text-amber-800">
-          {terms.priceAdjustmentNotice}
         </div>
 
         {/* What's included */}
         <div className="bg-white rounded-2xl shadow-sm border p-5">
-          <h3 className="font-bold text-gray-800 mb-3">What's included</h3>
-          <div className="space-y-2">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">Includes</h3>
+          <div className="space-y-2.5">
             {terms.included.map(item => (
-              <div key={item} className="flex items-center gap-2 text-sm text-gray-700">
-                <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+              <div key={item} className="flex items-center gap-2.5 text-sm text-gray-700">
+                <svg className="w-4 h-4 text-green-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                 </svg>
                 {item}
               </div>
@@ -188,9 +184,20 @@ export default function ApprovedQuote() {
           )}
         </div>
 
+        {/* Estimate details */}
+        <div className="bg-white rounded-2xl shadow-sm border p-5">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Estimate Details</h3>
+          <p className="text-sm text-gray-600 leading-relaxed mb-2">
+            This estimate is based on the photos and description provided.
+          </p>
+          <p className="text-sm text-gray-600 leading-relaxed">
+            If the actual load size or materials differ substantially when we arrive, we will discuss any pricing adjustment before beginning work.
+          </p>
+        </div>
+
         {/* Pickup details */}
         <div className="bg-white rounded-2xl shadow-sm border p-5">
-          <h3 className="font-bold text-gray-800 mb-3">Pickup details</h3>
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">Pickup Details</h3>
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
               <span className="text-gray-500">Address</span>
@@ -282,9 +289,11 @@ export default function ApprovedQuote() {
           </button>
         )}
 
-        {/* Fine print */}
-        <div className="text-xs text-gray-400 text-center space-y-1 px-4">
-          <p>{terms.priceAdjustmentNotice}</p>
+        {/* Footer */}
+        <div className="text-center">
+          <p className="text-sm text-gray-700">
+            Thank you for considering <span className="font-semibold text-gray-900">Junk Pickup</span>.
+          </p>
         </div>
       </div>
     </div>
