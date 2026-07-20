@@ -12,38 +12,46 @@
     display: none !important;
   }
 
-  /* Clean PDF output */
   html, body {
     background: white !important;
-    margin: 0 !important;
-    padding: 0 !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
 
-  /* Hide everything except the quote */
-  body > #root {
-    display: none !important;
+  /* Collapse everything to zero height so no extra pages */
+  body * {
+    visibility: hidden;
+    height: 0;
+    overflow: hidden;
+    margin: 0;
+    padding: 0;
+    border: none;
   }
 
-  /* The modal overlay sits outside normal flow — show it */
-  .no-print-overlay {
-    display: block !important;
+  /* Restore the quote and all ancestors in the DOM path */
+  .no-print-overlay,
+  .no-print-overlay > div,
+  .print-quote {
+    visibility: visible !important;
+    height: auto !important;
+    overflow: visible !important;
     position: static !important;
-    background: none !important;
-    padding: 0 !important;
-    inset: auto !important;
-  }
-
-  .no-print-overlay > div {
+    background: white !important;
     box-shadow: none !important;
     border-radius: 0 !important;
     max-height: none !important;
-    overflow: visible !important;
     max-width: none !important;
+    width: 100% !important;
+    padding: 0 !important;
+    inset: auto !important;
+    display: block !important;
   }
 
-  .print-quote {
-    padding: 0 !important;
+  .print-quote * {
+    visibility: visible !important;
+    height: auto !important;
+    overflow: visible !important;
+    margin: revert !important;
+    padding: revert !important;
   }
 }
