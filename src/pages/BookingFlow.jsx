@@ -1027,7 +1027,7 @@ function BrandHeader() {
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0">
             <img
-              src="/logo-squatterz.png"
+              src="/icon-squatterz.png"
               alt="Squatterz"
               className="w-6 h-6 object-contain"
             />
