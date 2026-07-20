@@ -392,20 +392,20 @@ export default function BookingFlow() {
             <div className="absolute bottom-[20%] right-[30%] w-[500px] h-[500px] bg-green-500/[0.025] rounded-full blur-[140px]" />
           </div>
 
-          {/* Truck - positioned absolutely, large, anchored bottom-right, extends off-screen */}
-          <div className="absolute bottom-0 right-0 w-[48%] xl:w-[45%] pointer-events-none" style={{ transform: 'translateX(5%)' }}>
-            {/* Green rim glow behind the truck */}
+          {/* Truck - anchored bottom-right, natural proportions only */}
+          <div className="absolute bottom-0 right-0 pointer-events-none">
             <div className="absolute bottom-[10%] left-1/2 -translate-x-1/2 w-[80%] h-[40%] bg-green-500/[0.06] rounded-full blur-[80px]" />
             <img
-              src="/truck-hero.webp"
+              src="/truck-hero.png"
               alt="Squatterz truck ready for pickup"
-              className="relative w-full object-contain"
-              style={{ filter: 'drop-shadow(0 30px 60px rgba(0,0,0,0.6)) drop-shadow(0 8px 20px rgba(0,0,0,0.4))' }}
+              style={{
+                display: 'block',
+                width: 'min(48vw, 720px)',
+                height: 'auto',
+                filter: 'drop-shadow(0 30px 60px rgba(0,0,0,0.6)) drop-shadow(0 8px 20px rgba(0,0,0,0.4))',
+              }}
             />
-            {/* Ground shadow / fade */}
             <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-gray-950 via-gray-950/80 to-transparent" />
-            {/* Right edge fade so truck bleeds off naturally */}
-            <div className="absolute top-0 right-0 bottom-0 w-20 bg-gradient-to-l from-gray-950 to-transparent" />
           </div>
 
           {/* Left: copy + CTA */}
@@ -455,15 +455,19 @@ export default function BookingFlow() {
             </p>
           </div>
 
-          {/* Truck - large, bleeds right, product-style */}
+          {/* Truck - natural proportions, bleeds right */}
           <div className="relative overflow-hidden -mr-8 pl-4 mt-2 mb-0">
-            {/* Green glow underneath */}
             <div className="absolute bottom-[15%] left-1/2 -translate-x-1/4 w-[70%] h-[30%] bg-green-500/[0.05] rounded-full blur-[60px]" />
             <img
-              src="/truck-hero.webp"
+              src="/truck-hero.png"
               alt="Squatterz truck ready for pickup"
-              className="relative w-full max-w-lg object-contain"
-              style={{ filter: 'drop-shadow(0 16px 40px rgba(0,0,0,0.5))' }}
+              style={{
+                display: 'block',
+                width: '90%',
+                maxWidth: '480px',
+                height: 'auto',
+                filter: 'drop-shadow(0 16px 40px rgba(0,0,0,0.5))',
+              }}
             />
             <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-gray-950 to-transparent" />
           </div>
@@ -1049,12 +1053,12 @@ function PageShell({ children }) {
 function BrandHeader() {
   return (
     <header className="bg-gray-950/80 backdrop-blur-xl border-b border-gray-800/40 sticky top-0 z-40 lg:relative">
-      <div className="max-w-7xl mx-auto px-5 lg:px-8 h-[65px] flex items-center justify-between">
+      <div className="max-w-7xl mx-auto px-5 lg:px-8 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <img
             src="/logo-squatterz.webp"
-            alt="Squatterz"
-            className="h-16 w-auto object-contain"
+            alt="Squatterz – We Haul It All"
+            className="w-[100px] lg:w-[130px] h-auto object-contain"
           />
         </div>
         <a
