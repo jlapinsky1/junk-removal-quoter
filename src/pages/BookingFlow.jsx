@@ -384,22 +384,19 @@ export default function BookingFlow() {
       <PageShell>
         <BrandHeader />
 
-        {/* ── Desktop Hero: two-column with truck photo ── */}
-        <div className="hidden lg:flex min-h-[calc(100vh-65px)]">
-          {/* Left column - copy + CTA */}
-          <div className="w-[50%] xl:w-[45%] flex flex-col justify-center px-14 xl:px-20 relative overflow-hidden"
-            style={{ background: 'linear-gradient(160deg, rgba(17,24,39,0.95) 0%, rgba(3,7,18,1) 50%, rgba(17,24,39,0.9) 100%)' }}
-          >
-            <div className="absolute top-1/4 right-0 w-80 h-80 bg-green-500/[0.04] rounded-full blur-[100px] translate-x-1/3" />
-            <div className="absolute bottom-1/4 left-0 w-64 h-64 bg-green-500/[0.03] rounded-full blur-[80px] -translate-x-1/3" />
+        {/* ── Desktop Hero ── */}
+        <div className="hidden lg:flex min-h-[calc(100vh-65px)] relative overflow-hidden">
+          {/* Ambient background lighting */}
+          <div className="absolute inset-0 pointer-events-none">
+            <div className="absolute top-1/3 left-1/4 w-[500px] h-[500px] bg-green-500/[0.03] rounded-full blur-[120px]" />
+            <div className="absolute bottom-0 right-1/4 w-[400px] h-[400px] bg-green-500/[0.02] rounded-full blur-[100px]" />
+          </div>
 
-            <div className="max-w-lg relative">
-              <div className="inline-flex items-center gap-2 bg-green-500/10 text-green-400 text-xs font-bold tracking-widest uppercase px-3.5 py-2 rounded-full border border-green-500/20 mb-8">
-                <div className="w-1.5 h-1.5 bg-green-400 rounded-full" />
-                Now booking
-              </div>
-
-              <h1 className="text-5xl xl:text-[3.5rem] font-black leading-[1.05] tracking-tight mb-5">
+          {/* Content container */}
+          <div className="max-w-7xl mx-auto w-full flex items-center px-14 xl:px-20 relative">
+            {/* Left: copy + CTA */}
+            <div className="w-[50%] xl:w-[45%] shrink-0 py-16">
+              <h1 className="text-5xl xl:text-[3.75rem] font-black leading-[1.05] tracking-tight mb-6">
                 Junk Gone.<br />
                 <span className="text-green-400">Fast & Easy.</span>
               </h1>
@@ -407,10 +404,9 @@ export default function BookingFlow() {
                 Snap a few photos, get a fair estimate, and we'll haul it all away. No phone calls. No hassle.
               </p>
 
-              {/* How it works */}
               <div className="space-y-5 mb-10">
                 <HowItWorksStep number="1" title="Request Your Pickup" description="Tell us what needs to go and upload photos." />
-                <HowItWorksStep number="2" title="Get Your Estimate" description="We review your photos and send a fair, firm price." />
+                <HowItWorksStep number="2" title="Get Your Estimate" description="We review and send a fair, firm price." />
                 <HowItWorksStep number="3" title="We Haul It Away" description="Pick a time. We show up and handle everything." />
               </div>
 
@@ -422,62 +418,54 @@ export default function BookingFlow() {
               </button>
               <p className="text-gray-600 text-xs mt-3 font-medium tracking-wide max-w-sm text-center">Takes about 2 minutes</p>
 
-              {/* Trust signals */}
-              <div className="flex flex-wrap gap-x-6 gap-y-2.5 mt-10 pt-8 border-t border-gray-800/40">
+              <div className="flex flex-wrap gap-x-6 gap-y-2.5 mt-10 pt-8 border-t border-gray-800/30">
                 <CompanionTrust text="Touchless process" />
                 <CompanionTrust text="Fully insured" />
                 <CompanionTrust text="No hidden fees" />
                 <CompanionTrust text="Reviewed by a real person" />
               </div>
             </div>
-          </div>
 
-          {/* Right column - truck hero image */}
-          <div className="flex-1 relative overflow-hidden">
-            <img
-              src="/truck-hero.jpg"
-              alt="Junk Pickup truck loaded and ready"
-              className="absolute inset-0 w-full h-full object-cover object-[65%_center]"
-            />
-            {/* Gradient overlays for blending into dark UI */}
-            <div className="absolute inset-0 bg-gradient-to-r from-gray-950 via-gray-950/60 to-transparent w-1/3" />
-            <div className="absolute inset-0 bg-gradient-to-t from-gray-950 via-transparent to-gray-950/40" />
-            <div className="absolute inset-0 bg-gray-950/20" />
+            {/* Right: truck as product photography */}
+            <div className="flex-1 flex items-end justify-center relative self-end">
+              <img
+                src="/truck-hero.webp"
+                alt="Junk Pickup truck loaded and ready"
+                className="w-full max-w-2xl object-contain drop-shadow-[0_20px_60px_rgba(0,0,0,0.5)]"
+                style={{ marginBottom: '-2px' }}
+              />
+              {/* Subtle ground reflection / fade */}
+              <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-gray-950 to-transparent" />
+            </div>
           </div>
         </div>
 
         {/* ── Mobile Hero ── */}
         <div className="lg:hidden">
-          {/* Hero image - contained, not full-bleed */}
-          <div className="relative overflow-hidden mx-4 mt-4 rounded-2xl" style={{ maxHeight: '240px' }}>
-            <img
-              src="/truck-hero.jpg"
-              alt="Junk Pickup truck loaded and ready"
-              className="w-full h-full object-cover object-[60%_35%]"
-              style={{ minHeight: '200px' }}
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-gray-950 via-gray-950/30 to-transparent" />
-            <div className="absolute bottom-4 left-4 right-4">
-              <span className="inline-flex items-center gap-2 bg-black/50 backdrop-blur-sm text-green-400 text-[10px] font-bold tracking-widest uppercase px-3 py-1.5 rounded-full border border-white/10">
-                <div className="w-1.5 h-1.5 bg-green-400 rounded-full" />
-                Now booking
-              </span>
-            </div>
-          </div>
-
-          {/* Mobile copy */}
-          <div className="px-5 pt-6 pb-10 max-w-lg mx-auto">
+          <div className="px-5 pt-10 pb-2 max-w-lg mx-auto">
             <h1 className="text-[2.75rem] font-black leading-[1.08] tracking-tight">
               Junk Gone.<br />
               <span className="text-green-400">Fast & Easy.</span>
             </h1>
-            <p className="text-gray-400 text-lg mt-5 leading-relaxed max-w-sm">
-              Snap a few photos, get a fair estimate, and we'll haul it all away. No phone calls. No hassle.
+            <p className="text-gray-400 text-lg mt-4 leading-relaxed max-w-sm">
+              Snap a few photos, get a fair estimate, and we'll haul it all away.
             </p>
+          </div>
 
+          {/* Truck image - product-style, floating on dark bg */}
+          <div className="relative px-4 -mb-2">
+            <img
+              src="/truck-hero.webp"
+              alt="Junk Pickup truck loaded and ready"
+              className="w-full max-w-md mx-auto object-contain drop-shadow-[0_12px_40px_rgba(0,0,0,0.4)]"
+            />
+            <div className="absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-t from-gray-950 to-transparent" />
+          </div>
+
+          <div className="px-5 pb-10 max-w-lg mx-auto">
             <button
               onClick={() => goToStep(0)}
-              className="mt-8 w-full bg-green-500 hover:bg-green-400 text-gray-950 font-extrabold text-lg py-5 rounded-2xl transition-all duration-200 btn-glow active:scale-[0.98] transform"
+              className="w-full bg-green-500 hover:bg-green-400 text-gray-950 font-extrabold text-lg py-5 rounded-2xl transition-all duration-200 btn-glow active:scale-[0.98] transform"
             >
               Get Your Free Estimate
             </button>
@@ -489,12 +477,11 @@ export default function BookingFlow() {
             <h2 className="text-[10px] font-bold tracking-[0.15em] uppercase text-gray-500 mb-6">How it works</h2>
             <div className="space-y-6">
               <HowItWorksStep number="1" title="Request Your Pickup" description="Tell us what needs to go and upload photos." />
-              <HowItWorksStep number="2" title="Get Your Estimate" description="We review your photos and send a fair, firm price." />
+              <HowItWorksStep number="2" title="Get Your Estimate" description="We review and send a fair, firm price." />
               <HowItWorksStep number="3" title="We Haul It Away" description="Pick a time. We show up and handle everything." />
             </div>
           </div>
 
-          {/* Trust */}
           <div className="px-5 pb-12 max-w-lg mx-auto">
             <div className="bg-gray-900/60 rounded-2xl p-6 space-y-4 border border-gray-800/60 ring-1 ring-white/[0.02]">
               <TrustBadge icon={ShieldIcon} text="100% touchless process" />
@@ -505,7 +492,6 @@ export default function BookingFlow() {
             </div>
           </div>
 
-          {/* We haul it all */}
           <div className="px-5 pb-14 max-w-lg mx-auto">
             <h2 className="text-[10px] font-bold tracking-[0.15em] uppercase text-gray-500 mb-4">We haul it all</h2>
             <div className="flex flex-wrap gap-2">
