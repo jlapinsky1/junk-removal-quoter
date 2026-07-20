@@ -141,22 +141,9 @@ export default function CustomerQuoteView({ formData, quoteResult, onClose }) {
       scopeText,
       validDateStr,
     });
-
-    // Use a hidden iframe to avoid popup blockers
-    let iframe = document.getElementById('quote-print-frame');
-    if (iframe) iframe.remove();
-    iframe = document.createElement('iframe');
-    iframe.id = 'quote-print-frame';
-    iframe.style.cssText = 'position:fixed;width:0;height:0;border:none;left:-9999px;';
-    document.body.appendChild(iframe);
-    const doc = iframe.contentDocument || iframe.contentWindow.document;
-    doc.open();
-    doc.write(html);
-    doc.close();
-    iframe.onload = () => {
-      iframe.contentWindow.focus();
-      iframe.contentWindow.print();
-    };
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank');
   }
 
   return (
