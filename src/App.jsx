@@ -72,7 +72,7 @@ function AdminDashboard() {
       <main className={`mx-auto px-4 py-4 ${
         ['dashboard', 'learning'].includes(activeTab) ? 'max-w-5xl' : 'max-w-lg'
       }`}>
-        {activeTab === 'dashboard' && <Dashboard />}
+        {activeTab === 'dashboard' && <Dashboard onNavigate={setActiveTab} />}
         {activeTab === 'requests' && <RequestQueue />}
         {activeTab === 'quote' && (
           <QuoteForm
