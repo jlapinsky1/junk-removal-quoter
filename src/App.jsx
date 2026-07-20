@@ -11,6 +11,8 @@ import BookingFlow from './pages/BookingFlow';
 import ApprovedQuote from './pages/ApprovedQuote';
 import AdminLogin from './pages/AdminLogin';
 import Commercial from './pages/Commercial';
+import ClientLogin from './pages/ClientLogin';
+import ClientPortal from './pages/ClientPortal';
 import { getSettings } from './utils/storage';
 import { getRepo } from './utils/repository';
 
@@ -101,6 +103,8 @@ export default function App() {
       <Route path="/book" element={<BookingFlow />} />
       <Route path="/quote/:id" element={<ApprovedQuote />} />
       <Route path="/commercial" element={<Commercial />} />
+      <Route path="/portal/login" element={<ClientLogin />} />
+      <Route path="/portal" element={<ClientPortal />} />
       <Route path="/admin" element={<AdminDashboard />} />
     </Routes>
   );

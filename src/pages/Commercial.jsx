@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Phone,
   Star,
@@ -29,6 +30,7 @@ import {
   Trash,
   Mail,
   User,
+  LogIn,
 } from "lucide-react";
 
 const TRUST_BAR = [
@@ -180,6 +182,7 @@ function Field({ icon: Icon, label, children }) {
 }
 
 export default function Commercial() {
+  const navigate = useNavigate();
   const [form, setForm] = useState({ name: "", property: "", email: "", phone: "", notes: "" });
   const [submitted, setSubmitted] = useState(false);
 
@@ -209,7 +212,7 @@ export default function Commercial() {
             <a href="#faq" className="text-sm text-white/60 hover:text-white transition-colors">FAQ</a>
           </nav>
 
-          <div className="hidden md:flex items-center gap-5">
+          <div className="hidden md:flex items-center gap-3">
             <a
               href="tel:8135550123"
               className="flex items-center gap-2 text-sm text-white/70 hover:text-white transition-colors"
@@ -217,6 +220,13 @@ export default function Commercial() {
               <Phone className="w-4 h-4 text-[#22c55e]" />
               <span className="font-medium">(813) 555-0123</span>
             </a>
+            <button
+              onClick={() => navigate("/portal/login")}
+              className="border border-white/15 hover:border-white/30 text-white font-bold text-sm px-5 py-2.5 rounded-full transition-colors flex items-center gap-2"
+            >
+              <LogIn className="w-4 h-4" />
+              Log In
+            </button>
             <a
               href="#account-setup"
               className="bg-[#22c55e] hover:bg-[#16a34a] text-black font-bold text-sm px-5 py-2.5 rounded-full transition-colors"
@@ -225,9 +235,18 @@ export default function Commercial() {
             </a>
           </div>
 
-          <a href="#account-setup" className="md:hidden bg-[#22c55e] text-black font-bold text-xs px-4 py-2 rounded-full">
-            Set Up
-          </a>
+          <div className="md:hidden flex items-center gap-2">
+            <button
+              onClick={() => navigate("/portal/login")}
+              className="border border-white/15 text-white font-bold text-xs px-3 py-2 rounded-full flex items-center gap-1.5"
+            >
+              <LogIn className="w-3.5 h-3.5" />
+              Log In
+            </button>
+            <a href="#account-setup" className="bg-[#22c55e] text-black font-bold text-xs px-4 py-2 rounded-full">
+              Set Up
+            </a>
+          </div>
         </div>
       </header>
 
@@ -272,6 +291,12 @@ export default function Commercial() {
               >
                 Set Up a Commercial Account
               </a>
+              <button
+                onClick={() => navigate("/portal/login")}
+                className="border border-white/15 hover:border-white/30 text-white font-semibold text-base px-8 py-4 rounded-full flex items-center justify-center gap-2 transition-colors"
+              >
+                <LogIn className="w-4 h-4" /> Client Portal Log In
+              </button>
             </div>
 
             <div className="flex flex-wrap gap-x-6 gap-y-2 pt-2">
@@ -672,6 +697,7 @@ export default function Commercial() {
           <div className="flex gap-6 text-xs text-white/30">
             <a href="/" className="hover:text-white/60 transition-colors">Residential</a>
             <a href="/commercial" className="hover:text-white/60 transition-colors">Commercial</a>
+            <button onClick={() => navigate("/portal/login")} className="hover:text-white/60 transition-colors">Client Portal</button>
             <a href="#" className="hover:text-white/60 transition-colors">Privacy</a>
             <a href="#" className="hover:text-white/60 transition-colors">Terms</a>
           </div>
