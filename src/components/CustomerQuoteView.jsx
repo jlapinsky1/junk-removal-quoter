@@ -11,7 +11,9 @@ function buildQuoteHtml({ customerName, jobAddress, price, scopeText, validDateS
 <style>
   @page { margin: 0.6in; size: letter; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1a1a1a; line-height: 1.5; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1a1a1a; line-height: 1.5; background: #f3f4f6; }
+  .page { max-width: 600px; margin: 40px auto; background: white; border-radius: 16px; padding: 48px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+  @media print { body { background: white; } .page { max-width: none; margin: 0; padding: 0; box-shadow: none; border-radius: 0; } }
   .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px; }
   .brand { font-size: 24px; font-weight: 800; letter-spacing: -0.5px; }
   .tagline { font-size: 10px; color: #9ca3af; text-transform: uppercase; letter-spacing: 3px; margin-top: 2px; }
@@ -35,6 +37,7 @@ function buildQuoteHtml({ customerName, jobAddress, price, scopeText, validDateS
 </style>
 </head>
 <body>
+<div class="page">
   <div class="header">
     <div>
       <div class="brand">${COMPANY_NAME}</div>
@@ -88,6 +91,7 @@ function buildQuoteHtml({ customerName, jobAddress, price, scopeText, validDateS
     Thanks for considering <span class="bold">${COMPANY_NAME}</span>.
     <div class="footer-sub">Our team has reviewed your request and we are excited to complete your pickup.</div>
   </div>
+</div>
 </body>
 </html>`;
 }
