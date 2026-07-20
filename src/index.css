@@ -7,29 +7,36 @@
     display: none !important;
   }
 
-  /* Clean single-page PDF output for quote */
+  /* Clean PDF output for quote */
   body {
     background: white !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
 
-  /* Hide everything except the quote modal content */
-  body > #root > *:not(.fixed) {
-    display: none !important;
+  /* Hide everything on the page */
+  body * {
+    visibility: hidden;
   }
 
-  /* Remove modal overlay styling for print */
-  .fixed {
+  /* Show only the printable quote content */
+  .print-quote,
+  .print-quote * {
+    visibility: visible;
+  }
+
+  .print-quote {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    padding: 40px !important;
+  }
+
+  /* Hide the modal overlay backdrop */
+  .no-print-overlay {
     position: static !important;
     background: none !important;
     padding: 0 !important;
-  }
-
-  .fixed > div {
-    box-shadow: none !important;
-    max-height: none !important;
-    overflow: visible !important;
-    border-radius: 0 !important;
   }
 }

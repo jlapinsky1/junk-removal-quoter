@@ -51,11 +51,11 @@ export default function CustomerQuoteView({ formData, quoteResult, onClose }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 no-print-overlay">
       <div className="bg-white rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl">
 
         {/* Printable quote body */}
-        <div ref={quoteRef} className="px-8 py-10">
+        <div ref={quoteRef} className="print-quote px-8 py-10">
 
           {/* Header bar */}
           <div className="flex items-center justify-between mb-8">
