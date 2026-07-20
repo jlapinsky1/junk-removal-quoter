@@ -383,127 +383,137 @@ export default function BookingFlow() {
     return (
       <PageShell>
         <BrandHeader />
-        <div className="lg:flex lg:min-h-[calc(100vh-65px)]">
-          {/* Desktop left panel - brand showcase */}
-          <CompanionPanel>
-            <div className="max-w-md relative">
+
+        {/* ── Desktop Hero: two-column with truck photo ── */}
+        <div className="hidden lg:flex min-h-[calc(100vh-65px)]">
+          {/* Left column - copy + CTA */}
+          <div className="w-[50%] xl:w-[45%] flex flex-col justify-center px-14 xl:px-20 relative overflow-hidden"
+            style={{ background: 'linear-gradient(160deg, rgba(17,24,39,0.95) 0%, rgba(3,7,18,1) 50%, rgba(17,24,39,0.9) 100%)' }}
+          >
+            <div className="absolute top-1/4 right-0 w-80 h-80 bg-green-500/[0.04] rounded-full blur-[100px] translate-x-1/3" />
+            <div className="absolute bottom-1/4 left-0 w-64 h-64 bg-green-500/[0.03] rounded-full blur-[80px] -translate-x-1/3" />
+
+            <div className="max-w-lg relative">
               <div className="inline-flex items-center gap-2 bg-green-500/10 text-green-400 text-xs font-bold tracking-widest uppercase px-3.5 py-2 rounded-full border border-green-500/20 mb-8">
                 <div className="w-1.5 h-1.5 bg-green-400 rounded-full" />
                 Now booking
               </div>
-              <h2 className="text-5xl xl:text-[3.5rem] font-black leading-[1.05] tracking-tight mb-6">
+
+              <h1 className="text-5xl xl:text-[3.5rem] font-black leading-[1.05] tracking-tight mb-5">
                 Junk Gone.<br />
                 <span className="text-green-400">Fast & Easy.</span>
-              </h2>
-              <p className="text-gray-400 text-lg leading-relaxed mb-12">
+              </h1>
+              <p className="text-gray-400 text-lg leading-relaxed mb-10 max-w-md">
                 Snap a few photos, get a fair estimate, and we'll haul it all away. No phone calls. No hassle.
               </p>
 
-              {/* How it works - desktop */}
-              <div className="space-y-6 mb-12">
-                <HowItWorksStep number="1" title="Upload Photos" description="Snap a few pictures of your junk from your phone." />
+              {/* How it works */}
+              <div className="space-y-5 mb-10">
+                <HowItWorksStep number="1" title="Request Your Pickup" description="Tell us what needs to go and upload photos." />
                 <HowItWorksStep number="2" title="Get Your Estimate" description="We review your photos and send a fair, firm price." />
-                <HowItWorksStep number="3" title="Schedule Pickup" description="Pick a time that works. We handle the rest." />
-              </div>
-
-              {/* Trust signals */}
-              <div className="space-y-3.5 pt-8 border-t border-gray-800/40">
-                <CompanionTrust text="100% touchless process" />
-                <CompanionTrust text="Reviewed by a real person" />
-                <CompanionTrust text="No hidden fees" />
-                <CompanionTrust text="Fully insured" />
-              </div>
-            </div>
-          </CompanionPanel>
-
-          {/* Right side - hero content */}
-          <div className="flex-1 flex flex-col justify-center relative">
-            {/* Subtle radial glow on desktop */}
-            <div className="hidden lg:block absolute inset-0 overflow-hidden pointer-events-none">
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-green-500/[0.03] rounded-full blur-[100px]" />
-            </div>
-
-            <div className="px-5 pt-14 pb-10 max-w-lg mx-auto w-full lg:pt-0 lg:pb-0 lg:px-10 xl:px-14 relative">
-              {/* Mobile-only hero text */}
-              <div className="lg:hidden">
-                <div className="mb-3">
-                  <span className="inline-flex items-center gap-2 bg-green-500/10 text-green-400 text-xs font-bold tracking-widest uppercase px-3 py-1.5 rounded-full border border-green-500/20">
-                    <div className="w-1.5 h-1.5 bg-green-400 rounded-full" />
-                    Junk Pickup
-                  </span>
-                </div>
-                <h1 className="text-[2.75rem] font-black leading-[1.08] tracking-tight mt-4">
-                  Junk Gone.<br />
-                  <span className="text-green-400">Fast & Easy.</span>
-                </h1>
-                <p className="text-gray-400 text-lg mt-5 leading-relaxed max-w-sm">
-                  Snap a few photos, get a fair estimate, and we'll haul it all away. No phone calls. No hassle.
-                </p>
-              </div>
-
-              {/* Desktop hero text */}
-              <div className="hidden lg:block mb-10">
-                <h1 className="text-[2.75rem] font-black leading-[1.1] tracking-tight">
-                  Get your free estimate<br />
-                  <span className="text-green-400">in 2 minutes.</span>
-                </h1>
-                <p className="text-gray-400/90 text-base mt-4 leading-relaxed max-w-sm">
-                  No phone calls, no waiting. Upload a few photos and we'll send you a fair price.
-                </p>
+                <HowItWorksStep number="3" title="We Haul It Away" description="Pick a time. We show up and handle everything." />
               </div>
 
               <button
                 onClick={() => goToStep(0)}
-                className="mt-8 lg:mt-0 w-full bg-green-500 hover:bg-green-400 text-gray-950 font-extrabold text-lg py-5 rounded-2xl transition-all duration-200 btn-glow active:scale-[0.98] transform"
+                className="w-full max-w-sm bg-green-500 hover:bg-green-400 text-gray-950 font-extrabold text-lg py-5 rounded-2xl transition-all duration-200 btn-glow active:scale-[0.98] transform"
               >
                 Get Your Free Estimate
               </button>
-              <p className="text-center text-gray-600 text-xs mt-3 font-medium tracking-wide">Takes about 2 minutes</p>
+              <p className="text-gray-600 text-xs mt-3 font-medium tracking-wide max-w-sm text-center">Takes about 2 minutes</p>
 
-              {/* Desktop: what we haul chips */}
-              <div className="hidden lg:block mt-12">
-                <p className="text-[10px] font-bold tracking-[0.15em] uppercase text-gray-500 mb-3">We haul it all</p>
-                <div className="flex flex-wrap gap-2">
-                  {['Furniture', 'Appliances', 'Yard Waste', 'Garage Cleanouts', 'Estate Cleanouts', 'Construction Debris', 'Electronics', 'Mattresses'].map(item => (
-                    <span key={item} className="bg-gray-900/60 text-gray-500 text-xs px-3 py-1.5 rounded-full border border-gray-800/60 hover:text-gray-400 hover:border-gray-700 transition-colors">
-                      {item}
-                    </span>
-                  ))}
-                </div>
+              {/* Trust signals */}
+              <div className="flex flex-wrap gap-x-6 gap-y-2.5 mt-10 pt-8 border-t border-gray-800/40">
+                <CompanionTrust text="Touchless process" />
+                <CompanionTrust text="Fully insured" />
+                <CompanionTrust text="No hidden fees" />
+                <CompanionTrust text="Reviewed by a real person" />
               </div>
             </div>
+          </div>
 
-            {/* Mobile-only sections below the fold */}
-            <div className="lg:hidden">
-              <div className="px-5 pb-10 max-w-lg mx-auto">
-                <h2 className="text-[10px] font-bold tracking-[0.15em] uppercase text-gray-500 mb-6">How it works</h2>
-                <div className="space-y-6">
-                  <HowItWorksStep number="1" title="Upload Photos" description="Snap a few pictures of your junk from your phone." />
-                  <HowItWorksStep number="2" title="Get Your Estimate" description="We review your photos and send a fair, firm price." />
-                  <HowItWorksStep number="3" title="Schedule Pickup" description="Pick a time that works. We handle the rest." />
-                </div>
-              </div>
+          {/* Right column - truck hero image */}
+          <div className="flex-1 relative overflow-hidden">
+            <img
+              src="/truck-hero.jpg"
+              alt="Junk Pickup truck loaded and ready"
+              className="absolute inset-0 w-full h-full object-cover object-[65%_center]"
+            />
+            {/* Gradient overlays for blending into dark UI */}
+            <div className="absolute inset-0 bg-gradient-to-r from-gray-950 via-gray-950/60 to-transparent w-1/3" />
+            <div className="absolute inset-0 bg-gradient-to-t from-gray-950 via-transparent to-gray-950/40" />
+            <div className="absolute inset-0 bg-gray-950/20" />
+          </div>
+        </div>
 
-              <div className="px-5 pb-12 max-w-lg mx-auto">
-                <div className="bg-gray-900/60 rounded-2xl p-6 space-y-4 border border-gray-800/60 ring-1 ring-white/[0.02]">
-                  <TrustBadge icon={ShieldIcon} text="100% touchless process" />
-                  <TrustBadge icon={CheckCircleIcon} text="No phone calls required" />
-                  <TrustBadge icon={UserGroupIcon} text="Reviewed by a real person" />
-                  <TrustBadge icon={ClockIcon} text="Fast response time" />
-                  <TrustBadge icon={StarIcon} text="No obligation estimate" />
-                </div>
-              </div>
+        {/* ── Mobile Hero ── */}
+        <div className="lg:hidden">
+          {/* Hero image - contained, not full-bleed */}
+          <div className="relative overflow-hidden mx-4 mt-4 rounded-2xl" style={{ maxHeight: '240px' }}>
+            <img
+              src="/truck-hero.jpg"
+              alt="Junk Pickup truck loaded and ready"
+              className="w-full h-full object-cover object-[60%_35%]"
+              style={{ minHeight: '200px' }}
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-gray-950 via-gray-950/30 to-transparent" />
+            <div className="absolute bottom-4 left-4 right-4">
+              <span className="inline-flex items-center gap-2 bg-black/50 backdrop-blur-sm text-green-400 text-[10px] font-bold tracking-widest uppercase px-3 py-1.5 rounded-full border border-white/10">
+                <div className="w-1.5 h-1.5 bg-green-400 rounded-full" />
+                Now booking
+              </span>
+            </div>
+          </div>
 
-              <div className="px-5 pb-14 max-w-lg mx-auto">
-                <h2 className="text-[10px] font-bold tracking-[0.15em] uppercase text-gray-500 mb-4">We haul it all</h2>
-                <div className="flex flex-wrap gap-2">
-                  {['Furniture', 'Appliances', 'Yard Waste', 'Garage Cleanouts', 'Estate Cleanouts', 'Construction Debris', 'Electronics', 'Mattresses'].map(item => (
-                    <span key={item} className="bg-gray-900/60 text-gray-300 text-sm px-4 py-2 rounded-full border border-gray-800/60">
-                      {item}
-                    </span>
-                  ))}
-                </div>
-              </div>
+          {/* Mobile copy */}
+          <div className="px-5 pt-6 pb-10 max-w-lg mx-auto">
+            <h1 className="text-[2.75rem] font-black leading-[1.08] tracking-tight">
+              Junk Gone.<br />
+              <span className="text-green-400">Fast & Easy.</span>
+            </h1>
+            <p className="text-gray-400 text-lg mt-5 leading-relaxed max-w-sm">
+              Snap a few photos, get a fair estimate, and we'll haul it all away. No phone calls. No hassle.
+            </p>
+
+            <button
+              onClick={() => goToStep(0)}
+              className="mt-8 w-full bg-green-500 hover:bg-green-400 text-gray-950 font-extrabold text-lg py-5 rounded-2xl transition-all duration-200 btn-glow active:scale-[0.98] transform"
+            >
+              Get Your Free Estimate
+            </button>
+            <p className="text-center text-gray-600 text-xs mt-3 font-medium tracking-wide">Takes about 2 minutes</p>
+          </div>
+
+          {/* How it works */}
+          <div className="px-5 pb-10 max-w-lg mx-auto">
+            <h2 className="text-[10px] font-bold tracking-[0.15em] uppercase text-gray-500 mb-6">How it works</h2>
+            <div className="space-y-6">
+              <HowItWorksStep number="1" title="Request Your Pickup" description="Tell us what needs to go and upload photos." />
+              <HowItWorksStep number="2" title="Get Your Estimate" description="We review your photos and send a fair, firm price." />
+              <HowItWorksStep number="3" title="We Haul It Away" description="Pick a time. We show up and handle everything." />
+            </div>
+          </div>
+
+          {/* Trust */}
+          <div className="px-5 pb-12 max-w-lg mx-auto">
+            <div className="bg-gray-900/60 rounded-2xl p-6 space-y-4 border border-gray-800/60 ring-1 ring-white/[0.02]">
+              <TrustBadge icon={ShieldIcon} text="100% touchless process" />
+              <TrustBadge icon={CheckCircleIcon} text="No phone calls required" />
+              <TrustBadge icon={UserGroupIcon} text="Reviewed by a real person" />
+              <TrustBadge icon={ClockIcon} text="Fast response time" />
+              <TrustBadge icon={StarIcon} text="No obligation estimate" />
+            </div>
+          </div>
+
+          {/* We haul it all */}
+          <div className="px-5 pb-14 max-w-lg mx-auto">
+            <h2 className="text-[10px] font-bold tracking-[0.15em] uppercase text-gray-500 mb-4">We haul it all</h2>
+            <div className="flex flex-wrap gap-2">
+              {['Furniture', 'Appliances', 'Yard Waste', 'Garage Cleanouts', 'Estate Cleanouts', 'Construction Debris', 'Electronics', 'Mattresses'].map(item => (
+                <span key={item} className="bg-gray-900/60 text-gray-300 text-sm px-4 py-2 rounded-full border border-gray-800/60">
+                  {item}
+                </span>
+              ))}
             </div>
           </div>
         </div>
