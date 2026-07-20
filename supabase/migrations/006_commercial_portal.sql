@@ -47,7 +47,9 @@ LANGUAGE plpgsql SECURITY DEFINER
 AS $$
 BEGIN
   INSERT INTO commercial_clients (user_id, contact_name)
-  VALUES (NEW.id, COALESCE(NEW.raw_user_meta_data->>'contact_name', ''));
+  VALUES (NEW.id, COALESCE(NEW.raw_user_meta_data->>'contact_name', ''))
+  ON CONFLICT (user_id) DO UPDATE
+    SET contact_name = EXCLUDED.contact_name;
   RETURN NEW;
 END;
 $$;
