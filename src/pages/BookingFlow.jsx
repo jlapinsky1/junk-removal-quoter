@@ -46,6 +46,35 @@ const TIME_PREFERENCES = [
   { value: 'flexible', label: 'Flexible', sub: 'Either works for me', icon: '👍' },
 ];
 
+// Dynamic companion panel content per step
+const COMPANION_CONTENT = [
+  {
+    headline: 'No phone calls required.',
+    body: 'We\'ll only use your contact info to send your estimate. No spam, no sales calls.',
+    trust: ['Fast response time', 'Your info stays private', 'Touchless process'],
+  },
+  {
+    headline: 'We service your area.',
+    body: 'Your address helps us calculate travel distance and check availability for your neighborhood.',
+    trust: ['Local crew dispatched', 'Accurate scheduling', 'Fully insured'],
+  },
+  {
+    headline: 'Better photos, better estimate.',
+    body: 'Clear photos help us give you an accurate price upfront. No surprises on pickup day.',
+    trust: ['AI-powered item detection', 'Reviewed by a real person', 'No hidden fees'],
+  },
+  {
+    headline: 'Tell us about the job.',
+    body: 'These details help us send the right size crew and truck. Every estimate is reviewed by a real person.',
+    trust: ['Right crew for the job', 'No obligation estimate', 'Fair, transparent pricing'],
+  },
+  {
+    headline: 'Pick the day that works.',
+    body: 'Choose your preferred pickup time and we\'ll confirm availability after reviewing your request.',
+    trust: ['Flexible scheduling', 'Easy rescheduling', 'We confirm before we come'],
+  },
+];
+
 function generateNextDays(count) {
   const days = [];
   const today = new Date();
@@ -287,117 +316,209 @@ export default function BookingFlow() {
     }
   }
 
+  const progressPercent = step < 0 ? 0 : ((step + 1) / STEPS.length) * 100;
+  const availableDays = generateNextDays(14);
+
   // ──────────────────────── SUCCESS SCREEN ────────────────────────
   if (submitted) {
     return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center p-5">
-        <div className="max-w-md w-full text-center">
-          <div className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg shadow-green-500/30">
-            <svg className="w-10 h-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-            </svg>
-          </div>
-          <h1 className="text-3xl font-black text-white mb-3">You're All Set!</h1>
-          <p className="text-gray-400 text-lg mb-8">
-            We'll review your photos and send you a firm estimate. No surprises.
-          </p>
-
-          <div className="bg-gray-900 rounded-2xl p-6 text-left space-y-3 border border-gray-800">
-            <div className="flex justify-between items-center">
-              <span className="text-gray-500 text-sm">Preferred date</span>
-              <span className="text-white font-semibold">{formatDate(form.preferredDate)}</span>
-            </div>
-            {form.secondChoiceDate && (
-              <div className="flex justify-between items-center">
-                <span className="text-gray-500 text-sm">Second choice</span>
-                <span className="text-white font-semibold">{formatDate(form.secondChoiceDate)}</span>
+      <div className="min-h-screen bg-gray-950 text-white">
+        <BrandHeader />
+        <div className="lg:flex lg:min-h-[calc(100vh-64px)]">
+          {/* Desktop companion */}
+          <div className="hidden lg:flex lg:w-[45%] xl:w-[42%] bg-gradient-to-br from-gray-900 via-gray-950 to-gray-900 border-r border-gray-800/50 flex-col justify-center px-12 xl:px-16">
+            <div className="max-w-md">
+              <div className="w-16 h-16 bg-green-500/15 rounded-2xl flex items-center justify-center mb-6">
+                <CheckCircleIcon className="w-8 h-8 text-green-400" />
               </div>
-            )}
-            <div className="flex justify-between items-center">
-              <span className="text-gray-500 text-sm">Time</span>
-              <span className="text-white font-semibold">
-                {TIME_PREFERENCES.find(t => t.value === form.timePreference)?.label || form.timePreference}
-              </span>
-            </div>
-            <div className="border-t border-gray-800 pt-3 flex justify-between items-center">
-              <span className="text-gray-500 text-sm">Confirmation</span>
-              <span className="text-green-400 font-mono font-bold tracking-wider">
-                #{bookingId.slice(0, 8).toUpperCase()}
-              </span>
+              <h2 className="text-3xl font-black text-white leading-tight mb-4">
+                Request received.
+              </h2>
+              <p className="text-gray-400 text-lg leading-relaxed mb-8">
+                We'll review everything and send your approved estimate. Most customers hear back within a few hours.
+              </p>
+              <div className="space-y-4">
+                <CompanionTrust text="Reviewed by a real person" />
+                <CompanionTrust text="No obligation - review before you commit" />
+                <CompanionTrust text="Fully insured and licensed" />
+              </div>
             </div>
           </div>
 
-          <div className="mt-8 flex flex-col gap-3">
-            <TrustBadge icon={CheckCircleIcon} text="A real person will review your request" />
-            <TrustBadge icon={CheckCircleIcon} text="Estimate sent within a few hours" />
-            <TrustBadge icon={CheckCircleIcon} text="No obligation - review before you commit" />
+          {/* Success content */}
+          <div className="flex-1 flex items-center justify-center p-5">
+            <div className="max-w-md w-full text-center">
+              <div className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg shadow-green-500/30">
+                <svg className="w-10 h-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <h1 className="text-3xl font-black text-white mb-3">You're All Set!</h1>
+              <p className="text-gray-400 text-lg mb-8">
+                We'll review your photos and send you a firm estimate. No surprises.
+              </p>
+
+              <div className="bg-gray-900 rounded-2xl p-6 text-left space-y-3 border border-gray-800">
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500 text-sm">Preferred date</span>
+                  <span className="text-white font-semibold">{formatDate(form.preferredDate)}</span>
+                </div>
+                {form.secondChoiceDate && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-500 text-sm">Second choice</span>
+                    <span className="text-white font-semibold">{formatDate(form.secondChoiceDate)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500 text-sm">Time</span>
+                  <span className="text-white font-semibold">
+                    {TIME_PREFERENCES.find(t => t.value === form.timePreference)?.label || form.timePreference}
+                  </span>
+                </div>
+                <div className="border-t border-gray-800 pt-3 flex justify-between items-center">
+                  <span className="text-gray-500 text-sm">Confirmation</span>
+                  <span className="text-green-400 font-mono font-bold tracking-wider">
+                    #{bookingId.slice(0, 8).toUpperCase()}
+                  </span>
+                </div>
+              </div>
+
+              <div className="mt-8 flex flex-col gap-3 lg:hidden">
+                <TrustBadge icon={CheckCircleIcon} text="A real person will review your request" />
+                <TrustBadge icon={CheckCircleIcon} text="Estimate sent within a few hours" />
+                <TrustBadge icon={CheckCircleIcon} text="No obligation - review before you commit" />
+              </div>
+            </div>
           </div>
         </div>
       </div>
     );
   }
 
-  const availableDays = generateNextDays(14);
-  const progressPercent = step < 0 ? 0 : ((step + 1) / STEPS.length) * 100;
-
   // ──────────────────────── HERO LANDING ────────────────────────
   if (step === -1) {
     return (
       <div className="min-h-screen bg-gray-950 text-white">
-        {/* Hero */}
-        <div className="px-5 pt-14 pb-10 max-w-lg mx-auto">
-          <div className="mb-2">
-            <span className="inline-block bg-green-500/15 text-green-400 text-xs font-bold tracking-widest uppercase px-3 py-1.5 rounded-full border border-green-500/30">
-              Junk Pickup
-            </span>
+        <BrandHeader />
+        <div className="lg:flex lg:min-h-[calc(100vh-64px)]">
+          {/* Desktop left panel - brand showcase */}
+          <div className="hidden lg:flex lg:w-[45%] xl:w-[42%] bg-gradient-to-br from-gray-900 via-gray-950 to-gray-900 border-r border-gray-800/50 flex-col justify-center px-12 xl:px-16 relative overflow-hidden">
+            {/* Subtle decorative elements */}
+            <div className="absolute top-0 right-0 w-64 h-64 bg-green-500/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+            <div className="absolute bottom-0 left-0 w-48 h-48 bg-green-500/5 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2" />
+
+            <div className="max-w-md relative">
+              <h2 className="text-4xl xl:text-5xl font-black leading-[1.05] tracking-tight mb-6">
+                Junk Gone.<br />
+                <span className="text-green-400">Fast & Easy.</span>
+              </h2>
+              <p className="text-gray-400 text-lg leading-relaxed mb-10">
+                Snap a few photos, get a fair estimate, and we'll haul it all away. No phone calls. No hassle.
+              </p>
+
+              {/* How it works - desktop */}
+              <div className="space-y-5 mb-10">
+                <HowItWorksStep number="1" title="Upload Photos" description="Snap a few pictures of your junk from your phone." />
+                <HowItWorksStep number="2" title="Get Your Estimate" description="We review your photos and send a fair, firm price." />
+                <HowItWorksStep number="3" title="Schedule Pickup" description="Pick a time that works. We handle the rest." />
+              </div>
+
+              {/* Trust signals */}
+              <div className="space-y-3 pt-6 border-t border-gray-800/50">
+                <CompanionTrust text="100% touchless process" />
+                <CompanionTrust text="Reviewed by a real person" />
+                <CompanionTrust text="No hidden fees" />
+                <CompanionTrust text="Fully insured" />
+              </div>
+            </div>
           </div>
-          <h1 className="text-5xl font-black leading-[1.05] tracking-tight mt-4">
-            Junk Gone.<br />
-            <span className="text-green-400">Fast & Easy.</span>
-          </h1>
-          <p className="text-gray-400 text-lg mt-4 leading-relaxed max-w-sm">
-            Snap a few photos, get a fair estimate, and we'll haul it all away. No phone calls. No hassle.
-          </p>
 
-          <button
-            onClick={() => setStep(0)}
-            className="mt-8 w-full bg-green-500 hover:bg-green-400 text-gray-950 font-extrabold text-lg py-5 rounded-2xl transition-colors shadow-lg shadow-green-500/25 active:scale-[0.98] transform"
-          >
-            Get Your Free Estimate
-          </button>
-          <p className="text-center text-gray-600 text-sm mt-3">Takes about 2 minutes</p>
-        </div>
+          {/* Right side - hero content */}
+          <div className="flex-1 flex flex-col justify-center">
+            <div className="px-5 pt-14 pb-10 max-w-lg mx-auto w-full lg:pt-0 lg:pb-0 lg:px-8 xl:px-12">
+              {/* Mobile-only hero text */}
+              <div className="lg:hidden">
+                <div className="mb-2">
+                  <span className="inline-block bg-green-500/15 text-green-400 text-xs font-bold tracking-widest uppercase px-3 py-1.5 rounded-full border border-green-500/30">
+                    Junk Pickup
+                  </span>
+                </div>
+                <h1 className="text-5xl font-black leading-[1.05] tracking-tight mt-4">
+                  Junk Gone.<br />
+                  <span className="text-green-400">Fast & Easy.</span>
+                </h1>
+                <p className="text-gray-400 text-lg mt-4 leading-relaxed max-w-sm">
+                  Snap a few photos, get a fair estimate, and we'll haul it all away. No phone calls. No hassle.
+                </p>
+              </div>
 
-        {/* How it works */}
-        <div className="px-5 pb-10 max-w-lg mx-auto">
-          <h2 className="text-sm font-bold tracking-widest uppercase text-gray-500 mb-6">How it works</h2>
-          <div className="space-y-5">
-            <HowItWorksStep number="1" title="Upload Photos" description="Snap a few pictures of your junk from your phone." />
-            <HowItWorksStep number="2" title="Get Your Estimate" description="We review your photos and send a fair, firm price." />
-            <HowItWorksStep number="3" title="Schedule Pickup" description="Pick a time that works. We handle the rest." />
-          </div>
-        </div>
+              {/* Desktop hero text */}
+              <div className="hidden lg:block mb-8">
+                <h1 className="text-4xl font-black leading-tight tracking-tight">
+                  Get your free estimate<br />
+                  <span className="text-green-400">in 2 minutes.</span>
+                </h1>
+                <p className="text-gray-400 text-base mt-3 leading-relaxed">
+                  No phone calls, no waiting. Upload a few photos and we'll send you a fair price.
+                </p>
+              </div>
 
-        {/* Trust section */}
-        <div className="px-5 pb-14 max-w-lg mx-auto">
-          <div className="bg-gray-900 rounded-2xl p-6 space-y-4 border border-gray-800">
-            <TrustBadge icon={ShieldIcon} text="100% touchless process" />
-            <TrustBadge icon={CheckCircleIcon} text="No phone calls required" />
-            <TrustBadge icon={UserGroupIcon} text="Reviewed by a real person" />
-            <TrustBadge icon={ClockIcon} text="Fast response time" />
-            <TrustBadge icon={StarIcon} text="No obligation estimate" />
-          </div>
-        </div>
+              <button
+                onClick={() => setStep(0)}
+                className="mt-8 lg:mt-0 w-full bg-green-500 hover:bg-green-400 text-gray-950 font-extrabold text-lg py-5 rounded-2xl transition-colors shadow-lg shadow-green-500/25 active:scale-[0.98] transform"
+              >
+                Get Your Free Estimate
+              </button>
+              <p className="text-center text-gray-600 text-sm mt-3">Takes about 2 minutes</p>
 
-        {/* What we haul */}
-        <div className="px-5 pb-14 max-w-lg mx-auto">
-          <h2 className="text-sm font-bold tracking-widest uppercase text-gray-500 mb-4">We haul it all</h2>
-          <div className="flex flex-wrap gap-2">
-            {['Furniture', 'Appliances', 'Yard Waste', 'Garage Cleanouts', 'Estate Cleanouts', 'Construction Debris', 'Electronics', 'Mattresses'].map(item => (
-              <span key={item} className="bg-gray-900 text-gray-300 text-sm px-4 py-2 rounded-full border border-gray-800">
-                {item}
-              </span>
-            ))}
+              {/* Desktop: what we haul chips */}
+              <div className="hidden lg:block mt-10">
+                <p className="text-xs font-bold tracking-widest uppercase text-gray-500 mb-3">We haul it all</p>
+                <div className="flex flex-wrap gap-2">
+                  {['Furniture', 'Appliances', 'Yard Waste', 'Garage Cleanouts', 'Estate Cleanouts', 'Construction Debris', 'Electronics', 'Mattresses'].map(item => (
+                    <span key={item} className="bg-gray-900 text-gray-400 text-xs px-3 py-1.5 rounded-full border border-gray-800">
+                      {item}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Mobile-only sections below the fold */}
+            <div className="lg:hidden">
+              {/* How it works */}
+              <div className="px-5 pb-10 max-w-lg mx-auto">
+                <h2 className="text-sm font-bold tracking-widest uppercase text-gray-500 mb-6">How it works</h2>
+                <div className="space-y-5">
+                  <HowItWorksStep number="1" title="Upload Photos" description="Snap a few pictures of your junk from your phone." />
+                  <HowItWorksStep number="2" title="Get Your Estimate" description="We review your photos and send a fair, firm price." />
+                  <HowItWorksStep number="3" title="Schedule Pickup" description="Pick a time that works. We handle the rest." />
+                </div>
+              </div>
+
+              {/* Trust section */}
+              <div className="px-5 pb-14 max-w-lg mx-auto">
+                <div className="bg-gray-900 rounded-2xl p-6 space-y-4 border border-gray-800">
+                  <TrustBadge icon={ShieldIcon} text="100% touchless process" />
+                  <TrustBadge icon={CheckCircleIcon} text="No phone calls required" />
+                  <TrustBadge icon={UserGroupIcon} text="Reviewed by a real person" />
+                  <TrustBadge icon={ClockIcon} text="Fast response time" />
+                  <TrustBadge icon={StarIcon} text="No obligation estimate" />
+                </div>
+              </div>
+
+              {/* What we haul */}
+              <div className="px-5 pb-14 max-w-lg mx-auto">
+                <h2 className="text-sm font-bold tracking-widest uppercase text-gray-500 mb-4">We haul it all</h2>
+                <div className="flex flex-wrap gap-2">
+                  {['Furniture', 'Appliances', 'Yard Waste', 'Garage Cleanouts', 'Estate Cleanouts', 'Construction Debris', 'Electronics', 'Mattresses'].map(item => (
+                    <span key={item} className="bg-gray-900 text-gray-300 text-sm px-4 py-2 rounded-full border border-gray-800">
+                      {item}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -405,481 +526,575 @@ export default function BookingFlow() {
   }
 
   // ──────────────────────── FORM FLOW ────────────────────────
+  const companion = COMPANION_CONTENT[step];
+
   return (
     <div className="min-h-screen bg-gray-950 text-white">
-      {/* Top bar with progress */}
-      <div className="sticky top-0 z-50 bg-gray-950/95 backdrop-blur-md border-b border-gray-800/50">
-        <div className="max-w-lg mx-auto px-5 pt-4 pb-3">
-          {/* Progress bar */}
-          <div className="h-1 bg-gray-800 rounded-full overflow-hidden mb-4">
-            <div
-              className="h-full bg-green-500 rounded-full transition-all duration-500 ease-out"
-              style={{ width: `${progressPercent}%` }}
-            />
-          </div>
-          {/* Step indicators */}
-          <div className="flex items-center justify-between">
-            {STEPS.map((s, i) => {
-              const Icon = s.icon;
-              const isActive = i === step;
-              const isDone = i < step;
-              return (
-                <div key={s.key} className="flex flex-col items-center gap-1">
-                  <div className={`w-9 h-9 rounded-full flex items-center justify-center transition-all duration-300 ${
-                    isDone ? 'bg-green-500/20 text-green-400' :
-                    isActive ? 'bg-green-500 text-gray-950 shadow-lg shadow-green-500/30' :
-                    'bg-gray-800 text-gray-600'
-                  }`}>
-                    {isDone ? (
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                      </svg>
-                    ) : (
-                      <Icon className="w-4 h-4" />
-                    )}
-                  </div>
-                  <span className={`text-[10px] font-semibold transition-colors ${
-                    isActive ? 'text-white' : isDone ? 'text-green-400' : 'text-gray-600'
-                  }`}>
-                    {s.label}
-                  </span>
-                </div>
-              );
-            })}
+      <BrandHeader />
+
+      <div className="lg:flex lg:min-h-[calc(100vh-64px)]">
+        {/* Desktop companion panel */}
+        <div className="hidden lg:flex lg:w-[45%] xl:w-[42%] bg-gradient-to-br from-gray-900 via-gray-950 to-gray-900 border-r border-gray-800/50 flex-col justify-center px-12 xl:px-16 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-green-500/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+          <div className="absolute bottom-0 left-0 w-48 h-48 bg-green-500/5 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2" />
+
+          <div className="max-w-md relative">
+            {/* Step context icon */}
+            <div className="w-14 h-14 bg-green-500/15 rounded-2xl flex items-center justify-center mb-6">
+              {React.createElement(STEPS[step].icon, { className: 'w-7 h-7 text-green-400' })}
+            </div>
+
+            <h2 className="text-3xl font-black text-white leading-tight mb-4">
+              {companion.headline}
+            </h2>
+            <p className="text-gray-400 text-lg leading-relaxed mb-10">
+              {companion.body}
+            </p>
+
+            {/* Contextual trust signals */}
+            <div className="space-y-4 pt-6 border-t border-gray-800/50">
+              {companion.trust.map(text => (
+                <CompanionTrust key={text} text={text} />
+              ))}
+            </div>
+
+            {/* Progress indicator on desktop */}
+            <div className="mt-10 pt-6 border-t border-gray-800/50">
+              <div className="flex items-center gap-2">
+                {STEPS.map((s, i) => (
+                  <div
+                    key={s.key}
+                    className={`h-1.5 rounded-full flex-1 transition-all duration-500 ${
+                      i < step ? 'bg-green-500' :
+                      i === step ? 'bg-green-400' :
+                      'bg-gray-800'
+                    }`}
+                  />
+                ))}
+              </div>
+              <p className="text-gray-600 text-xs mt-2">Step {step + 1} of {STEPS.length}</p>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Form content */}
-      <div className="max-w-lg mx-auto px-5 py-8">
-        {/* Step header */}
-        <div className="mb-6">
-          <h2 className="text-2xl font-black text-white">{STEPS[step].description}</h2>
-          <p className="text-gray-500 text-sm mt-1">
-            Step {step + 1} of {STEPS.length}
-          </p>
-        </div>
-
-        {/* ──── Step 0: Contact ──── */}
-        {step === 0 && (
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <FloatingInput label="First name" value={form.firstName} onChange={v => update('firstName', v)} autoFocus />
-              <FloatingInput label="Last name" value={form.lastName} onChange={v => update('lastName', v)} />
-            </div>
-            <FloatingInput label="Phone number" type="tel" value={form.phone} onChange={v => update('phone', v)} placeholder="(555) 555-5555" />
-            <FloatingInput label="Email (optional)" type="email" value={form.email} onChange={v => update('email', v)} placeholder="you@example.com" />
-            <InlineTrust text="We'll only use this to send your estimate" />
-          </div>
-        )}
-
-        {/* ──── Step 1: Address ──── */}
-        {step === 1 && (
-          <div className="space-y-4">
-            <FloatingInput label="Street address" value={form.address} onChange={v => update('address', v)} autoFocus placeholder="123 Main St" />
-            <div className="grid grid-cols-5 gap-3">
-              <div className="col-span-3">
-                <FloatingInput label="City" value={form.city} onChange={v => update('city', v)} />
+        {/* Right side - form */}
+        <div className="flex-1 flex flex-col">
+          {/* Mobile-only progress bar */}
+          <div className="lg:hidden sticky top-0 z-50 bg-gray-950/95 backdrop-blur-md border-b border-gray-800/50">
+            <div className="max-w-lg mx-auto px-5 pt-4 pb-3">
+              <div className="h-1 bg-gray-800 rounded-full overflow-hidden mb-4">
+                <div
+                  className="h-full bg-green-500 rounded-full transition-all duration-500 ease-out"
+                  style={{ width: `${progressPercent}%` }}
+                />
               </div>
-              <FloatingInput label="State" value={form.state} onChange={v => update('state', v)} placeholder="GA" />
-              <FloatingInput label="ZIP" value={form.zip} onChange={v => update('zip', v)} placeholder="30301" />
-            </div>
-            <InlineTrust text="We need this to check if we service your area" />
-          </div>
-        )}
-
-        {/* ──── Step 2: Photos ──── */}
-        {step === 2 && (
-          <div className="space-y-4">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              multiple
-              className="hidden"
-              onChange={handlePhotoUpload}
-            />
-
-            {form.photos.length < 10 && !uploadingPhotos && (
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="w-full border-2 border-dashed border-gray-700 hover:border-green-500/50 rounded-2xl p-8 text-center transition-all hover:bg-green-500/5 group"
-              >
-                <div className="w-14 h-14 bg-gray-800 group-hover:bg-green-500/20 rounded-2xl flex items-center justify-center mx-auto mb-3 transition-colors">
-                  <CameraIcon className="w-7 h-7 text-gray-500 group-hover:text-green-400 transition-colors" />
-                </div>
-                <span className="text-white font-bold text-base block">
-                  Tap to add photos
-                </span>
-                <span className="text-gray-500 text-sm mt-1 block">
-                  {form.photos.length === 0
-                    ? 'Upload at least 3 photos of your items'
-                    : `${form.photos.length}/10 photos (${Math.max(0, 3 - form.photos.length)} more required)`
-                  }
-                </span>
-              </button>
-            )}
-
-            {form.photos.length > 0 && (
-              <div className="grid grid-cols-3 gap-2">
-                {form.photos.map((photo, i) => (
-                  <div key={i} className="relative aspect-square rounded-xl overflow-hidden bg-gray-800 ring-1 ring-gray-700">
-                    <img src={photo} alt={`Photo ${i + 1}`} className="w-full h-full object-cover" />
-                    <button
-                      onClick={() => removePhoto(i)}
-                      className="absolute top-1.5 right-1.5 w-7 h-7 bg-black/70 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-red-500/80 transition-colors"
-                    >
-                      <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </div>
-                ))}
-                {form.photos.length < 10 && (
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    className="aspect-square rounded-xl border-2 border-dashed border-gray-700 flex items-center justify-center hover:border-green-500/50 transition-colors"
-                  >
-                    <svg className="w-6 h-6 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                    </svg>
-                  </button>
-                )}
-              </div>
-            )}
-
-            {form.photos.length >= 3 && !aiItems && (
-              <button
-                onClick={analyzePhotos}
-                disabled={analyzing}
-                className="w-full bg-gray-800 hover:bg-gray-700 text-white py-4 rounded-xl font-bold text-sm disabled:opacity-50 transition-colors border border-gray-700 flex items-center justify-center gap-2"
-              >
-                {analyzing ? (
-                  <>
-                    <svg className="animate-spin w-5 h-5" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                    </svg>
-                    Identifying items...
-                  </>
-                ) : (
-                  <>
-                    <SparkleIcon className="w-5 h-5 text-green-400" />
-                    Auto-detect items from photos
-                  </>
-                )}
-              </button>
-            )}
-
-            {aiItems && aiItems.length > 0 && (
-              <div className="bg-gray-900 rounded-2xl p-4 space-y-2 border border-gray-800">
-                <div className="flex items-center gap-2 mb-3">
-                  <SparkleIcon className="w-4 h-4 text-green-400" />
-                  <span className="text-sm font-bold text-white">Items detected - confirm or edit:</span>
-                </div>
-                {aiItems.map((item, i) => (
-                  <div key={i} className="flex items-center gap-2 bg-gray-800 rounded-xl p-2.5">
-                    <input
-                      type="text"
-                      value={item.item}
-                      onChange={e => updateDetectedItem(i, 'item', e.target.value)}
-                      className="flex-1 text-sm bg-transparent text-white border border-gray-700 rounded-lg px-3 py-2 focus:outline-none focus:border-green-500"
-                    />
-                    <input
-                      type="number"
-                      min="1"
-                      value={item.quantity}
-                      onChange={e => updateDetectedItem(i, 'quantity', Number(e.target.value))}
-                      className="w-16 text-sm bg-transparent text-white border border-gray-700 rounded-lg px-2 py-2 text-center focus:outline-none focus:border-green-500"
-                    />
-                    <button
-                      onClick={() => removeDetectedItem(i)}
-                      className="text-gray-600 hover:text-red-400 p-1.5 transition-colors"
-                    >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {aiItems && aiItems.length === 0 && (
-              <p className="text-sm text-gray-500 text-center py-2">
-                Couldn't auto-detect items. No worries - just describe them in the next step.
-              </p>
-            )}
-
-            {uploadingPhotos && (
-              <div className="flex items-center justify-center gap-2 py-3 text-sm text-gray-400">
-                <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
-                Uploading photos...
-              </div>
-            )}
-
-            {photoError && (
-              <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 text-sm text-red-400 text-center">
-                {photoError}
-              </div>
-            )}
-
-            <InlineTrust text="Photos help us give you an accurate, no-surprise estimate" />
-          </div>
-        )}
-
-        {/* ──── Step 3: Details ──── */}
-        {step === 3 && (
-          <div className="space-y-6">
-            <div>
-              <label className="block text-sm font-bold text-gray-400 mb-3 uppercase tracking-wide">How much stuff?</label>
-              <div className="grid grid-cols-2 gap-2">
-                {QUANTITY_OPTIONS.map(opt => (
-                  <button
-                    key={opt.value}
-                    onClick={() => update('quantity', opt.value)}
-                    className={`p-4 rounded-xl border text-left transition-all ${
-                      form.quantity === opt.value
-                        ? 'bg-green-500/10 border-green-500 ring-1 ring-green-500'
-                        : 'bg-gray-900 border-gray-800 hover:border-gray-600'
-                    }`}
-                  >
-                    <span className={`text-2xl font-black block ${form.quantity === opt.value ? 'text-green-400' : 'text-gray-600'}`}>
-                      {opt.icon}
-                    </span>
-                    <span className={`text-sm font-bold block mt-1 ${form.quantity === opt.value ? 'text-white' : 'text-gray-300'}`}>
-                      {opt.label}
-                    </span>
-                    <span className="text-xs text-gray-500 block">{opt.sub}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-bold text-gray-400 mb-3 uppercase tracking-wide">Where are the items?</label>
-              <div className="space-y-2">
-                {ACCESS_OPTIONS.map(opt => (
-                  <button
-                    key={opt.value}
-                    onClick={() => update('accessType', opt.value)}
-                    className={`w-full flex items-center gap-3 p-4 rounded-xl border text-left transition-all ${
-                      form.accessType === opt.value
-                        ? 'bg-green-500/10 border-green-500 ring-1 ring-green-500'
-                        : 'bg-gray-900 border-gray-800 hover:border-gray-600'
-                    }`}
-                  >
-                    <span className="text-xl">{opt.icon}</span>
-                    <span className={`font-semibold text-sm ${form.accessType === opt.value ? 'text-white' : 'text-gray-300'}`}>
-                      {opt.label}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-bold text-gray-400 mb-3 uppercase tracking-wide">Any stairs?</label>
-              <div className="grid grid-cols-2 gap-2">
-                {STAIRS_OPTIONS.map(opt => (
-                  <button
-                    key={opt.value}
-                    onClick={() => update('stairs', opt.value)}
-                    className={`p-3.5 rounded-xl border font-semibold text-sm transition-all ${
-                      form.stairs === opt.value
-                        ? 'bg-green-500/10 border-green-500 text-white ring-1 ring-green-500'
-                        : 'bg-gray-900 border-gray-800 text-gray-400 hover:border-gray-600'
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {(form.accessType === 'upstairs' || form.accessType === 'basement') && (
-              <div>
-                <label className="block text-sm font-bold text-gray-400 mb-3 uppercase tracking-wide">Elevator available?</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {ELEVATOR_OPTIONS.map(opt => (
-                    <button
-                      key={opt.value}
-                      onClick={() => update('elevator', opt.value)}
-                      className={`p-3.5 rounded-xl border font-semibold text-sm transition-all ${
-                        form.elevator === opt.value
-                          ? 'bg-green-500/10 border-green-500 text-white ring-1 ring-green-500'
-                          : 'bg-gray-900 border-gray-800 text-gray-400 hover:border-gray-600'
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div>
-              <label className="block text-sm font-bold text-gray-400 mb-2 uppercase tracking-wide">
-                Anything else? <span className="text-gray-600 font-normal normal-case tracking-normal">(optional)</span>
-              </label>
-              <textarea
-                className="w-full bg-gray-900 border border-gray-800 rounded-xl px-4 py-3.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-green-500 transition-colors resize-none"
-                rows={3}
-                value={form.description}
-                onChange={e => update('description', e.target.value)}
-                placeholder="e.g. Old furniture from a renovation, some items are heavy..."
-              />
-            </div>
-          </div>
-        )}
-
-        {/* ──── Step 4: Schedule ──── */}
-        {step === 4 && (
-          <div className="space-y-6">
-            <div>
-              <label className="block text-sm font-bold text-gray-400 mb-3 uppercase tracking-wide">Pick a day</label>
-              <div className="grid grid-cols-3 gap-2">
-                {availableDays.map(day => {
-                  const { weekday, date } = formatDateShort(day);
-                  const isSelected = form.preferredDate === day;
-                  const isSecond = form.secondChoiceDate === day;
+              <div className="flex items-center justify-between">
+                {STEPS.map((s, i) => {
+                  const Icon = s.icon;
+                  const isActive = i === step;
+                  const isDone = i < step;
                   return (
-                    <button
-                      key={day}
-                      onClick={() => update('preferredDate', day)}
-                      className={`p-3 rounded-xl border text-center transition-all ${
-                        isSelected
-                          ? 'bg-green-500/15 border-green-500 ring-1 ring-green-500'
-                          : isSecond
-                          ? 'bg-gray-800 border-gray-600'
-                          : 'bg-gray-900 border-gray-800 hover:border-gray-600'
-                      }`}
-                    >
-                      <span className={`text-xs font-bold block ${isSelected ? 'text-green-400' : 'text-gray-500'}`}>
-                        {weekday}
+                    <div key={s.key} className="flex flex-col items-center gap-1">
+                      <div className={`w-9 h-9 rounded-full flex items-center justify-center transition-all duration-300 ${
+                        isDone ? 'bg-green-500/20 text-green-400' :
+                        isActive ? 'bg-green-500 text-gray-950 shadow-lg shadow-green-500/30' :
+                        'bg-gray-800 text-gray-600'
+                      }`}>
+                        {isDone ? (
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                        ) : (
+                          <Icon className="w-4 h-4" />
+                        )}
+                      </div>
+                      <span className={`text-[10px] font-semibold transition-colors ${
+                        isActive ? 'text-white' : isDone ? 'text-green-400' : 'text-gray-600'
+                      }`}>
+                        {s.label}
                       </span>
-                      <span className={`text-sm font-semibold block mt-0.5 ${isSelected ? 'text-white' : 'text-gray-300'}`}>
-                        {date}
-                      </span>
-                    </button>
+                    </div>
                   );
                 })}
               </div>
             </div>
+          </div>
 
-            {form.preferredDate && (
-              <div>
-                <label className="block text-sm font-bold text-gray-400 mb-3 uppercase tracking-wide">
-                  Backup day <span className="text-gray-600 font-normal normal-case tracking-normal">(optional)</span>
-                </label>
-                <div className="grid grid-cols-3 gap-2">
-                  {availableDays.filter(d => d !== form.preferredDate).slice(0, 6).map(day => {
-                    const { weekday, date } = formatDateShort(day);
-                    const isSelected = form.secondChoiceDate === day;
-                    return (
-                      <button
-                        key={day}
-                        onClick={() => update('secondChoiceDate', form.secondChoiceDate === day ? '' : day)}
-                        className={`p-3 rounded-xl border text-center transition-all ${
-                          isSelected
-                            ? 'bg-green-500/15 border-green-500 ring-1 ring-green-500'
-                            : 'bg-gray-900 border-gray-800 hover:border-gray-600'
-                        }`}
-                      >
-                        <span className={`text-xs font-bold block ${isSelected ? 'text-green-400' : 'text-gray-500'}`}>
-                          {weekday}
-                        </span>
-                        <span className={`text-sm font-semibold block mt-0.5 ${isSelected ? 'text-white' : 'text-gray-300'}`}>
-                          {date}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
+          {/* Form content */}
+          <div className="flex-1 flex flex-col justify-center">
+            <div className="max-w-lg mx-auto w-full px-5 py-8 lg:px-8 xl:px-12 lg:py-0">
+              {/* Step header */}
+              <div className="mb-6">
+                <h2 className="text-2xl font-black text-white">{STEPS[step].description}</h2>
+                <p className="text-gray-500 text-sm mt-1 lg:hidden">
+                  Step {step + 1} of {STEPS.length}
+                </p>
               </div>
-            )}
 
-            <div>
-              <label className="block text-sm font-bold text-gray-400 mb-3 uppercase tracking-wide">Preferred time</label>
-              <div className="grid grid-cols-3 gap-2">
-                {TIME_PREFERENCES.map(pref => (
+              {/* ──── Step 0: Contact ──── */}
+              {step === 0 && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <FloatingInput label="First name" value={form.firstName} onChange={v => update('firstName', v)} autoFocus />
+                    <FloatingInput label="Last name" value={form.lastName} onChange={v => update('lastName', v)} />
+                  </div>
+                  <FloatingInput label="Phone number" type="tel" value={form.phone} onChange={v => update('phone', v)} placeholder="(555) 555-5555" />
+                  <FloatingInput label="Email (optional)" type="email" value={form.email} onChange={v => update('email', v)} placeholder="you@example.com" />
+                  <InlineTrust text="We'll only use this to send your estimate" />
+                </div>
+              )}
+
+              {/* ──── Step 1: Address ──── */}
+              {step === 1 && (
+                <div className="space-y-4">
+                  <FloatingInput label="Street address" value={form.address} onChange={v => update('address', v)} autoFocus placeholder="123 Main St" />
+                  <div className="grid grid-cols-5 gap-3">
+                    <div className="col-span-3">
+                      <FloatingInput label="City" value={form.city} onChange={v => update('city', v)} />
+                    </div>
+                    <FloatingInput label="State" value={form.state} onChange={v => update('state', v)} placeholder="GA" />
+                    <FloatingInput label="ZIP" value={form.zip} onChange={v => update('zip', v)} placeholder="30301" />
+                  </div>
+                  <InlineTrust text="We need this to check if we service your area" />
+                </div>
+              )}
+
+              {/* ──── Step 2: Photos ──── */}
+              {step === 2 && (
+                <div className="space-y-4">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={handlePhotoUpload}
+                  />
+
+                  {form.photos.length < 10 && !uploadingPhotos && (
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      className="w-full border-2 border-dashed border-gray-700 hover:border-green-500/50 rounded-2xl p-8 text-center transition-all hover:bg-green-500/5 group"
+                    >
+                      <div className="w-14 h-14 bg-gray-800 group-hover:bg-green-500/20 rounded-2xl flex items-center justify-center mx-auto mb-3 transition-colors">
+                        <CameraIcon className="w-7 h-7 text-gray-500 group-hover:text-green-400 transition-colors" />
+                      </div>
+                      <span className="text-white font-bold text-base block">
+                        Tap to add photos
+                      </span>
+                      <span className="text-gray-500 text-sm mt-1 block">
+                        {form.photos.length === 0
+                          ? 'Upload at least 3 photos of your items'
+                          : `${form.photos.length}/10 photos (${Math.max(0, 3 - form.photos.length)} more required)`
+                        }
+                      </span>
+                    </button>
+                  )}
+
+                  {form.photos.length > 0 && (
+                    <div className="grid grid-cols-3 gap-2">
+                      {form.photos.map((photo, i) => (
+                        <div key={i} className="relative aspect-square rounded-xl overflow-hidden bg-gray-800 ring-1 ring-gray-700">
+                          <img src={photo} alt={`Photo ${i + 1}`} className="w-full h-full object-cover" />
+                          <button
+                            onClick={() => removePhoto(i)}
+                            className="absolute top-1.5 right-1.5 w-7 h-7 bg-black/70 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-red-500/80 transition-colors"
+                          >
+                            <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </div>
+                      ))}
+                      {form.photos.length < 10 && (
+                        <button
+                          onClick={() => fileInputRef.current?.click()}
+                          className="aspect-square rounded-xl border-2 border-dashed border-gray-700 flex items-center justify-center hover:border-green-500/50 transition-colors"
+                        >
+                          <svg className="w-6 h-6 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  {form.photos.length >= 3 && !aiItems && (
+                    <button
+                      onClick={analyzePhotos}
+                      disabled={analyzing}
+                      className="w-full bg-gray-800 hover:bg-gray-700 text-white py-4 rounded-xl font-bold text-sm disabled:opacity-50 transition-colors border border-gray-700 flex items-center justify-center gap-2"
+                    >
+                      {analyzing ? (
+                        <>
+                          <svg className="animate-spin w-5 h-5" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                          </svg>
+                          Identifying items...
+                        </>
+                      ) : (
+                        <>
+                          <SparkleIcon className="w-5 h-5 text-green-400" />
+                          Auto-detect items from photos
+                        </>
+                      )}
+                    </button>
+                  )}
+
+                  {aiItems && aiItems.length > 0 && (
+                    <div className="bg-gray-900 rounded-2xl p-4 space-y-2 border border-gray-800">
+                      <div className="flex items-center gap-2 mb-3">
+                        <SparkleIcon className="w-4 h-4 text-green-400" />
+                        <span className="text-sm font-bold text-white">Items detected - confirm or edit:</span>
+                      </div>
+                      {aiItems.map((item, i) => (
+                        <div key={i} className="flex items-center gap-2 bg-gray-800 rounded-xl p-2.5">
+                          <input
+                            type="text"
+                            value={item.item}
+                            onChange={e => updateDetectedItem(i, 'item', e.target.value)}
+                            className="flex-1 text-sm bg-transparent text-white border border-gray-700 rounded-lg px-3 py-2 focus:outline-none focus:border-green-500"
+                          />
+                          <input
+                            type="number"
+                            min="1"
+                            value={item.quantity}
+                            onChange={e => updateDetectedItem(i, 'quantity', Number(e.target.value))}
+                            className="w-16 text-sm bg-transparent text-white border border-gray-700 rounded-lg px-2 py-2 text-center focus:outline-none focus:border-green-500"
+                          />
+                          <button
+                            onClick={() => removeDetectedItem(i)}
+                            className="text-gray-600 hover:text-red-400 p-1.5 transition-colors"
+                          >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {aiItems && aiItems.length === 0 && (
+                    <p className="text-sm text-gray-500 text-center py-2">
+                      Couldn't auto-detect items. No worries - just describe them in the next step.
+                    </p>
+                  )}
+
+                  {uploadingPhotos && (
+                    <div className="flex items-center justify-center gap-2 py-3 text-sm text-gray-400">
+                      <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                      Uploading photos...
+                    </div>
+                  )}
+
+                  {photoError && (
+                    <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 text-sm text-red-400 text-center">
+                      {photoError}
+                    </div>
+                  )}
+
+                  <InlineTrust text="Photos help us give you an accurate, no-surprise estimate" />
+                </div>
+              )}
+
+              {/* ──── Step 3: Details ──── */}
+              {step === 3 && (
+                <div className="space-y-6">
+                  <div>
+                    <label className="block text-sm font-bold text-gray-400 mb-3 uppercase tracking-wide">How much stuff?</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {QUANTITY_OPTIONS.map(opt => (
+                        <button
+                          key={opt.value}
+                          onClick={() => update('quantity', opt.value)}
+                          className={`p-4 rounded-xl border text-left transition-all ${
+                            form.quantity === opt.value
+                              ? 'bg-green-500/10 border-green-500 ring-1 ring-green-500'
+                              : 'bg-gray-900 border-gray-800 hover:border-gray-600'
+                          }`}
+                        >
+                          <span className={`text-2xl font-black block ${form.quantity === opt.value ? 'text-green-400' : 'text-gray-600'}`}>
+                            {opt.icon}
+                          </span>
+                          <span className={`text-sm font-bold block mt-1 ${form.quantity === opt.value ? 'text-white' : 'text-gray-300'}`}>
+                            {opt.label}
+                          </span>
+                          <span className="text-xs text-gray-500 block">{opt.sub}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-bold text-gray-400 mb-3 uppercase tracking-wide">Where are the items?</label>
+                    <div className="space-y-2">
+                      {ACCESS_OPTIONS.map(opt => (
+                        <button
+                          key={opt.value}
+                          onClick={() => update('accessType', opt.value)}
+                          className={`w-full flex items-center gap-3 p-4 rounded-xl border text-left transition-all ${
+                            form.accessType === opt.value
+                              ? 'bg-green-500/10 border-green-500 ring-1 ring-green-500'
+                              : 'bg-gray-900 border-gray-800 hover:border-gray-600'
+                          }`}
+                        >
+                          <span className="text-xl">{opt.icon}</span>
+                          <span className={`font-semibold text-sm ${form.accessType === opt.value ? 'text-white' : 'text-gray-300'}`}>
+                            {opt.label}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-bold text-gray-400 mb-3 uppercase tracking-wide">Any stairs?</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {STAIRS_OPTIONS.map(opt => (
+                        <button
+                          key={opt.value}
+                          onClick={() => update('stairs', opt.value)}
+                          className={`p-3.5 rounded-xl border font-semibold text-sm transition-all ${
+                            form.stairs === opt.value
+                              ? 'bg-green-500/10 border-green-500 text-white ring-1 ring-green-500'
+                              : 'bg-gray-900 border-gray-800 text-gray-400 hover:border-gray-600'
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {(form.accessType === 'upstairs' || form.accessType === 'basement') && (
+                    <div>
+                      <label className="block text-sm font-bold text-gray-400 mb-3 uppercase tracking-wide">Elevator available?</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {ELEVATOR_OPTIONS.map(opt => (
+                          <button
+                            key={opt.value}
+                            onClick={() => update('elevator', opt.value)}
+                            className={`p-3.5 rounded-xl border font-semibold text-sm transition-all ${
+                              form.elevator === opt.value
+                                ? 'bg-green-500/10 border-green-500 text-white ring-1 ring-green-500'
+                                : 'bg-gray-900 border-gray-800 text-gray-400 hover:border-gray-600'
+                            }`}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-sm font-bold text-gray-400 mb-2 uppercase tracking-wide">
+                      Anything else? <span className="text-gray-600 font-normal normal-case tracking-normal">(optional)</span>
+                    </label>
+                    <textarea
+                      className="w-full bg-gray-900 border border-gray-800 rounded-xl px-4 py-3.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-green-500 transition-colors resize-none"
+                      rows={3}
+                      value={form.description}
+                      onChange={e => update('description', e.target.value)}
+                      placeholder="e.g. Old furniture from a renovation, some items are heavy..."
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* ──── Step 4: Schedule ──── */}
+              {step === 4 && (
+                <div className="space-y-6">
+                  <div>
+                    <label className="block text-sm font-bold text-gray-400 mb-3 uppercase tracking-wide">Pick a day</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {availableDays.map(day => {
+                        const { weekday, date } = formatDateShort(day);
+                        const isSelected = form.preferredDate === day;
+                        const isSecond = form.secondChoiceDate === day;
+                        return (
+                          <button
+                            key={day}
+                            onClick={() => update('preferredDate', day)}
+                            className={`p-3 rounded-xl border text-center transition-all ${
+                              isSelected
+                                ? 'bg-green-500/15 border-green-500 ring-1 ring-green-500'
+                                : isSecond
+                                ? 'bg-gray-800 border-gray-600'
+                                : 'bg-gray-900 border-gray-800 hover:border-gray-600'
+                            }`}
+                          >
+                            <span className={`text-xs font-bold block ${isSelected ? 'text-green-400' : 'text-gray-500'}`}>
+                              {weekday}
+                            </span>
+                            <span className={`text-sm font-semibold block mt-0.5 ${isSelected ? 'text-white' : 'text-gray-300'}`}>
+                              {date}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {form.preferredDate && (
+                    <div>
+                      <label className="block text-sm font-bold text-gray-400 mb-3 uppercase tracking-wide">
+                        Backup day <span className="text-gray-600 font-normal normal-case tracking-normal">(optional)</span>
+                      </label>
+                      <div className="grid grid-cols-3 gap-2">
+                        {availableDays.filter(d => d !== form.preferredDate).slice(0, 6).map(day => {
+                          const { weekday, date } = formatDateShort(day);
+                          const isSelected = form.secondChoiceDate === day;
+                          return (
+                            <button
+                              key={day}
+                              onClick={() => update('secondChoiceDate', form.secondChoiceDate === day ? '' : day)}
+                              className={`p-3 rounded-xl border text-center transition-all ${
+                                isSelected
+                                  ? 'bg-green-500/15 border-green-500 ring-1 ring-green-500'
+                                  : 'bg-gray-900 border-gray-800 hover:border-gray-600'
+                              }`}
+                            >
+                              <span className={`text-xs font-bold block ${isSelected ? 'text-green-400' : 'text-gray-500'}`}>
+                                {weekday}
+                              </span>
+                              <span className={`text-sm font-semibold block mt-0.5 ${isSelected ? 'text-white' : 'text-gray-300'}`}>
+                                {date}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-sm font-bold text-gray-400 mb-3 uppercase tracking-wide">Preferred time</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {TIME_PREFERENCES.map(pref => (
+                        <button
+                          key={pref.value}
+                          onClick={() => update('timePreference', pref.value)}
+                          className={`p-4 rounded-xl border text-center transition-all ${
+                            form.timePreference === pref.value
+                              ? 'bg-green-500/15 border-green-500 ring-1 ring-green-500'
+                              : 'bg-gray-900 border-gray-800 hover:border-gray-600'
+                          }`}
+                        >
+                          <span className="text-xl block">{pref.icon}</span>
+                          <span className={`text-sm font-bold block mt-1 ${form.timePreference === pref.value ? 'text-white' : 'text-gray-300'}`}>
+                            {pref.label}
+                          </span>
+                          <span className="text-xs text-gray-500 block">{pref.sub}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <InlineTrust text="You'll confirm the exact time when you accept your estimate" />
+                </div>
+              )}
+
+              {submitError && (
+                <div className="mt-4 bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-sm text-red-400 text-center">
+                  {submitError}
+                </div>
+              )}
+
+              {/* Navigation */}
+              <div className="mt-8 space-y-3 pb-8 lg:pb-0">
+                {step < STEPS.length - 1 ? (
                   <button
-                    key={pref.value}
-                    onClick={() => update('timePreference', pref.value)}
-                    className={`p-4 rounded-xl border text-center transition-all ${
-                      form.timePreference === pref.value
-                        ? 'bg-green-500/15 border-green-500 ring-1 ring-green-500'
-                        : 'bg-gray-900 border-gray-800 hover:border-gray-600'
-                    }`}
+                    onClick={next}
+                    disabled={!canProceed()}
+                    className="w-full bg-green-500 hover:bg-green-400 text-gray-950 py-4.5 rounded-xl text-base font-extrabold shadow-lg shadow-green-500/20 disabled:opacity-30 disabled:shadow-none disabled:hover:bg-green-500 active:scale-[0.98] transform transition-all"
+                    style={{ paddingTop: '18px', paddingBottom: '18px' }}
                   >
-                    <span className="text-xl block">{pref.icon}</span>
-                    <span className={`text-sm font-bold block mt-1 ${form.timePreference === pref.value ? 'text-white' : 'text-gray-300'}`}>
-                      {pref.label}
-                    </span>
-                    <span className="text-xs text-gray-500 block">{pref.sub}</span>
+                    Continue
                   </button>
-                ))}
+                ) : (
+                  <button
+                    onClick={handleSubmit}
+                    disabled={!canProceed() || submitting}
+                    className="w-full bg-green-500 hover:bg-green-400 text-gray-950 py-4.5 rounded-xl text-base font-extrabold shadow-lg shadow-green-500/20 disabled:opacity-30 disabled:shadow-none disabled:hover:bg-green-500 active:scale-[0.98] transform transition-all"
+                    style={{ paddingTop: '18px', paddingBottom: '18px' }}
+                  >
+                    {submitting ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <svg className="animate-spin w-5 h-5" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                        Submitting...
+                      </span>
+                    ) : (
+                      'Submit Request'
+                    )}
+                  </button>
+                )}
+
+                <button
+                  onClick={back}
+                  className="w-full text-gray-500 hover:text-gray-300 py-3 text-sm font-semibold transition-colors"
+                >
+                  {step === 0 ? 'Back to start' : 'Back'}
+                </button>
               </div>
             </div>
-
-            <InlineTrust text="You'll confirm the exact time when you accept your estimate" />
           </div>
-        )}
-
-        {submitError && (
-          <div className="mt-4 bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-sm text-red-400 text-center">
-            {submitError}
-          </div>
-        )}
-
-        {/* Navigation */}
-        <div className="mt-8 space-y-3 pb-8">
-          {step < STEPS.length - 1 ? (
-            <button
-              onClick={next}
-              disabled={!canProceed()}
-              className="w-full bg-green-500 hover:bg-green-400 text-gray-950 py-4.5 rounded-xl text-base font-extrabold shadow-lg shadow-green-500/20 disabled:opacity-30 disabled:shadow-none disabled:hover:bg-green-500 active:scale-[0.98] transform transition-all"
-              style={{ paddingTop: '18px', paddingBottom: '18px' }}
-            >
-              Continue
-            </button>
-          ) : (
-            <button
-              onClick={handleSubmit}
-              disabled={!canProceed() || submitting}
-              className="w-full bg-green-500 hover:bg-green-400 text-gray-950 py-4.5 rounded-xl text-base font-extrabold shadow-lg shadow-green-500/20 disabled:opacity-30 disabled:shadow-none disabled:hover:bg-green-500 active:scale-[0.98] transform transition-all"
-              style={{ paddingTop: '18px', paddingBottom: '18px' }}
-            >
-              {submitting ? (
-                <span className="flex items-center justify-center gap-2">
-                  <svg className="animate-spin w-5 h-5" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                  </svg>
-                  Submitting...
-                </span>
-              ) : (
-                'Submit Request'
-              )}
-            </button>
-          )}
-
-          <button
-            onClick={back}
-            className="w-full text-gray-500 hover:text-gray-300 py-3 text-sm font-semibold transition-colors"
-          >
-            {step === 0 ? 'Back to start' : 'Back'}
-          </button>
         </div>
       </div>
     </div>
   );
 }
 
-// ──────────────────────── COMPONENTS ────────────────────────
+// ──────────────────────── LAYOUT COMPONENTS ────────────────────────
+
+function BrandHeader() {
+  return (
+    <header className="bg-gray-950 border-b border-gray-800/50">
+      <div className="max-w-7xl mx-auto px-5 lg:px-8 h-16 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          {/* Logo mark */}
+          <div className="w-9 h-9 bg-green-500 rounded-xl flex items-center justify-center flex-shrink-0">
+            <TruckIcon className="w-5 h-5 text-gray-950" />
+          </div>
+          <div className="flex flex-col">
+            <span className="text-white font-black text-base leading-tight tracking-tight">Junk Pickup</span>
+            <span className="text-gray-500 text-[10px] font-bold tracking-widest uppercase leading-tight">We Haul It All</span>
+          </div>
+        </div>
+        <a
+          href="tel:+15555555555"
+          className="text-gray-500 hover:text-gray-300 text-xs font-semibold transition-colors hidden sm:flex items-center gap-1.5"
+        >
+          <PhoneIcon className="w-3.5 h-3.5" />
+          Need help?
+        </a>
+      </div>
+    </header>
+  );
+}
+
+function CompanionTrust({ text }) {
+  return (
+    <div className="flex items-center gap-3">
+      <div className="w-5 h-5 rounded-full bg-green-500/15 flex items-center justify-center flex-shrink-0">
+        <svg className="w-3 h-3 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+        </svg>
+      </div>
+      <span className="text-gray-400 text-sm">{text}</span>
+    </div>
+  );
+}
+
+// ──────────────────────── FORM COMPONENTS ────────────────────────
 
 function FloatingInput({ label, type = 'text', value, onChange, placeholder, autoFocus }) {
   return (
@@ -930,6 +1145,22 @@ function InlineTrust({ text }) {
 }
 
 // ──────────────────────── ICONS ────────────────────────
+
+function TruckIcon({ className }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
+    </svg>
+  );
+}
+
+function PhoneIcon({ className }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+    </svg>
+  );
+}
 
 function UserIcon({ className }) {
   return (
