@@ -298,6 +298,7 @@ export default function Commercial() {
                   display: 'block',
                   width: 'min(90%, 600px)',
                   height: 'auto',
+                  mixBlendMode: 'multiply',
                   filter: 'drop-shadow(0 20px 40px rgba(34, 197, 94, 0.15))',
                 }}
               />
