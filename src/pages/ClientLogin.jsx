@@ -31,7 +31,7 @@ export default function ClientLogin() {
         if (password.length < 8) {
           throw new Error("Password must be at least 8 characters.");
         }
-        const { data: signUpData, error } = await supabase.auth.signUp({
+        const { error } = await supabase.auth.signUp({
           email,
           password,
           options: {
@@ -40,21 +40,11 @@ export default function ClientLogin() {
           },
         });
         if (error) throw error;
-        // Supabase returns a user with no identities if the email is already taken
-        if (signUpData?.user && signUpData.user.identities?.length === 0) {
-          throw new Error("An account with this email already exists. Try logging in instead.");
-        }
         setSignupSuccess(true);
       }
     } catch (err) {
-      const msg = err?.message || JSON.stringify(err) || "Something went wrong.";
-      if (msg === "{}" || msg === "{}}" ) {
-        setError("An account with this email may already exist. Try logging in instead.");
-      } else if (msg.includes("<!DOCTYPE") || msg.includes("is not valid JSON")) {
-        setError("Unable to reach the authentication service. Please try again in a moment.");
-      } else {
-        setError(msg);
-      }
+      const msg = err?.message || "Something went wrong.";
+      setError(msg);
     } finally {
       setLoading(false);
     }
