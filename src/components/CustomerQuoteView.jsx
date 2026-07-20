@@ -141,10 +141,22 @@ export default function CustomerQuoteView({ formData, quoteResult, onClose }) {
       scopeText,
       validDateStr,
     });
-    const win = window.open('', '_blank', 'width=700,height=900');
-    win.document.write(html);
-    win.document.close();
-    win.onload = () => { win.print(); };
+
+    // Use a hidden iframe to avoid popup blockers
+    let iframe = document.getElementById('quote-print-frame');
+    if (iframe) iframe.remove();
+    iframe = document.createElement('iframe');
+    iframe.id = 'quote-print-frame';
+    iframe.style.cssText = 'position:fixed;width:0;height:0;border:none;left:-9999px;';
+    document.body.appendChild(iframe);
+    const doc = iframe.contentDocument || iframe.contentWindow.document;
+    doc.open();
+    doc.write(html);
+    doc.close();
+    iframe.onload = () => {
+      iframe.contentWindow.focus();
+      iframe.contentWindow.print();
+    };
   }
 
   return (
