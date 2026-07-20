@@ -393,7 +393,7 @@ export default function BookingFlow() {
           </div>
 
           {/* Truck - positioned absolutely, large, anchored bottom-right, extends off-screen */}
-          <div className="absolute bottom-0 right-0 w-[58%] xl:w-[55%] pointer-events-none" style={{ transform: 'translateX(5%)' }}>
+          <div className="absolute bottom-0 right-0 w-[48%] xl:w-[45%] pointer-events-none" style={{ transform: 'translateX(5%)' }}>
             {/* Green rim glow behind the truck */}
             <div className="absolute bottom-[10%] left-1/2 -translate-x-1/2 w-[80%] h-[40%] bg-green-500/[0.06] rounded-full blur-[80px]" />
             <img
@@ -1054,7 +1054,7 @@ function BrandHeader() {
           <img
             src="/logo-squatterz.webp"
             alt="Squatterz"
-            className="h-10 w-auto object-contain"
+            className="h-16 w-auto object-contain"
           />
         </div>
         <a
