@@ -385,17 +385,32 @@ export default function BookingFlow() {
         <BrandHeader />
 
         {/* ── Desktop Hero ── */}
-        <div className="hidden lg:flex min-h-[calc(100vh-65px)] relative overflow-hidden">
-          {/* Ambient background lighting */}
+        <div className="hidden lg:block min-h-[calc(100vh-65px)] relative overflow-hidden">
+          {/* Brand-colored ambient lighting */}
           <div className="absolute inset-0 pointer-events-none">
-            <div className="absolute top-1/3 left-1/4 w-[500px] h-[500px] bg-green-500/[0.03] rounded-full blur-[120px]" />
-            <div className="absolute bottom-0 right-1/4 w-[400px] h-[400px] bg-green-500/[0.02] rounded-full blur-[100px]" />
+            <div className="absolute top-[15%] left-[10%] w-[400px] h-[400px] bg-green-500/[0.04] rounded-full blur-[120px]" />
+            <div className="absolute bottom-[20%] right-[30%] w-[500px] h-[500px] bg-green-500/[0.025] rounded-full blur-[140px]" />
           </div>
 
-          {/* Content container */}
-          <div className="max-w-7xl mx-auto w-full flex items-center px-14 xl:px-20 relative">
-            {/* Left: copy + CTA */}
-            <div className="w-[50%] xl:w-[45%] shrink-0 py-16">
+          {/* Truck - positioned absolutely, large, anchored bottom-right, extends off-screen */}
+          <div className="absolute bottom-0 right-0 w-[58%] xl:w-[55%] pointer-events-none" style={{ transform: 'translateX(5%)' }}>
+            {/* Green rim glow behind the truck */}
+            <div className="absolute bottom-[10%] left-1/2 -translate-x-1/2 w-[80%] h-[40%] bg-green-500/[0.06] rounded-full blur-[80px]" />
+            <img
+              src="/truck-hero.webp"
+              alt="Professional junk pickup truck"
+              className="relative w-full object-contain"
+              style={{ filter: 'drop-shadow(0 30px 60px rgba(0,0,0,0.6)) drop-shadow(0 8px 20px rgba(0,0,0,0.4))' }}
+            />
+            {/* Ground shadow / fade */}
+            <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-gray-950 via-gray-950/80 to-transparent" />
+            {/* Right edge fade so truck bleeds off naturally */}
+            <div className="absolute top-0 right-0 bottom-0 w-20 bg-gradient-to-l from-gray-950 to-transparent" />
+          </div>
+
+          {/* Left: copy + CTA */}
+          <div className="relative z-10 max-w-7xl mx-auto px-14 xl:px-20 flex items-center min-h-[calc(100vh-65px)]">
+            <div className="w-[45%] xl:w-[42%] py-16">
               <h1 className="text-5xl xl:text-[3.75rem] font-black leading-[1.05] tracking-tight mb-6">
                 Junk Gone.<br />
                 <span className="text-green-400">Fast & Easy.</span>
@@ -425,41 +440,32 @@ export default function BookingFlow() {
                 <CompanionTrust text="Reviewed by a real person" />
               </div>
             </div>
-
-            {/* Right: truck as product photography */}
-            <div className="flex-1 flex items-end justify-center relative self-end">
-              <img
-                src="/truck-hero.webp"
-                alt="Junk Pickup truck loaded and ready"
-                className="w-full max-w-2xl object-contain drop-shadow-[0_20px_60px_rgba(0,0,0,0.5)]"
-                style={{ marginBottom: '-2px' }}
-              />
-              {/* Subtle ground reflection / fade */}
-              <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-gray-950 to-transparent" />
-            </div>
           </div>
         </div>
 
         {/* ── Mobile Hero ── */}
         <div className="lg:hidden">
-          <div className="px-5 pt-10 pb-2 max-w-lg mx-auto">
+          <div className="px-5 pt-10 pb-0 max-w-lg mx-auto">
             <h1 className="text-[2.75rem] font-black leading-[1.08] tracking-tight">
               Junk Gone.<br />
               <span className="text-green-400">Fast & Easy.</span>
             </h1>
-            <p className="text-gray-400 text-lg mt-4 leading-relaxed max-w-sm">
-              Snap a few photos, get a fair estimate, and we'll haul it all away.
+            <p className="text-gray-400 text-lg mt-4 leading-relaxed">
+              Snap photos. Get an estimate. We haul it all away.
             </p>
           </div>
 
-          {/* Truck image - product-style, floating on dark bg */}
-          <div className="relative px-4 -mb-2">
+          {/* Truck - large, bleeds right, product-style */}
+          <div className="relative overflow-hidden -mr-8 pl-4 mt-2 mb-0">
+            {/* Green glow underneath */}
+            <div className="absolute bottom-[15%] left-1/2 -translate-x-1/4 w-[70%] h-[30%] bg-green-500/[0.05] rounded-full blur-[60px]" />
             <img
               src="/truck-hero.webp"
-              alt="Junk Pickup truck loaded and ready"
-              className="w-full max-w-md mx-auto object-contain drop-shadow-[0_12px_40px_rgba(0,0,0,0.4)]"
+              alt="Professional junk pickup truck"
+              className="relative w-full max-w-lg object-contain"
+              style={{ filter: 'drop-shadow(0 16px 40px rgba(0,0,0,0.5))' }}
             />
-            <div className="absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-t from-gray-950 to-transparent" />
+            <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-gray-950 to-transparent" />
           </div>
 
           <div className="px-5 pb-10 max-w-lg mx-auto">
@@ -472,7 +478,6 @@ export default function BookingFlow() {
             <p className="text-center text-gray-600 text-xs mt-3 font-medium tracking-wide">Takes about 2 minutes</p>
           </div>
 
-          {/* How it works */}
           <div className="px-5 pb-10 max-w-lg mx-auto">
             <h2 className="text-[10px] font-bold tracking-[0.15em] uppercase text-gray-500 mb-6">How it works</h2>
             <div className="space-y-6">
