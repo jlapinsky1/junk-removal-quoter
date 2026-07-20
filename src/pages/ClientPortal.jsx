@@ -556,9 +556,14 @@ function JobDetail({ id, go }) {
           </div>
           <p className="text-sm text-white/45">{job.unit || "No unit specified"}</p>
         </div>
-        <button onClick={() => go({ name: "new-request" })} className="flex items-center gap-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-semibold text-sm px-4 py-2.5 rounded-full transition-colors self-start">
-          <Plus className="w-4 h-4" /> New Request
-        </button>
+        <div className="flex items-center gap-2 self-start">
+          {job.status === "completed" && (
+            <DownloadPacketButton jobId={id} />
+          )}
+          <button onClick={() => go({ name: "new-request" })} className="flex items-center gap-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-semibold text-sm px-4 py-2.5 rounded-full transition-colors">
+            <Plus className="w-4 h-4" /> New Request
+          </button>
+        </div>
       </div>
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -951,6 +956,52 @@ function NewRequest({ go }) {
         </p>
       </form>
     </div>
+  );
+}
+
+function DownloadPacketButton({ jobId }) {
+  const [downloading, setDownloading] = useState(false);
+
+  async function handleDownload() {
+    setDownloading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const res = await fetch(`/.netlify/functions/completion-packet?jobId=${jobId}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Failed to generate packet");
+      }
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Squatterz-Completion-${jobId.slice(0, 8).toUpperCase()}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error("Download failed:", e);
+    } finally {
+      setDownloading(false);
+    }
+  }
+
+  return (
+    <button
+      onClick={handleDownload}
+      disabled={downloading}
+      className="flex items-center gap-1.5 bg-[#22c55e] hover:bg-[#16a34a] disabled:opacity-50 text-black font-bold text-sm px-4 py-2.5 rounded-full transition-colors"
+    >
+      <Download className="w-4 h-4" />
+      {downloading ? "Generating..." : "Completion Packet"}
+    </button>
   );
 }
 
