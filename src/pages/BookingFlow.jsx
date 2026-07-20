@@ -1,5 +1,9 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { getRepo } from '../utils/repository';
+
+function generateIdempotencyKey() {
+  return crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
 
 const STEPS = [
   { key: 'info', label: 'Your Info', icon: UserIcon, description: 'Tell us where to send your estimate' },
@@ -73,6 +77,12 @@ export default function BookingFlow() {
   const [aiItems, setAiItems] = useState(null);
   const fileInputRef = useRef(null);
 
+  // Upload session state
+  const [sessionId, setSessionId] = useState(null);
+  const [idempotencyKey] = useState(() => generateIdempotencyKey());
+  const [uploadingPhotos, setUploadingPhotos] = useState(false);
+  const [photoError, setPhotoError] = useState(null);
+
   const [form, setForm] = useState({
     firstName: '',
     lastName: '',
@@ -82,7 +92,7 @@ export default function BookingFlow() {
     city: '',
     state: '',
     zip: '',
-    photos: [],
+    photos: [],       // base64 previews for display
     photoNames: [],
     detectedItems: [],
     description: '',
@@ -94,6 +104,15 @@ export default function BookingFlow() {
     secondChoiceDate: '',
     timePreference: 'morning',
   });
+
+  // Ensure an upload session exists (created lazily before first photo upload)
+  const ensureSession = useCallback(async () => {
+    if (sessionId) return sessionId;
+    const repo = await getRepo();
+    const session = await repo.createUploadSession(null);
+    setSessionId(session.sessionId);
+    return session.sessionId;
+  }, [sessionId]);
 
   function update(field, value) {
     setForm(prev => ({ ...prev, [field]: value }));
@@ -124,21 +143,48 @@ export default function BookingFlow() {
     const maxPhotos = 10;
     const remaining = maxPhotos - form.photos.length;
     const toProcess = files.slice(0, remaining);
+    if (toProcess.length === 0) return;
 
-    const newPhotos = [];
-    const newNames = [];
+    setUploadingPhotos(true);
+    setPhotoError(null);
 
-    for (const file of toProcess) {
-      const resized = await resizeImage(file, 1200);
-      newPhotos.push(resized);
-      newNames.push(file.name);
+    try {
+      const sid = await ensureSession();
+      const repo = await getRepo();
+
+      for (const file of toProcess) {
+        // Create local preview
+        const preview = await resizeImage(file, 1200);
+
+        // Get signed upload URL from backend
+        const { signedUrl, token } = await repo.getUploadUrl(
+          sid,
+          file.name,
+          file.type || 'image/jpeg'
+        );
+
+        // Upload the file to Supabase storage
+        await fetch(signedUrl, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': file.type || 'image/jpeg',
+            ...(token ? { 'x-upsert': 'true' } : {}),
+          },
+          body: file,
+        });
+
+        setForm(prev => ({
+          ...prev,
+          photos: [...prev.photos, preview],
+          photoNames: [...prev.photoNames, file.name],
+        }));
+      }
+    } catch (err) {
+      console.error('Photo upload error:', err);
+      setPhotoError(err.message || 'Failed to upload photo. Please try again.');
+    } finally {
+      setUploadingPhotos(false);
     }
-
-    setForm(prev => ({
-      ...prev,
-      photos: [...prev.photos, ...newPhotos],
-      photoNames: [...prev.photoNames, ...newNames],
-    }));
   }
 
   function removePhoto(index) {
@@ -210,6 +256,8 @@ export default function BookingFlow() {
     try {
       const repo = await getRepo();
       const result = await repo.createBooking({
+        sessionId,
+        idempotencyKey,
         customerName: `${form.firstName} ${form.lastName}`.trim(),
         customerPhone: form.phone,
         customerEmail: form.email,
@@ -219,7 +267,6 @@ export default function BookingFlow() {
         zip: form.zip,
         fullAddress: `${form.address}, ${form.city}, ${form.state} ${form.zip}`,
         photoCount: form.photos.length,
-        photos: form.photos,
         detectedItems: form.detectedItems,
         aiDetectedItems: form.detectedItems,
         description: form.description,
@@ -228,10 +275,8 @@ export default function BookingFlow() {
         stairs: form.stairs,
         elevator: form.elevator,
         preferredDate: form.preferredDate,
-        secondChoiceDate: form.secondChoiceDate,
+        secondChoiceDate: form.secondChoiceDate || null,
         timePreference: form.timePreference,
-        sessionId: form.sessionId,
-        idempotencyKey: form.idempotencyKey,
       });
       setBookingId(result.bookingId || result.id);
       setSubmitted(true);
@@ -455,7 +500,7 @@ export default function BookingFlow() {
               onChange={handlePhotoUpload}
             />
 
-            {form.photos.length < 10 && (
+            {form.photos.length < 10 && !uploadingPhotos && (
               <button
                 onClick={() => fileInputRef.current?.click()}
                 className="w-full border-2 border-dashed border-gray-700 hover:border-green-500/50 rounded-2xl p-8 text-center transition-all hover:bg-green-500/5 group"
@@ -564,6 +609,22 @@ export default function BookingFlow() {
               <p className="text-sm text-gray-500 text-center py-2">
                 Couldn't auto-detect items. No worries - just describe them in the next step.
               </p>
+            )}
+
+            {uploadingPhotos && (
+              <div className="flex items-center justify-center gap-2 py-3 text-sm text-gray-400">
+                <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                Uploading photos...
+              </div>
+            )}
+
+            {photoError && (
+              <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 text-sm text-red-400 text-center">
+                {photoError}
+              </div>
             )}
 
             <InlineTrust text="Photos help us give you an accurate, no-surprise estimate" />
