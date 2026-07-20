@@ -334,7 +334,7 @@ function PropertiesView({ go }) {
         <SectionHeader title="Properties" subtitle="Your managed properties and their recent jobs." />
         <button
           onClick={() => setShowAdd(true)}
-          className="bg-[#22c55e] hover:bg-[#16a34a] text-black font-bold text-sm px-4 py-2.5 rounded-full flex items-center gap-1.5 transition-colors shrink-0"
+          className="border border-white/15 hover:border-[#22c55e]/50 text-white/60 hover:text-[#22c55e] font-semibold text-sm px-4 py-2 rounded-xl flex items-center gap-1.5 transition-all shrink-0"
         >
           <Plus className="w-4 h-4" /> Add Property
         </button>
