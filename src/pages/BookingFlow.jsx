@@ -454,7 +454,7 @@ export default function BookingFlow() {
               Get a free, firm estimate in about 2 minutes. No phone calls required.
             </p>
 
-            <div className="flex flex-col sm:flex-row gap-4 justify-center mb-10">
+            <div className="flex justify-center mb-10">
               <button
                 onClick={() => goToStep(0)}
                 className="bg-green-500 hover:bg-green-400 text-gray-950 font-extrabold text-lg px-10 py-5 rounded-2xl transition-all duration-200 btn-glow active:scale-[0.98] transform flex items-center justify-center gap-2"
@@ -464,13 +464,6 @@ export default function BookingFlow() {
                   <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
                 </svg>
               </button>
-              <a
-                href="tel:+18135550123"
-                className="bg-gray-800 hover:bg-gray-700 text-white font-bold text-lg px-10 py-5 rounded-2xl transition-colors flex items-center justify-center gap-2 border border-gray-700/50"
-              >
-                <PhoneIcon className="w-5 h-5" />
-                (813) 555-0123
-              </a>
             </div>
 
             <div className="flex flex-wrap justify-center gap-x-6 gap-y-3">
@@ -479,6 +472,92 @@ export default function BookingFlow() {
               <CompanionTrust text="No hidden fees" />
               <CompanionTrust text="Reviewed by a real person" />
             </div>
+          </div>
+        </section>
+
+        {/* ── SECTION 3: How It Works ── */}
+        <section className="border-t border-gray-800/30">
+          <div className="max-w-6xl mx-auto px-5 py-20 lg:py-28">
+            <div className="text-center mb-14">
+              <p className="text-green-400 text-xs font-bold tracking-[0.2em] uppercase mb-3">Simple Process</p>
+              <h2 className="text-3xl lg:text-5xl font-black tracking-tight">Three steps and you're done</h2>
+            </div>
+
+            <div className="grid md:grid-cols-3 gap-6">
+              <div className="bg-gray-900/50 border border-gray-800/60 rounded-2xl p-8">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-9 h-9 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0">
+                    <span className="text-gray-950 font-black text-sm">1</span>
+                  </div>
+                  <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" />
+                  </svg>
+                </div>
+                <h3 className="text-white font-bold text-lg mb-2">Snap a Few Photos</h3>
+                <p className="text-gray-500 text-sm leading-relaxed">Show us what needs to go.</p>
+              </div>
+
+              <div className="bg-gray-900/50 border border-gray-800/60 rounded-2xl p-8">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-9 h-9 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0">
+                    <span className="text-gray-950 font-black text-sm">2</span>
+                  </div>
+                  <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 6h.008v.008H6V6z" />
+                  </svg>
+                </div>
+                <h3 className="text-white font-bold text-lg mb-2">Get a Firm Price</h3>
+                <p className="text-gray-500 text-sm leading-relaxed">No surprises, no upsells.</p>
+              </div>
+
+              <div className="bg-gray-900/50 border border-gray-800/60 rounded-2xl p-8">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-9 h-9 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0">
+                    <span className="text-gray-950 font-black text-sm">3</span>
+                  </div>
+                  <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 00-3.213-9.193 2.056 2.056 0 00-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.958c0-.568-.422-1.048-.987-1.106a48.554 48.554 0 00-10.026 0 1.106 1.106 0 00-.987 1.106v7.635m12-6.677v6.677m0 4.5v-4.5m0 0h-12" />
+                  </svg>
+                </div>
+                <h3 className="text-white font-bold text-lg mb-2">We Haul It All</h3>
+                <p className="text-gray-500 text-sm leading-relaxed">Pick a time. We handle everything.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ── SECTION 4: Pricing ── */}
+        <section className="border-t border-gray-800/30">
+          <div className="max-w-6xl mx-auto px-5 py-20 lg:py-28">
+            <div className="text-center mb-14">
+              <p className="text-green-400 text-xs font-bold tracking-[0.2em] uppercase mb-3">Transparent Pricing</p>
+              <h2 className="text-3xl lg:text-5xl font-black tracking-tight mb-4">No surprises. Ever.</h2>
+              <p className="text-gray-400 text-lg max-w-xl mx-auto">You get a firm price before we lift a single item.</p>
+            </div>
+
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 max-w-4xl mx-auto">
+              {[
+                { label: 'Single Item', price: '$75+' },
+                { label: '¼ Truckload', price: '$150+' },
+                { label: '½ Truckload', price: '$300+' },
+                { label: 'Full Truckload', price: '$500+' },
+              ].map(tier => (
+                <div key={tier.label} className="bg-gray-900/50 border border-gray-800/60 rounded-2xl p-6 lg:p-8 text-center">
+                  <p className="text-gray-400 text-sm mb-3">{tier.label}</p>
+                  <p className="text-green-400 text-3xl lg:text-4xl font-black">{tier.price}</p>
+                  <p className="text-gray-600 text-xs mt-2">starting from</p>
+                </div>
+              ))}
+            </div>
+
+            <p className="text-center text-gray-500 text-sm mt-10">
+              Final price confirmed before any work begins.{' '}
+              <button onClick={() => goToStep(0)} className="text-green-400 hover:text-green-300 font-medium transition-colors">
+                Get your estimate →
+              </button>
+            </p>
           </div>
         </section>
       </PageShell>
