@@ -334,43 +334,6 @@ export default function Commercial() {
         </div>
       </section>
 
-      {/* HOW IT WORKS */}
-      <section id="process" className="py-24 border-t border-white/5 bg-white/[0.02]">
-        <div className="max-w-5xl mx-auto px-5">
-          <div className="text-center mb-14">
-            <p className="text-[#22c55e] text-sm font-semibold uppercase tracking-widest mb-3">
-              How it works
-            </p>
-            <h2 className="text-3xl md:text-4xl font-black text-white">
-              From work order to completion packet
-            </h2>
-            <p className="mt-3 text-white/45 text-base max-w-xl mx-auto">
-              The last step is what sets our crew apart — you get documentation that helps you close the work order and report back to owners.
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-2 gap-6">
-            {STEPS.map(({ num, icon: Icon, title, desc }) => (
-              <div
-                key={num}
-                className="relative bg-white/4 border border-white/8 rounded-2xl p-7 hover:border-[#22c55e]/40 hover:bg-white/6 transition-all"
-              >
-                <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 rounded-full bg-[#22c55e] flex items-center justify-center shrink-0">
-                    <span className="font-black text-black text-base">{num}</span>
-                  </div>
-                  <div className="w-11 h-11 rounded-xl bg-white/6 flex items-center justify-center shrink-0">
-                    <Icon className="w-5 h-5 text-white/60" />
-                  </div>
-                </div>
-                <h3 className="mt-5 font-bold text-white text-lg">{title}</h3>
-                <p className="mt-1.5 text-sm text-white/45 leading-relaxed">{desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* DOCUMENTATION */}
       <section className="py-24 border-t border-white/5">
         <div className="max-w-6xl mx-auto px-5 grid lg:grid-cols-2 gap-12 items-center">
@@ -497,6 +460,43 @@ export default function Commercial() {
                   <Icon className="w-5 h-5 text-[#22c55e]" />
                 </div>
                 <h3 className="font-bold text-white text-base">{title}</h3>
+                <p className="mt-1.5 text-sm text-white/45 leading-relaxed">{desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* HOW IT WORKS */}
+      <section id="process" className="py-24 border-t border-white/5 bg-white/[0.02]">
+        <div className="max-w-5xl mx-auto px-5">
+          <div className="text-center mb-14">
+            <p className="text-[#22c55e] text-sm font-semibold uppercase tracking-widest mb-3">
+              How it works
+            </p>
+            <h2 className="text-3xl md:text-4xl font-black text-white">
+              From work order to completion packet
+            </h2>
+            <p className="mt-3 text-white/45 text-base max-w-xl mx-auto">
+              The last step is what sets our crew apart — you get documentation that helps you close the work order and report back to owners.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-6">
+            {STEPS.map(({ num, icon: Icon, title, desc }) => (
+              <div
+                key={num}
+                className="relative bg-white/4 border border-white/8 rounded-2xl p-7 hover:border-[#22c55e]/40 hover:bg-white/6 transition-all"
+              >
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 rounded-full bg-[#22c55e] flex items-center justify-center shrink-0">
+                    <span className="font-black text-black text-base">{num}</span>
+                  </div>
+                  <div className="w-11 h-11 rounded-xl bg-white/6 flex items-center justify-center shrink-0">
+                    <Icon className="w-5 h-5 text-white/60" />
+                  </div>
+                </div>
+                <h3 className="mt-5 font-bold text-white text-lg">{title}</h3>
                 <p className="mt-1.5 text-sm text-white/45 leading-relaxed">{desc}</p>
               </div>
             ))}
