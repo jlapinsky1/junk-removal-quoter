@@ -147,13 +147,8 @@ function GoalSetupModal({ onSave, onClose, existingGoal }) {
       active: true,
     };
 
-    // Close modal and update state immediately (optimistic)
+    // Close modal immediately, parent handles persistence
     onSave(goalData);
-
-    // Persist in background — failures are non-critical since goal is already in state
-    getRepo().then(repo => repo.upsertGoal(goalData)).catch(err => {
-      console.error('Failed to persist goal:', err);
-    });
   }
 
   return (
@@ -872,11 +867,20 @@ export default function Dashboard({ onNavigate }) {
     })();
   }, [goalType, loadDashboard]);
 
-  function handleGoalSaved(savedGoal) {
-    setGoal(savedGoal);
+  async function handleGoalSaved(goalData) {
     setShowGoalModal(false);
+    setGoal(goalData);
     setLoading(true);
-    loadDashboard(savedGoal);
+    try {
+      const repo = await getRepo();
+      const persisted = await repo.upsertGoal(goalData);
+      setGoal(persisted);
+      await loadDashboard(persisted);
+    } catch (err) {
+      console.error('Failed to persist goal:', err);
+      // Still try to load dashboard with the in-memory goal
+      await loadDashboard(goalData);
+    }
   }
 
   // Navigation handler — try parent prop first, fall back to finding AdminDashboard's setActiveTab
