@@ -58,6 +58,12 @@ export default function ClientLogin() {
           );
         }
 
+        // If we got a session, email confirmation is off — go straight to portal
+        if (data?.session) {
+          navigate("/portal");
+          return;
+        }
+
         setSignupSuccess(true);
       }
     } catch (err) {
