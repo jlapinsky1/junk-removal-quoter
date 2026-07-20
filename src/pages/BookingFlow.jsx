@@ -110,6 +110,7 @@ export default function BookingFlow() {
   const [uploadingPhotos, setUploadingPhotos] = useState(false);
   const [photoError, setPhotoError] = useState(null);
 
+  const [heroZip, setHeroZip] = useState('');
   const [form, setForm] = useState({
     firstName: '', lastName: '', phone: '', email: '',
     address: '', city: '', state: '', zip: '',
@@ -384,134 +385,102 @@ export default function BookingFlow() {
       <PageShell>
         <BrandHeader />
 
-        {/* ── Desktop Hero ── */}
-        <div className="hidden lg:block min-h-[calc(100vh-65px)] relative overflow-hidden">
-          {/* Brand-colored ambient lighting */}
-          <div className="absolute inset-0 pointer-events-none">
-            <div className="absolute top-[15%] left-[10%] w-[400px] h-[400px] bg-green-500/[0.04] rounded-full blur-[120px]" />
-            <div className="absolute bottom-[20%] right-[30%] w-[500px] h-[500px] bg-green-500/[0.025] rounded-full blur-[140px]" />
-          </div>
+        {/* ── SECTION 1: Hero ── */}
+        <section className="relative overflow-hidden">
+          <div className="max-w-7xl mx-auto px-5 lg:px-14 xl:px-20 py-16 lg:py-24">
+            <div className="lg:flex lg:items-center lg:gap-12">
+              {/* Left: copy + zip input */}
+              <div className="lg:w-1/2">
+                <h1 className="text-5xl lg:text-6xl xl:text-7xl font-black leading-[1.05] tracking-tight mb-6">
+                  Junk gone.<br />
+                  <span className="text-green-400">On your schedule.</span>
+                </h1>
+                <p className="text-gray-400 text-lg lg:text-xl leading-relaxed mb-10 max-w-lg">
+                  Fast, friendly pickup from a real local crew — no phone tag, no hidden fees.
+                </p>
 
-          {/* Truck - anchored bottom-right, natural proportions only */}
-          <div className="absolute bottom-0 right-0 pointer-events-none">
-            <div className="absolute bottom-[10%] left-1/2 -translate-x-1/2 w-[80%] h-[40%] bg-green-500/[0.06] rounded-full blur-[80px]" />
-            <img
-              src="/truck-hero.png"
-              alt="Squatterz truck ready for pickup"
-              style={{
-                display: 'block',
-                width: 'min(48vw, 720px)',
-                height: 'auto',
-                filter: 'drop-shadow(0 30px 60px rgba(0,0,0,0.6)) drop-shadow(0 8px 20px rgba(0,0,0,0.4))',
-              }}
-            />
-            <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-gray-950 via-gray-950/80 to-transparent" />
-          </div>
-
-          {/* Left: copy + CTA */}
-          <div className="relative z-10 max-w-7xl mx-auto px-14 xl:px-20 flex items-center min-h-[calc(100vh-65px)]">
-            <div className="w-[45%] xl:w-[42%] py-16">
-              <h1 className="text-5xl xl:text-[3.75rem] font-black leading-[1.05] tracking-tight mb-6">
-                Junk Gone.<br />
-                <span className="text-green-400">Fast & Easy.</span>
-              </h1>
-              <p className="text-gray-400 text-lg leading-relaxed mb-10 max-w-md">
-                Snap a few photos, get a fair estimate, and we'll haul it all away. No phone calls. No hassle.
-              </p>
-
-              <div className="space-y-5 mb-10">
-                <HowItWorksStep number="1" title="Request Your Pickup" description="Tell us what needs to go and upload photos." />
-                <HowItWorksStep number="2" title="Get Your Estimate" description="We review and send a fair, firm price." />
-                <HowItWorksStep number="3" title="We Haul It Away" description="Pick a time. We show up and handle everything." />
+                {/* ZIP input card */}
+                <div className="bg-gray-900/60 border border-gray-800/60 rounded-2xl p-6 max-w-md ring-1 ring-white/[0.02]">
+                  <label className="block text-[11px] font-bold text-gray-400 mb-3 uppercase tracking-[0.15em]">
+                    Where is the pickup?
+                  </label>
+                  <div className="flex gap-3">
+                    <div className="flex-1 flex items-center bg-gray-800/50 border border-gray-700/50 rounded-xl px-4">
+                      <PinIcon className="w-4 h-4 text-gray-500 mr-3 flex-shrink-0" />
+                      <input
+                        id="hero-zip"
+                        type="text"
+                        className="w-full bg-transparent py-3.5 text-sm text-white placeholder-gray-500 focus:outline-none"
+                        placeholder="Enter ZIP code or address"
+                        value={heroZip}
+                        onChange={e => setHeroZip(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter' && heroZip.trim()) { update('zip', heroZip); goToStep(0); } }}
+                      />
+                    </div>
+                    <button
+                      onClick={() => { if (heroZip.trim()) update('zip', heroZip); goToStep(0); }}
+                      className="bg-green-500 hover:bg-green-400 text-gray-950 font-bold text-sm px-6 rounded-xl transition-colors whitespace-nowrap"
+                    >
+                      See My Estimate
+                    </button>
+                  </div>
+                </div>
               </div>
 
+              {/* Right: truck image */}
+              <div className="lg:w-1/2 mt-10 lg:mt-0 flex justify-center lg:justify-end">
+                <img
+                  src="/truck-hero.png"
+                  alt="Squatterz truck ready for pickup"
+                  style={{
+                    display: 'block',
+                    width: 'min(90%, 600px)',
+                    height: 'auto',
+                    filter: 'drop-shadow(0 20px 40px rgba(0,0,0,0.4))',
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ── SECTION 2: CTA ── */}
+        <section className="border-t border-gray-800/30">
+          <div className="max-w-4xl mx-auto px-5 py-20 lg:py-28 text-center">
+            <h2 className="text-4xl lg:text-6xl font-black leading-[1.08] tracking-tight mb-6">
+              Ready to reclaim your<br />space?
+            </h2>
+            <p className="text-gray-400 text-lg lg:text-xl mb-10 max-w-2xl mx-auto">
+              Get a free, firm estimate in about 2 minutes. No phone calls required.
+            </p>
+
+            <div className="flex flex-col sm:flex-row gap-4 justify-center mb-10">
               <button
                 onClick={() => goToStep(0)}
-                className="w-full max-w-sm bg-green-500 hover:bg-green-400 text-gray-950 font-extrabold text-lg py-5 rounded-2xl transition-all duration-200 btn-glow active:scale-[0.98] transform"
+                className="bg-green-500 hover:bg-green-400 text-gray-950 font-extrabold text-lg px-10 py-5 rounded-2xl transition-all duration-200 btn-glow active:scale-[0.98] transform flex items-center justify-center gap-2"
               >
-                Get Your Free Estimate
+                Get My Free Estimate
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                </svg>
               </button>
-              <p className="text-gray-600 text-xs mt-3 font-medium tracking-wide max-w-sm text-center">Takes about 2 minutes</p>
+              <a
+                href="tel:+18135550123"
+                className="bg-gray-800 hover:bg-gray-700 text-white font-bold text-lg px-10 py-5 rounded-2xl transition-colors flex items-center justify-center gap-2 border border-gray-700/50"
+              >
+                <PhoneIcon className="w-5 h-5" />
+                (813) 555-0123
+              </a>
+            </div>
 
-              <div className="flex flex-wrap gap-x-6 gap-y-2.5 mt-10 pt-8 border-t border-gray-800/30">
-                <CompanionTrust text="Touchless process" />
-                <CompanionTrust text="Fully insured" />
-                <CompanionTrust text="No hidden fees" />
-                <CompanionTrust text="Reviewed by a real person" />
-              </div>
+            <div className="flex flex-wrap justify-center gap-x-6 gap-y-3">
+              <CompanionTrust text="Touchless process" />
+              <CompanionTrust text="Fully insured" />
+              <CompanionTrust text="No hidden fees" />
+              <CompanionTrust text="Reviewed by a real person" />
             </div>
           </div>
-        </div>
-
-        {/* ── Mobile Hero ── */}
-        <div className="lg:hidden">
-          <div className="px-5 pt-10 pb-0 max-w-lg mx-auto">
-            <h1 className="text-[2.75rem] font-black leading-[1.08] tracking-tight">
-              Junk Gone.<br />
-              <span className="text-green-400">Fast & Easy.</span>
-            </h1>
-            <p className="text-gray-400 text-lg mt-4 leading-relaxed">
-              Snap photos. Get an estimate. We haul it all away.
-            </p>
-          </div>
-
-          {/* Truck - natural proportions, bleeds right */}
-          <div className="relative overflow-hidden -mr-8 pl-4 mt-2 mb-0">
-            <div className="absolute bottom-[15%] left-1/2 -translate-x-1/4 w-[70%] h-[30%] bg-green-500/[0.05] rounded-full blur-[60px]" />
-            <img
-              src="/truck-hero.png"
-              alt="Squatterz truck ready for pickup"
-              style={{
-                display: 'block',
-                width: '90%',
-                maxWidth: '480px',
-                height: 'auto',
-                filter: 'drop-shadow(0 16px 40px rgba(0,0,0,0.5))',
-              }}
-            />
-            <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-gray-950 to-transparent" />
-          </div>
-
-          <div className="px-5 pb-10 max-w-lg mx-auto">
-            <button
-              onClick={() => goToStep(0)}
-              className="w-full bg-green-500 hover:bg-green-400 text-gray-950 font-extrabold text-lg py-5 rounded-2xl transition-all duration-200 btn-glow active:scale-[0.98] transform"
-            >
-              Get Your Free Estimate
-            </button>
-            <p className="text-center text-gray-600 text-xs mt-3 font-medium tracking-wide">Takes about 2 minutes</p>
-          </div>
-
-          <div className="px-5 pb-10 max-w-lg mx-auto">
-            <h2 className="text-[10px] font-bold tracking-[0.15em] uppercase text-gray-500 mb-6">How it works</h2>
-            <div className="space-y-6">
-              <HowItWorksStep number="1" title="Request Your Pickup" description="Tell us what needs to go and upload photos." />
-              <HowItWorksStep number="2" title="Get Your Estimate" description="We review and send a fair, firm price." />
-              <HowItWorksStep number="3" title="We Haul It Away" description="Pick a time. We show up and handle everything." />
-            </div>
-          </div>
-
-          <div className="px-5 pb-12 max-w-lg mx-auto">
-            <div className="bg-gray-900/60 rounded-2xl p-6 space-y-4 border border-gray-800/60 ring-1 ring-white/[0.02]">
-              <TrustBadge icon={ShieldIcon} text="100% touchless process" />
-              <TrustBadge icon={CheckCircleIcon} text="No phone calls required" />
-              <TrustBadge icon={UserGroupIcon} text="Reviewed by a real person" />
-              <TrustBadge icon={ClockIcon} text="Fast response time" />
-              <TrustBadge icon={StarIcon} text="No obligation estimate" />
-            </div>
-          </div>
-
-          <div className="px-5 pb-14 max-w-lg mx-auto">
-            <h2 className="text-[10px] font-bold tracking-[0.15em] uppercase text-gray-500 mb-4">We haul it all</h2>
-            <div className="flex flex-wrap gap-2">
-              {['Furniture', 'Appliances', 'Yard Waste', 'Garage Cleanouts', 'Estate Cleanouts', 'Construction Debris', 'Electronics', 'Mattresses'].map(item => (
-                <span key={item} className="bg-gray-900/60 text-gray-300 text-sm px-4 py-2 rounded-full border border-gray-800/60">
-                  {item}
-                </span>
-              ))}
-            </div>
-          </div>
-        </div>
+        </section>
       </PageShell>
     );
   }
@@ -1052,22 +1021,36 @@ function PageShell({ children }) {
 
 function BrandHeader() {
   return (
-    <header className="bg-gray-950/80 backdrop-blur-xl border-b border-gray-800/40 sticky top-0 z-40 lg:relative">
-      <div className="max-w-7xl mx-auto px-5 lg:px-8 py-3 flex items-center justify-between">
+    <header className="bg-gray-950/80 backdrop-blur-xl border-b border-gray-800/40 sticky top-0 z-40">
+      <div className="max-w-7xl mx-auto px-5 lg:px-8 h-16 flex items-center justify-between">
+        {/* Logo: icon + text */}
         <div className="flex items-center gap-3">
-          <img
-            src="/logo-squatterz.png"
-            alt="Squatterz – We Haul It All"
-            className="w-[100px] lg:w-[130px] h-auto object-contain"
-          />
+          <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0">
+            <img
+              src="/logo-squatterz.png"
+              alt="Squatterz"
+              className="w-6 h-6 object-contain"
+            />
+          </div>
+          <div className="leading-tight">
+            <span className="text-white font-extrabold text-lg tracking-tight block">SQUATTERZ</span>
+            <span className="text-gray-500 text-[10px] font-bold tracking-[0.15em] uppercase block">We Haul It All</span>
+          </div>
         </div>
-        <a
-          href="tel:+15555555555"
-          className="text-gray-500 hover:text-gray-300 text-xs font-semibold transition-colors duration-200 hidden sm:flex items-center gap-1.5"
-        >
-          <PhoneIcon className="w-3.5 h-3.5" />
-          Need help?
-        </a>
+
+        {/* Right side */}
+        <div className="flex items-center gap-6">
+          <a href="tel:+18135550123" className="text-gray-400 hover:text-white text-sm font-medium transition-colors hidden sm:flex items-center gap-2">
+            <PhoneIcon className="w-4 h-4" />
+            (813) 555-0123
+          </a>
+          <button
+            onClick={() => document.getElementById('hero-zip')?.focus() || window.scrollTo({ top: 0, behavior: 'smooth' })}
+            className="bg-green-500 hover:bg-green-400 text-gray-950 font-bold text-sm px-5 py-2.5 rounded-xl transition-colors hidden lg:block"
+          >
+            Get Free Estimate
+          </button>
+        </div>
       </div>
     </header>
   );
