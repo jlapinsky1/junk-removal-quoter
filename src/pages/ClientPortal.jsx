@@ -177,19 +177,22 @@ function Dashboard({ go }) {
   const [recent, setRecent] = useState([]);
   const [outstandingTotal, setOutstandingTotal] = useState(0);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const [openR, scheduledR, completedR, invoicesR, recentR] = await Promise.all([
-          supabase.from("jobs").select("id", { count: "exact", head: true }).eq("status", "open"),
-          supabase.from("jobs").select("id", { count: "exact", head: true }).eq("status", "scheduled"),
-          supabase.from("jobs").select("id", { count: "exact", head: true }).eq("status", "completed"),
-          supabase.from("invoices").select("amount").in("status", ["outstanding", "overdue"]),
-          supabase.from("jobs").select("*, properties(*)").order("created_at", { ascending: false }).limit(6),
-        ]);
-        if (openR.error || scheduledR.error || completedR.error || invoicesR.error || recentR.error) {
-          throw new Error("Failed to load dashboard data");
-        }
+  const loadData = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [openR, scheduledR, completedR, invoicesR, recentR] = await Promise.all([
+        supabase.from("jobs").select("id", { count: "exact", head: true }).eq("status", "open"),
+        supabase.from("jobs").select("id", { count: "exact", head: true }).eq("status", "scheduled"),
+        supabase.from("jobs").select("id", { count: "exact", head: true }).eq("status", "completed"),
+        supabase.from("invoices").select("amount").in("status", ["outstanding", "overdue"]),
+        supabase.from("jobs").select("*, properties(*)").order("created_at", { ascending: false }).limit(6),
+      ]);
+      const firstError = [openR, scheduledR, completedR, invoicesR, recentR].find(r => r.error)?.error;
+      if (firstError) {
+        console.error("Dashboard query error:", firstError);
+        throw new Error(firstError.message || "Failed to load dashboard data");
+      }
         setStats({
           open: openR.count ?? 0,
           scheduled: scheduledR.count ?? 0,
@@ -203,11 +206,12 @@ function Dashboard({ go }) {
       } finally {
         setLoading(false);
       }
-    })();
-  }, []);
+  };
+
+  useEffect(() => { loadData(); }, []);
 
   if (loading) return <Spinner />;
-  if (error) return <ErrorState message={error} />;
+  if (error) return <ErrorState message={error} onRetry={loadData} />;
 
   const cards = [
     { label: "Open Requests", value: stats.open, icon: ClipboardList, color: "text-amber-300", bg: "bg-amber-400/10 border-amber-400/20", onClick: () => go({ name: "jobs" }) },

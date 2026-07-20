@@ -98,11 +98,17 @@ export function Spinner() {
   );
 }
 
-export function ErrorState({ message }) {
+export function ErrorState({ message, onRetry }) {
   return (
     <div className="text-center py-16 px-6">
       <p className="text-red-300 font-semibold text-sm">{message}</p>
-      <p className="text-white/30 text-xs mt-1">Please try again in a moment.</p>
+      {onRetry ? (
+        <button onClick={onRetry} className="mt-3 text-sm text-[#22c55e] font-semibold hover:underline">
+          Try again
+        </button>
+      ) : (
+        <p className="text-white/30 text-xs mt-1">Please try again in a moment.</p>
+      )}
     </div>
   );
 }
