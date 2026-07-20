@@ -318,7 +318,7 @@ export default function Commercial() {
               Services made for the jobs you actually deal with
             </h2>
             <p className="mt-4 text-white/45 text-base">
-              Not generic "junk." These are the situations our crew handles every week for property managers across Tampa Bay.
+              Not generic "junk." These are the situations our crew handles every week for property managers across Gainesville, GA.
             </p>
           </div>
 
@@ -565,7 +565,7 @@ export default function Commercial() {
             </span>
           </a>
           <p className="text-xs text-white/25">
-            &copy; {new Date().getFullYear()} Squatterz LLC · Tampa, FL · All rights reserved
+            &copy; {new Date().getFullYear()} Squatterz LLC · Gainesville, GA · All rights reserved
           </p>
           <div className="flex gap-6 text-xs text-white/30">
             <a href="/" className="hover:text-white/60 transition-colors">Residential</a>

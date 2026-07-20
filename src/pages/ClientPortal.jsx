@@ -160,7 +160,7 @@ export default function ClientPortal() {
             </div>
             <span className="font-bold tracking-widest uppercase">Squatterz</span>
           </a>
-          <p className="text-xs text-white/25">Client Portal &middot; Tampa, FL</p>
+          <p className="text-xs text-white/25">Client Portal &middot; Gainesville, GA</p>
           <a href="/commercial" className="text-xs text-white/30 hover:text-white/60 transition-colors">Back to Commercial</a>
         </div>
       </footer>
