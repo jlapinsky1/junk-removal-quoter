@@ -2,41 +2,48 @@
 @tailwind components;
 @tailwind utilities;
 
+@page {
+  margin: 0.5in;
+  size: letter;
+}
+
 @media print {
   .no-print {
     display: none !important;
   }
 
-  /* Clean PDF output for quote */
-  body {
+  /* Clean PDF output */
+  html, body {
     background: white !important;
+    margin: 0 !important;
+    padding: 0 !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
 
-  /* Hide everything on the page */
-  body * {
-    visibility: hidden;
+  /* Hide everything except the quote */
+  body > #root {
+    display: none !important;
   }
 
-  /* Show only the printable quote content */
-  .print-quote,
-  .print-quote * {
-    visibility: visible;
+  /* The modal overlay sits outside normal flow — show it */
+  .no-print-overlay {
+    display: block !important;
+    position: static !important;
+    background: none !important;
+    padding: 0 !important;
+    inset: auto !important;
+  }
+
+  .no-print-overlay > div {
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    max-width: none !important;
   }
 
   .print-quote {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
-    padding: 40px !important;
-  }
-
-  /* Hide the modal overlay backdrop */
-  .no-print-overlay {
-    position: static !important;
-    background: none !important;
     padding: 0 !important;
   }
 }

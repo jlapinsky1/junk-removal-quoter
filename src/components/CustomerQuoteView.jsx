@@ -38,8 +38,8 @@ export default function CustomerQuoteView({ formData, quoteResult, onClose }) {
       '',
       `Estimate valid through ${validDateStr}.`,
       '',
-      `Thank you for considering ${COMPANY_NAME}.`,
-      "We'll contact you shortly after reviewing your request.",
+      `Thanks for considering ${COMPANY_NAME}.`,
+      'Our team has reviewed your request and we are excited to complete your pickup.',
     ].join('\n');
 
     navigator.clipboard.writeText(text);
@@ -130,10 +130,10 @@ export default function CustomerQuoteView({ formData, quoteResult, onClose }) {
           {/* Footer */}
           <div className="text-center">
             <p className="text-sm text-gray-700">
-              Thank you for considering <span className="font-semibold text-gray-900">{COMPANY_NAME}</span>.
+              Thanks for considering <span className="font-semibold text-gray-900">{COMPANY_NAME}</span>.
             </p>
             <p className="text-sm text-gray-500 mt-1">
-              We'll contact you shortly after reviewing your request.
+              Our team has reviewed your request and we are excited to complete your pickup.
             </p>
           </div>
         </div>
