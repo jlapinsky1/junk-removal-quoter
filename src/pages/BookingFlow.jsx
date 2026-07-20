@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { getRepo } from '../utils/repository';
 
 function generateIdempotencyKey() {
@@ -134,6 +134,20 @@ export default function BookingFlow() {
     timePreference: 'morning',
   });
 
+  // Sync step with browser history so back button navigates between steps
+  useEffect(() => {
+    const handlePopState = (e) => {
+      const s = e.state?.step ?? -1;
+      setStep(s);
+    };
+    window.addEventListener('popstate', handlePopState);
+    // Push initial state
+    if (!window.history.state?.hasOwnProperty('step')) {
+      window.history.replaceState({ step: -1 }, '');
+    }
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
   // Ensure an upload session exists (created lazily before first photo upload)
   const ensureSession = useCallback(async () => {
     if (sessionId) return sessionId;
@@ -147,13 +161,17 @@ export default function BookingFlow() {
     setForm(prev => ({ ...prev, [field]: value }));
   }
 
+  function goToStep(s) {
+    setStep(s);
+    window.history.pushState({ step: s }, '');
+  }
+
   function next() {
-    if (step < STEPS.length - 1) setStep(step + 1);
+    if (step < STEPS.length - 1) goToStep(step + 1);
   }
 
   function back() {
-    if (step > 0) setStep(step - 1);
-    else if (step === 0) setStep(-1);
+    window.history.back();
   }
 
   function canProceed() {
@@ -464,7 +482,7 @@ export default function BookingFlow() {
               </div>
 
               <button
-                onClick={() => setStep(0)}
+                onClick={() => goToStep(0)}
                 className="mt-8 lg:mt-0 w-full bg-green-500 hover:bg-green-400 text-gray-950 font-extrabold text-lg py-5 rounded-2xl transition-colors shadow-lg shadow-green-500/25 active:scale-[0.98] transform"
               >
                 Get Your Free Estimate
