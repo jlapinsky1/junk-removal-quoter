@@ -74,17 +74,35 @@ const COMPANION_CONTENT = [
   },
 ];
 
-function generateNextDays(count) {
-  const days = [];
-  const today = new Date();
-  for (let i = 1; i <= count; i++) {
-    const d = new Date(today);
-    d.setDate(today.getDate() + i);
-    if (d.getDay() !== 0) {
-      days.push(d.toISOString().split('T')[0]);
+function localDateString(d) {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * Returns available booking dates within a rolling window.
+ * @param {object} options
+ * @param {number} [options.daysAhead=21] - Calendar days to look ahead from tomorrow.
+ * @param {string[]} [options.unavailableDates=[]] - ISO date strings (YYYY-MM-DD) that are blocked.
+ * @param {number[]} [options.businessDays=[1,2,3,4,5,6]] - Days of week to include (0=Sun, 6=Sat).
+ */
+function getAvailableBookingDates({ daysAhead = 21, unavailableDates = [], businessDays = [1, 2, 3, 4, 5, 6] } = {}) {
+  const result = [];
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(0, 0, 0, 0);
+  const blocked = new Set(unavailableDates);
+  for (let i = 0; i < daysAhead; i++) {
+    const d = new Date(tomorrow);
+    d.setDate(tomorrow.getDate() + i);
+    const str = localDateString(d);
+    if (businessDays.includes(d.getDay()) && !blocked.has(str)) {
+      result.push(str);
     }
   }
-  return days.slice(0, count);
+  return result;
 }
 
 function formatDate(dateStr) {
@@ -111,6 +129,7 @@ export default function BookingFlow() {
   const [photoError, setPhotoError] = useState(null);
 
   const [heroZip, setHeroZip] = useState('');
+  const [showMoreDates, setShowMoreDates] = useState(false);
   const [form, setForm] = useState({
     firstName: '', lastName: '', phone: '', email: '',
     address: '', city: '', state: '', zip: '',
@@ -301,7 +320,7 @@ export default function BookingFlow() {
   }
 
   const progressPercent = step < 0 ? 0 : ((step + 1) / STEPS.length) * 100;
-  const availableDays = generateNextDays(14);
+  const availableDays = getAvailableBookingDates();
 
   // ──────────────────────── SUCCESS SCREEN ────────────────────────
   if (submitted) {
@@ -950,19 +969,16 @@ export default function BookingFlow() {
                     <div>
                       <SectionLabel>Pick a day</SectionLabel>
                       <div className="grid grid-cols-3 gap-2.5">
-                        {availableDays.map(day => {
+                        {(showMoreDates ? availableDays : availableDays.slice(0, 12)).map(day => {
                           const { weekday, date } = formatDateShort(day);
                           const isSelected = form.preferredDate === day;
-                          const isSecond = form.secondChoiceDate === day;
                           return (
                             <button
                               key={day}
-                              onClick={() => update('preferredDate', day)}
+                              onClick={() => setForm(prev => ({ ...prev, preferredDate: day, secondChoiceDate: '' }))}
                               className={`p-3 rounded-xl border text-center transition-all duration-200 ${
                                 isSelected
                                   ? 'bg-green-500/10 border-green-500/50 ring-1 ring-green-500/40 shadow-sm shadow-green-500/5'
-                                  : isSecond
-                                  ? 'bg-gray-800/60 border-gray-600/60'
                                   : 'bg-gray-900/50 border-gray-800/60 hover:border-gray-700 hover:bg-gray-800/40'
                               }`}
                             >
@@ -976,39 +992,54 @@ export default function BookingFlow() {
                           );
                         })}
                       </div>
+                      {availableDays.length > 12 && (
+                        <button
+                          onClick={() => setShowMoreDates(v => !v)}
+                          className="mt-3 text-xs text-gray-500 hover:text-gray-300 transition-colors duration-200 underline underline-offset-2"
+                        >
+                          {showMoreDates ? 'Show fewer dates' : `View more dates (${availableDays.length - 12} more)`}
+                        </button>
+                      )}
                     </div>
 
-                    {form.preferredDate && (
-                      <div>
-                        <label className="block text-[11px] font-bold text-gray-400 mb-3 uppercase tracking-[0.1em]">
-                          Backup day <span className="text-gray-600 font-medium normal-case tracking-normal">(optional)</span>
-                        </label>
-                        <div className="grid grid-cols-3 gap-2.5">
-                          {availableDays.filter(d => d !== form.preferredDate).slice(0, 6).map(day => {
-                            const { weekday, date } = formatDateShort(day);
-                            const isSelected = form.secondChoiceDate === day;
-                            return (
-                              <button
-                                key={day}
-                                onClick={() => update('secondChoiceDate', form.secondChoiceDate === day ? '' : day)}
-                                className={`p-3 rounded-xl border text-center transition-all duration-200 ${
-                                  isSelected
-                                    ? 'bg-green-500/10 border-green-500/50 ring-1 ring-green-500/40 shadow-sm shadow-green-500/5'
-                                    : 'bg-gray-900/50 border-gray-800/60 hover:border-gray-700 hover:bg-gray-800/40'
-                                }`}
-                              >
-                                <span className={`text-[10px] font-bold block tracking-wide ${isSelected ? 'text-green-400' : 'text-gray-500'}`}>
-                                  {weekday}
-                                </span>
-                                <span className={`text-sm font-semibold block mt-0.5 ${isSelected ? 'text-white' : 'text-gray-300'}`}>
-                                  {date}
-                                </span>
-                              </button>
-                            );
-                          })}
+                    {(() => {
+                      const backupDates = availableDays.filter(d => d > form.preferredDate).slice(0, 6);
+                      if (!form.preferredDate || backupDates.length === 0) return null;
+                      return (
+                        <div>
+                          <div className="mb-3">
+                            <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-[0.1em]">
+                              Could another day work?
+                            </label>
+                            <p className="text-xs text-gray-600 mt-0.5">Optional — helps us schedule you faster.</p>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2.5">
+                            {backupDates.map(day => {
+                              const { weekday, date } = formatDateShort(day);
+                              const isSelected = form.secondChoiceDate === day;
+                              return (
+                                <button
+                                  key={day}
+                                  onClick={() => update('secondChoiceDate', form.secondChoiceDate === day ? '' : day)}
+                                  className={`p-3 rounded-xl border text-center transition-all duration-200 ${
+                                    isSelected
+                                      ? 'bg-green-500/10 border-green-500/50 ring-1 ring-green-500/40 shadow-sm shadow-green-500/5'
+                                      : 'bg-gray-900/50 border-gray-800/60 hover:border-gray-700 hover:bg-gray-800/40'
+                                  }`}
+                                >
+                                  <span className={`text-[10px] font-bold block tracking-wide ${isSelected ? 'text-green-400' : 'text-gray-500'}`}>
+                                    {weekday}
+                                  </span>
+                                  <span className={`text-sm font-semibold block mt-0.5 ${isSelected ? 'text-white' : 'text-gray-300'}`}>
+                                    {date}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      );
+                    })()}
 
                     <div>
                       <SectionLabel>Preferred time</SectionLabel>
