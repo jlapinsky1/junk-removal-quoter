@@ -1,28 +1,39 @@
-import { getClientIp, jsonResponse, errorResponse } from './_shared/supabase.js';
+import { getServiceClient, getClientIp, jsonResponse, errorResponse } from './_shared/supabase.js';
 
-/**
- * Captures an expansion-interest lead.
- *
- * To store leads persistently, connect this handler to your preferred backend:
- * - Supabase: insert into an `expansion_leads` table
- * - CRM: POST to HubSpot, Salesforce, etc.
- * - Email: forward via Resend or SendGrid
- *
- * Until then, leads are written to function logs so nothing is lost.
- */
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export default async function handler(req) {
   if (req.method !== 'POST') return errorResponse('Method not allowed', 405);
 
   try {
     const body = await req.json();
-    const name = (body?.name || '').trim();
     const email = (body?.email || '').trim();
-    const address = (body?.address || '').trim();
+    const name = (body?.name || '').trim();
+    const zip = (body?.zip || '').trim();
+    const testRunId = body?.testRunId || null;
 
-    if (!email) return errorResponse('Email is required');
+    if (!email) {
+      return errorResponse('email_required', 400);
+    }
+    if (!EMAIL_RE.test(email)) {
+      return errorResponse('invalid_email', 400);
+    }
 
     const ip = getClientIp(req);
-    console.log('expansion_lead', JSON.stringify({ name, email, address, ip, ts: new Date().toISOString() }));
+    const supabase = getServiceClient();
+
+    const { error } = await supabase.from('expansion_leads').insert({
+      email,
+      name: name || null,
+      zip: zip || null,
+      ip_address: ip,
+      test_run_id: testRunId,
+    });
+
+    if (error) {
+      console.error('expansion_lead insert error:', error);
+      return errorResponse('Server error', 500);
+    }
 
     return jsonResponse({ success: true });
   } catch (e) {

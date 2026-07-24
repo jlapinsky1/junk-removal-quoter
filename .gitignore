@@ -4,3 +4,6 @@ dist
 
 # Local Netlify folder
 .netlify
+__pycache__/
+*.pyc
+.env.test

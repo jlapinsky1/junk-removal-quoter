@@ -1,0 +1,5 @@
+pytest>=8.0
+pytest-mock>=3.0
+requests>=2.31
+responses>=0.25
+python-dotenv>=1.0

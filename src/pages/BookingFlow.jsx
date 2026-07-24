@@ -1,5 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { getRepo } from '../utils/repository';
+import { getAvailableBookingDates, localDateString } from '../utils/dateLogic';
 
 function generateIdempotencyKey() {
   return crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -74,36 +75,6 @@ const COMPANION_CONTENT = [
   },
 ];
 
-function localDateString(d) {
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-/**
- * Returns available booking dates within a rolling window.
- * @param {object} options
- * @param {number} [options.daysAhead=21] - Calendar days to look ahead from tomorrow.
- * @param {string[]} [options.unavailableDates=[]] - ISO date strings (YYYY-MM-DD) that are blocked.
- * @param {number[]} [options.businessDays=[1,2,3,4,5,6]] - Days of week to include (0=Sun, 6=Sat).
- */
-function getAvailableBookingDates({ daysAhead = 21, unavailableDates = [], businessDays = [1, 2, 3, 4, 5, 6] } = {}) {
-  const result = [];
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  tomorrow.setHours(0, 0, 0, 0);
-  const blocked = new Set(unavailableDates);
-  for (let i = 0; i < daysAhead; i++) {
-    const d = new Date(tomorrow);
-    d.setDate(tomorrow.getDate() + i);
-    const str = localDateString(d);
-    if (businessDays.includes(d.getDay()) && !blocked.has(str)) {
-      result.push(str);
-    }
-  }
-  return result;
-}
 
 function formatDate(dateStr) {
   const d = new Date(dateStr + 'T12:00:00');
@@ -398,7 +369,7 @@ export default function BookingFlow() {
   }
 
   const progressPercent = step < 0 ? 0 : ((step + 1) / STEPS.length) * 100;
-  const availableDays = getAvailableBookingDates();
+  const availableDays = getAvailableBookingDates({ referenceDate: new Date() });
 
   // ──────────────────────── SUCCESS SCREEN ────────────────────────
   if (submitted) {

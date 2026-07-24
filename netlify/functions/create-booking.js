@@ -23,8 +23,12 @@ export default async function handler(req) {
     if (!sessionId || !idempotencyKey || !customerName || !customerPhone || !address || !city || !zip || !fullAddress) {
       return errorResponse('Missing required fields');
     }
+    // Optional test-run tag — stored alongside booking for scoped cleanup in test environments
+    const testRunId = body.testRunId || null;
 
-    // Server-side service-area enforcement (cannot be bypassed by the client)
+    // Server-side service-area enforcement (cannot be bypassed by the client).
+    // Fail-closed: infrastructure errors block the booking rather than allowing unknown ZIPs.
+    // The 'unconfigured' reason (intentionally empty lists) is the only permitted pass-through.
     try {
       const saConfig = await loadServiceAreaConfig();
       const serviceAreaResult = evaluateZip(zip, saConfig);
@@ -32,7 +36,7 @@ export default async function handler(req) {
         return errorResponse('Address is outside the service area', 422);
       }
     } catch {
-      // Fail open on config load errors so infrastructure issues never block customers
+      return errorResponse('Service area check unavailable. Please try again shortly.', 503);
     }
 
     // Idempotency: return existing booking if key already used
@@ -104,6 +108,7 @@ export default async function handler(req) {
         time_preference: body.timePreference || null,
         upload_session_id: sessionId,
         idempotency_key: idempotencyKey,
+        test_run_id: testRunId,
       })
       .select('id')
       .single();
