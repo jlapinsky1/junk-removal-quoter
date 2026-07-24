@@ -11,6 +11,7 @@ import BookingFlow from './pages/BookingFlow';
 import ApprovedQuote from './pages/ApprovedQuote';
 import AdminLogin from './pages/AdminLogin';
 import Commercial from './pages/Commercial';
+import ServiceAreaAdmin from './pages/ServiceAreaAdmin';
 import ClientLogin from './pages/ClientLogin';
 import ClientPortal from './pages/ClientPortal';
 import { getSettings } from './utils/storage';
@@ -88,6 +89,7 @@ function AdminDashboard() {
           <QuoteHistory onDuplicate={handleDuplicate} />
         )}
         {activeTab === 'learning' && <LearningDashboard />}
+        {activeTab === 'service-area' && <ServiceAreaAdmin />}
         {activeTab === 'settings' && (
           <Settings settings={settings} onSettingsChange={setSettings} />
         )}

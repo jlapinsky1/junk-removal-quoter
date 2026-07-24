@@ -6,6 +6,7 @@ const tabs = [
   { id: 'quote', label: 'New Quote' },
   { id: 'history', label: 'History' },
   { id: 'learning', label: 'Learning' },
+  { id: 'service-area', label: 'Service Area' },
   { id: 'settings', label: 'Settings' },
 ];
 

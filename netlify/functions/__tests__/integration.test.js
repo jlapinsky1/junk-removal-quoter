@@ -364,6 +364,26 @@ vi.mock('../_shared/supabase.js', () => ({
   }),
 }));
 
+// ── Mock service-area module (prevents @netlify/blobs context errors) ────────
+
+vi.mock('../_shared/serviceArea.js', () => ({
+  loadServiceAreaConfig: async () => ({
+    mode: 'zip-list', centerZip: '', radiusMiles: 30,
+    serviceableZips: [], excludedZips: [], unavailableZips: [],
+    updatedAt: '', updatedBy: '',
+  }),
+  evaluateZip: () => ({ serviceable: true, reason: 'unconfigured' }),
+  isValidZip: (zip) => /^\d{5}$/.test((zip || '').trim()),
+  normalizeAndDedupeZips: (zips) => [
+    ...new Set((zips || []).map(z => (z || '').trim()).filter(z => /^\d{5}$/.test(z))),
+  ],
+  saveServiceAreaConfig: async () => {},
+  buildFromEnv: () => ({ serviceableZips: [], excludedZips: [], unavailableZips: [], radiusMiles: 30, centerZip: '', updatedAt: '', updatedBy: '' }),
+  DEFAULT_CONFIG: { mode: 'zip-list', serviceableZips: [], excludedZips: [], unavailableZips: [], radiusMiles: 30, centerZip: '', updatedAt: '', updatedBy: '' },
+  invalidateConfigCache: () => {},
+  checkServiceAreaServer: async () => ({ serviceable: true, reason: 'unconfigured' }),
+}));
+
 // ── Import handlers ──────────────────────────────────────────
 
 const { default: createUploadSession } = await import('../create-upload-session.js');

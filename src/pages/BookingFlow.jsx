@@ -129,6 +129,11 @@ export default function BookingFlow() {
   const [photoError, setPhotoError] = useState(null);
 
   const [heroZip, setHeroZip] = useState('');
+  // null | 'checking' | 'outside' | 'unavailable' | 'invalid'
+  const [heroCheckState, setHeroCheckState] = useState(null);
+  // null | 'checking' | 'outside' | 'unavailable' | 'invalid'
+  const [locationCheckState, setLocationCheckState] = useState(null);
+  const [notifyState, setNotifyState] = useState({ open: false, name: '', email: '', submitting: false, done: false });
   const [showMoreDates, setShowMoreDates] = useState(false);
   const [form, setForm] = useState({
     firstName: '', lastName: '', phone: '', email: '',
@@ -160,6 +165,9 @@ export default function BookingFlow() {
   }, [sessionId]);
 
   function update(field, value) {
+    if (['address', 'city', 'state', 'zip'].includes(field)) {
+      setLocationCheckState(null);
+    }
     setForm(prev => ({ ...prev, [field]: value }));
   }
 
@@ -319,6 +327,76 @@ export default function BookingFlow() {
     }
   }
 
+  async function callCheckServiceArea(zip) {
+    try {
+      const res = await fetch('/api/check-service-area', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ zip }),
+      });
+      if (!res.ok) return { serviceable: true, reason: 'error' };
+      return await res.json();
+    } catch {
+      // Network error -- fail open so infrastructure issues don't block customers
+      return { serviceable: true, reason: 'error' };
+    }
+  }
+
+  function resolveCheckState(result) {
+    if (result.serviceable) return null;
+    if (result.reason === 'invalid_zip') return 'invalid';
+    if (result.reason === 'unavailable') return 'unavailable';
+    return 'outside';
+  }
+
+  async function handleHeroCheck() {
+    const zip = heroZip.trim();
+    if (!zip || heroCheckState === 'checking') return;
+    // Client-side format check before hitting the API
+    if (!/^\d{5}$/.test(zip)) {
+      setHeroCheckState('invalid');
+      return;
+    }
+    setHeroCheckState('checking');
+    const result = await callCheckServiceArea(zip);
+    if (result.serviceable) {
+      update('zip', zip);
+      setHeroCheckState(null);
+      setNotifyState({ open: false, name: '', email: '', submitting: false, done: false });
+      goToStep(0);
+    } else {
+      setHeroCheckState(resolveCheckState(result));
+    }
+  }
+
+  async function handleLocationCheck() {
+    if (locationCheckState === 'checking') return;
+    const zip = form.zip.trim();
+    if (!zip) return;
+    setLocationCheckState('checking');
+    const result = await callCheckServiceArea(zip);
+    if (result.serviceable) {
+      setLocationCheckState(null);
+      next();
+    } else {
+      setLocationCheckState(resolveCheckState(result));
+    }
+  }
+
+  async function handleNotifySubmit(enteredAddress) {
+    setNotifyState(s => ({ ...s, submitting: true }));
+    try {
+      await fetch('/api/notify-expansion', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: notifyState.name, email: notifyState.email, address: enteredAddress }),
+      });
+    } catch {
+      // Fire-and-forget -- show success regardless
+    }
+    setNotifyState(s => ({ ...s, submitting: false, done: true }));
+  }
+
   const progressPercent = step < 0 ? 0 : ((step + 1) / STEPS.length) * 100;
   const availableDays = getAvailableBookingDates();
 
@@ -419,30 +497,66 @@ export default function BookingFlow() {
                 </p>
 
                 {/* ZIP input card */}
-                <div className="bg-gray-900/60 border border-gray-800/60 rounded-2xl p-6 max-w-md ring-1 ring-white/[0.02]">
-                  <label className="block text-[11px] font-bold text-gray-400 mb-3 uppercase tracking-[0.15em]">
-                    Where is the pickup?
-                  </label>
-                  <div className="flex gap-3">
-                    <div className="flex-1 flex items-center bg-gray-800/50 border border-gray-700/50 rounded-xl px-4">
-                      <PinIcon className="w-4 h-4 text-gray-500 mr-3 flex-shrink-0" />
-                      <input
-                        id="hero-zip"
-                        type="text"
-                        className="w-full bg-transparent py-3.5 text-sm text-white placeholder-gray-500 focus:outline-none"
-                        placeholder="Enter ZIP code or address"
-                        value={heroZip}
-                        onChange={e => setHeroZip(e.target.value)}
-                        onKeyDown={e => { if (e.key === 'Enter' && heroZip.trim()) { update('zip', heroZip); goToStep(0); } }}
-                      />
+                <div className="max-w-md space-y-3">
+                  <div className="bg-gray-900/60 border border-gray-800/60 rounded-2xl p-6 ring-1 ring-white/[0.02]">
+                    <label className="block text-[11px] font-bold text-gray-400 mb-3 uppercase tracking-[0.15em]">
+                      Where is the pickup?
+                    </label>
+                    <div className="flex gap-3">
+                      <div className="flex-1 flex items-center bg-gray-800/50 border border-gray-700/50 rounded-xl px-4">
+                        <PinIcon className="w-4 h-4 text-gray-500 mr-3 flex-shrink-0" />
+                        <input
+                          id="hero-zip"
+                          type="text"
+                          inputMode="numeric"
+                          maxLength={5}
+                          className="w-full bg-transparent py-3.5 text-sm text-white placeholder-gray-500 focus:outline-none font-mono tracking-widest"
+                          placeholder="ZIP code"
+                          value={heroZip}
+                          onChange={e => { setHeroZip(e.target.value.replace(/\D/g, '').slice(0, 5)); setHeroCheckState(null); }}
+                          onKeyDown={e => { if (e.key === 'Enter' && heroZip.trim()) handleHeroCheck(); }}
+                        />
+                      </div>
+                      <button
+                        onClick={handleHeroCheck}
+                        disabled={!heroZip.trim() || heroCheckState === 'checking'}
+                        className="bg-green-500 hover:bg-green-400 disabled:opacity-60 disabled:hover:bg-green-500 text-gray-950 font-bold text-sm px-6 rounded-xl transition-colors whitespace-nowrap flex items-center gap-2"
+                      >
+                        {heroCheckState === 'checking' ? (
+                          <>
+                            <svg className="animate-spin w-4 h-4 flex-shrink-0" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                            </svg>
+                            Checking...
+                          </>
+                        ) : 'See My Estimate'}
+                      </button>
                     </div>
-                    <button
-                      onClick={() => { if (heroZip.trim()) update('zip', heroZip); goToStep(0); }}
-                      className="bg-green-500 hover:bg-green-400 text-gray-950 font-bold text-sm px-6 rounded-xl transition-colors whitespace-nowrap"
-                    >
-                      See My Estimate
-                    </button>
+
+                    {/* Invalid ZIP error */}
+                    {heroCheckState === 'invalid' && (
+                      <p className="mt-3 text-sm text-red-400">
+                        Please enter a valid five-digit ZIP code.
+                      </p>
+                    )}
                   </div>
+
+                  {/* Outside or temporarily unavailable service area */}
+                  {(heroCheckState === 'outside' || heroCheckState === 'unavailable') && (
+                    <OutsideServiceAreaCard
+                      enteredZip={heroZip}
+                      isUnavailable={heroCheckState === 'unavailable'}
+                      notifyState={notifyState}
+                      onNotifyChange={patch => setNotifyState(s => ({ ...s, ...patch }))}
+                      onNotifySubmit={() => handleNotifySubmit(heroZip)}
+                      onCheckAnother={() => {
+                        setHeroCheckState(null);
+                        setNotifyState({ open: false, name: '', email: '', submitting: false, done: false });
+                        document.getElementById('hero-zip')?.focus();
+                      }}
+                    />
+                  )}
                 </div>
               </div>
 
@@ -718,6 +832,11 @@ export default function BookingFlow() {
                       <FloatingInput label="ZIP" value={form.zip} onChange={v => update('zip', v)} placeholder="30301" />
                     </div>
                     <InlineTrust text="We need this to check if we service your area" />
+                    {locationCheckState === 'invalid' && (
+                      <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3.5 text-sm text-red-400">
+                        Please enter a valid five-digit ZIP code.
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -1073,14 +1192,34 @@ export default function BookingFlow() {
 
                 {/* Navigation */}
                 <div className="mt-10 space-y-3 pb-8 lg:pb-0">
-                  {step < STEPS.length - 1 ? (
+                  {step === 1 && (locationCheckState === 'outside' || locationCheckState === 'unavailable') ? (
+                    <OutsideServiceAreaCard
+                      enteredZip={form.zip}
+                      isUnavailable={locationCheckState === 'unavailable'}
+                      notifyState={notifyState}
+                      onNotifyChange={patch => setNotifyState(s => ({ ...s, ...patch }))}
+                      onNotifySubmit={() => handleNotifySubmit(form.zip)}
+                      onCheckAnother={() => {
+                        setLocationCheckState(null);
+                        setNotifyState({ open: false, name: '', email: '', submitting: false, done: false });
+                      }}
+                    />
+                  ) : step < STEPS.length - 1 ? (
                     <button
-                      onClick={next}
-                      disabled={!canProceed()}
+                      onClick={step === 1 ? handleLocationCheck : next}
+                      disabled={!canProceed() || locationCheckState === 'checking'}
                       className="w-full bg-green-500 hover:bg-green-400 text-gray-950 rounded-xl text-base font-extrabold btn-glow disabled:opacity-30 disabled:shadow-none disabled:hover:bg-green-500 active:scale-[0.98] transform transition-all duration-200"
                       style={{ paddingTop: '18px', paddingBottom: '18px' }}
                     >
-                      Continue
+                      {step === 1 && locationCheckState === 'checking' ? (
+                        <span className="flex items-center justify-center gap-2">
+                          <svg className="animate-spin w-5 h-5" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                          </svg>
+                          Checking your area...
+                        </span>
+                      ) : 'Continue'}
                     </button>
                   ) : (
                     <button
@@ -1103,12 +1242,14 @@ export default function BookingFlow() {
                     </button>
                   )}
 
-                  <button
-                    onClick={back}
-                    className="w-full text-gray-500 hover:text-gray-300 py-3 text-sm font-semibold transition-colors duration-200"
-                  >
-                    {step === 0 ? 'Back to start' : 'Back'}
-                  </button>
+                  {!(step === 1 && (locationCheckState === 'outside' || locationCheckState === 'unavailable')) && (
+                    <button
+                      onClick={back}
+                      className="w-full text-gray-500 hover:text-gray-300 py-3 text-sm font-semibold transition-colors duration-200"
+                    >
+                      {step === 0 ? 'Back to start' : 'Back'}
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -1272,6 +1413,117 @@ function InlineTrust({ text }) {
     <div className="flex items-center gap-2 pt-3">
       <ShieldIcon className="w-3.5 h-3.5 text-gray-600 flex-shrink-0" />
       <span className="text-[11px] text-gray-600 font-medium">{text}</span>
+    </div>
+  );
+}
+
+// ──────────────────────── OUT-OF-AREA CARD ────────────────────────
+
+function OutsideServiceAreaCard({ enteredZip, isUnavailable, notifyState, onNotifyChange, onNotifySubmit, onCheckAnother }) {
+  if (notifyState.done) {
+    return (
+      <div className="bg-green-500/5 border border-green-500/20 rounded-2xl p-6 text-center">
+        <div className="w-12 h-12 bg-green-500/10 rounded-full flex items-center justify-center mx-auto mb-4 ring-1 ring-green-500/20">
+          <svg className="w-6 h-6 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+          </svg>
+        </div>
+        <p className="text-white font-bold mb-1">You're on the list!</p>
+        <p className="text-gray-400 text-sm">We'll reach out as soon as Squatterz expands to your area.</p>
+        <button
+          onClick={onCheckAnother}
+          className="mt-4 text-sm text-green-400 hover:text-green-300 font-medium transition-colors"
+        >
+          Check another ZIP
+        </button>
+      </div>
+    );
+  }
+
+  if (notifyState.open) {
+    return (
+      <div className="bg-gray-900/60 border border-gray-800/60 rounded-2xl p-6 ring-1 ring-white/[0.02]">
+        <p className="text-white font-bold mb-1">Leave your info</p>
+        <p className="text-gray-400 text-sm mb-5">
+          We'll let you know as soon as we start serving your area.
+        </p>
+        <div className="space-y-3">
+          <input
+            type="text"
+            placeholder="Your name (optional)"
+            value={notifyState.name}
+            onChange={e => onNotifyChange({ name: e.target.value })}
+            className="w-full bg-gray-800/60 border border-gray-700/60 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-green-500/60 transition-all"
+          />
+          <input
+            type="email"
+            placeholder="Email address"
+            value={notifyState.email}
+            onChange={e => onNotifyChange({ email: e.target.value })}
+            className="w-full bg-gray-800/60 border border-gray-700/60 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-green-500/60 transition-all"
+          />
+          <button
+            onClick={onNotifySubmit}
+            disabled={!notifyState.email.trim() || notifyState.submitting}
+            className="w-full bg-green-500 hover:bg-green-400 disabled:opacity-40 text-gray-950 font-bold text-sm py-3 rounded-xl transition-colors"
+          >
+            {notifyState.submitting ? 'Submitting...' : 'Notify Me When You Expand'}
+          </button>
+          <button
+            onClick={onCheckAnother}
+            className="w-full text-gray-500 hover:text-gray-300 py-2 text-sm font-medium transition-colors"
+          >
+            Check another ZIP
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (isUnavailable) {
+    return (
+      <div className="bg-gray-900/60 border border-gray-800/60 rounded-2xl p-6 ring-1 ring-white/[0.02]">
+        <p className="text-white font-bold text-[15px] mb-2">We're temporarily unavailable in this area.</p>
+        <p className="text-gray-400 text-sm leading-relaxed mb-5">
+          Please check back soon or contact us for assistance.
+        </p>
+        {enteredZip && (
+          <p className="text-gray-500 text-xs mb-5 font-mono">ZIP: {enteredZip}</p>
+        )}
+        <button
+          onClick={onCheckAnother}
+          className="w-full bg-gray-800/80 hover:bg-gray-700/80 text-white font-semibold text-sm py-3.5 rounded-xl border border-gray-700/60 transition-colors"
+        >
+          Check Another ZIP
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-gray-900/60 border border-gray-800/60 rounded-2xl p-6 ring-1 ring-white/[0.02]">
+      <p className="text-white font-bold text-[15px] mb-2">We're not in your neighborhood just yet.</p>
+      <p className="text-gray-400 text-sm leading-relaxed mb-5">
+        We're sorry, but Squatterz is not currently servicing this ZIP code. We're expanding, so leave your
+        information and we'll let you know when service becomes available.
+      </p>
+      {enteredZip && (
+        <p className="text-gray-500 text-xs mb-5 font-mono">ZIP: {enteredZip}</p>
+      )}
+      <div className="space-y-2">
+        <button
+          onClick={() => onNotifyChange({ open: true })}
+          className="w-full bg-green-500 hover:bg-green-400 text-gray-950 font-bold text-sm py-3.5 rounded-xl transition-colors"
+        >
+          Notify Me When You Expand
+        </button>
+        <button
+          onClick={onCheckAnother}
+          className="w-full bg-gray-800/80 hover:bg-gray-700/80 text-white font-semibold text-sm py-3.5 rounded-xl border border-gray-700/60 transition-colors"
+        >
+          Check Another ZIP
+        </button>
+      </div>
     </div>
   );
 }

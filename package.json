@@ -11,6 +11,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@netlify/blobs": "^10.7.10",
     "@supabase/supabase-js": "^2.110.7",
     "lucide-react": "^1.25.0",
     "pdfkit": "^0.19.1",

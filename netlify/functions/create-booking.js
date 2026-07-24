@@ -2,6 +2,7 @@ import {
   getServiceClient, getClientIp, checkRateLimit,
   jsonResponse, errorResponse,
 } from './_shared/supabase.js';
+import { evaluateZip, loadServiceAreaConfig } from './_shared/serviceArea.js';
 
 export default async function handler(req) {
   if (req.method !== 'POST') return errorResponse('Method not allowed', 405);
@@ -21,6 +22,17 @@ export default async function handler(req) {
     const { sessionId, idempotencyKey, customerName, customerPhone, address, city, zip, fullAddress } = body;
     if (!sessionId || !idempotencyKey || !customerName || !customerPhone || !address || !city || !zip || !fullAddress) {
       return errorResponse('Missing required fields');
+    }
+
+    // Server-side service-area enforcement (cannot be bypassed by the client)
+    try {
+      const saConfig = await loadServiceAreaConfig();
+      const serviceAreaResult = evaluateZip(zip, saConfig);
+      if (!serviceAreaResult.serviceable) {
+        return errorResponse('Address is outside the service area', 422);
+      }
+    } catch {
+      // Fail open on config load errors so infrastructure issues never block customers
     }
 
     // Idempotency: return existing booking if key already used
