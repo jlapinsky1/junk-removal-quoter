@@ -157,10 +157,7 @@ const supabaseRepo = {
   },
 
   async deleteBooking(id) {
-    const { error } = await supabase
-      .from('bookings')
-      .delete()
-      .eq('id', id);
+    const { error } = await supabase.rpc('admin_delete_booking', { p_booking_id: id });
     if (error) throw error;
   },
 

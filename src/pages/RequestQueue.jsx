@@ -273,9 +273,13 @@ function RequestDetail({ booking, onBack }) {
 
   async function handleDelete() {
     if (!confirm('Delete this request permanently?')) return;
-    const repo = await getRepo();
-    await repo.deleteBooking(data.id);
-    onBack();
+    try {
+      const repo = await getRepo();
+      await repo.deleteBooking(data.id);
+      onBack();
+    } catch (err) {
+      alert(`Delete failed: ${err.message}`);
+    }
   }
 
   async function handleSaveNotes() {
