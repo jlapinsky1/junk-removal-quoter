@@ -29,41 +29,26 @@ export default function ClientLogin() {
         if (error) throw error;
         navigate("/portal");
       } else if (mode === "forgot") {
-        const { error } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: `${window.location.origin}/portal/login`,
+        const res = await fetch("/.netlify/functions/reset-password", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email }),
         });
-        if (error) throw error;
+        const result = await res.json();
+        if (!res.ok) throw new Error(result.error || "Something went wrong.");
         setResetSent(true);
       } else {
-        // signup
+        // signup — handled server-side so Resend sends the confirmation email
         if (password.length < 8) {
           throw new Error("Password must be at least 8 characters.");
         }
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: { contact_name: contactName },
-            emailRedirectTo: `${window.location.origin}/portal/login`,
-          },
+        const res = await fetch("/.netlify/functions/signup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password, contactName }),
         });
-        if (error) throw error;
-
-        // Supabase returns a fake user with empty identities when the email
-        // already exists (to prevent email enumeration). Detect this case.
-        const identities = data?.user?.identities;
-        if (identities && identities.length === 0) {
-          throw new Error(
-            "An account with this email already exists. Please log in instead, or use \"Forgot password\" to reset your credentials."
-          );
-        }
-
-        // If we got a session, email confirmation is off — go straight to portal
-        if (data?.session) {
-          navigate("/portal");
-          return;
-        }
-
+        const result = await res.json();
+        if (!res.ok) throw new Error(result.error || "Something went wrong.");
         setSignupSuccess(true);
       }
     } catch (err) {
