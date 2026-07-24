@@ -545,6 +545,8 @@ The admin navigation has tabs for:
 
 ## Test Coverage
 
+### JavaScript Unit Tests (Vitest)
+
 | Test File | Tests | What It Covers |
 |-----------|-------|---------------|
 | `goalEngine.test.js` | 38 | Working days, profit extraction, pipeline weighting, pace status, alerts, today/week progress |
@@ -555,5 +557,122 @@ The admin navigation has tabs for:
 | `routeContext.test.js` | 11 | Haversine accuracy, address hashing, nearby job filtering |
 | `batchingEngine.test.js` | 10 | Capacity compatibility, batch suggestions, radius filtering |
 | `routeScoring.test.js` | 12 | Route scoring, scenario comparison, stop order optimization |
-| **Total new** | **118** | |
-| **Total suite** | **252** | All passing |
+| `serviceArea.test.js` | 17 | `isValidZip` format validation, `reasonToUiState` mapping |
+| `dateLogic.test.js` | 9 | `getAvailableBookingDates` unit tests |
+| `integration.test.js` | ~40 | Netlify Function handler integration (mocked Blobs) |
+| **Total JS suite** | **326** | All passing |
+
+### Python Regression Tests (pytest)
+
+The Python suite exercises real HTTP API endpoints against a live `netlify dev` instance, verifying HTTP contracts, Supabase persistence, and RLS enforcement. It complements (not duplicates) the JS suite.
+
+| Test Module | Markers | What It Covers |
+|---|---|---|
+| `unit/test_date_logic.py` | unit | Date algorithm via Node subprocess with explicit `referenceDate`; 18 edge cases including DST, leap year, year boundary |
+| `api/test_check_service_area.py` | smoke, regression | Full ZIP parameter matrix; exact reason codes; fail-closed vs unconfigured distinction |
+| `api/test_create_booking.py` | smoke, regression | Field matrix × 8 required fields; persistence via test-lookup; idempotency count verification |
+| `api/test_upload_flow.py` | regression | Session lifecycle, signed URL, disallowed extensions, max photos, expired/consumed session |
+| `api/test_quote_lifecycle.py` | smoke, regression | Full lifecycle: create → approve → view → accept → complete; token revocation; slot conflict |
+| `api/test_admin_endpoints.py` | regression | Auth enforcement, ZIP normalization, config round-trip, updatedBy/updatedAt fields |
+| `integration/test_auth.py` | smoke, regression | Token acquisition, wrong credentials, malformed headers, portal signup, enumeration safety |
+| `integration/test_expansion.py` | smoke, regression | Email required/invalid exact error codes, lead persistence, method enforcement |
+| `integration/test_service_area.py` | regression | Config persistence, check endpoint reflects saved config, auth enforcement |
+| `integration/test_booking.py` | smoke, regression | Server-side ZIP enforcement, idempotency, expired session, no stack trace |
+| `integration/test_commercial.py` | smoke, regression | Property + job CRUD via Supabase REST; RLS blocks unauthenticated access |
+| `integration/test_work_orders.py` | smoke, regression | CRUD, field persistence, status transitions, list visibility |
+| `integration/test_portal_visibility.py` | regression | Cross-tenant isolation: client B cannot read client A's data |
+| `integration/test_failure_handling.py` | regression | Exact status codes for all known error conditions; all errors are JSON |
+| `integration/test_security.py` | security | Injection strings, no stack traces in responses, status field tampering, extra field handling |
+
+#### Coverage boundaries
+
+The Python suite does NOT verify:
+- React component rendering or DOM structure
+- Client-side field validation (phone regex, email format, photo count min/max)
+- Button wiring, event handlers, or multi-step form navigation
+- Transactional email delivery (Resend)
+- `analyze-photos` (requires real base64 images + Anthropic API key)
+- PDF content (only `Content-Type: application/pdf` + 200 status verified)
+- Cloudflare/Netlify Blobs cache edge behavior in production vs local dev
+
+These are covered by manual testing before each release — see `LAUNCH_CHECKLIST.md`.
+
+---
+
+## New Netlify Functions (API Layer Additions)
+
+### `/api/health` (healthcheck.js)
+
+GET endpoint that returns `{ "status": "ok", "timestamp": "..." }` with 200. No auth, no DB calls. Used by CI to wait for full server readiness (not just TCP port open).
+
+### `/api/notify-expansion` (notify-expansion.js)
+
+Updated with validation and persistence:
+- `email` is required — returns 400 `{ "error": "email_required" }` if missing
+- `email` must match basic format — returns 400 `{ "error": "invalid_email" }` if invalid
+- `name` and `zip` are optional
+- Persists to `expansion_leads` table (migration 008)
+- Accepts optional `testRunId` for test isolation
+
+### `/api/test/lookup` (test-lookup.js)
+
+Test-only endpoint for verifying database state without direct DB access in test bodies. Only active when `NODE_ENV=test` AND `ENABLE_TEST_ENDPOINTS=true` AND `TEST_LOOKUP_SECRET` is set. Returns 404 (not 403) when disabled. Secret verified via `crypto.timingSafeEqual`.
+
+Operations:
+- `GET ?type=booking&testRunId={id}&idempotencyKey={key}` → booking row or 404
+- `GET ?type=booking_count&testRunId={id}&idempotencyKey={key}` → `{ count: N }`
+- `GET ?type=expansion_lead&testRunId={id}&email={email}` → lead row or 404
+- `GET ?type=service_area` → current Blobs config
+- `DELETE ?type=test_run&testRunId={id}` → deletes all records tagged with this testRunId
+
+---
+
+## Fail-Closed Service Area
+
+`create-booking.js` was changed from fail-open to fail-closed for infrastructure errors. Previously, any exception from `loadServiceAreaConfig()` would allow the booking through. Now:
+
+- Infrastructure error → 503 (booking blocked, customer told to try again)
+- `unconfigured` state (empty lists, intentional zero-config) → booking allowed (fail-open for this specific case)
+- Invalid/excluded/unavailable ZIP → 422 (booking blocked regardless of config state)
+
+This prevents silent approval of out-of-zone bookings during Blobs outages.
+
+---
+
+## Date Logic Extraction
+
+`getAvailableBookingDates()` was extracted from `BookingFlow.jsx` to `src/utils/dateLogic.js`. The function now accepts an explicit `referenceDate` parameter:
+
+```javascript
+getAvailableBookingDates({
+  referenceDate: '2025-01-01',  // string or Date; defaults to new Date()
+  daysAhead: 21,
+  unavailableDates: [],
+  businessDays: [1, 2, 3, 4, 5, 6],
+})
+```
+
+`BookingFlow.jsx` passes `new Date()` at the call site. The `tests/node-adapter/date-logic.js` CLI wrapper invokes the function from Python tests via subprocess with an explicit date — no system time freezing needed.
+
+---
+
+## Database Additions (Migration 008)
+
+```sql
+-- expansion_leads: captures out-of-zone interest for future coverage expansion
+create table expansion_leads (
+  id           uuid primary key default gen_random_uuid(),
+  email        text not null,
+  name         text,
+  zip          text,
+  ip_address   text,
+  test_run_id  text,           -- for test isolation and cleanup
+  created_at   timestamptz not null default now()
+);
+-- RLS: admins can read; service role writes via function
+-- Indexes on test_run_id and email
+
+-- bookings: test_run_id column added
+alter table bookings add column test_run_id text;
+-- Index: idx_bookings_test_run_id (partial, where test_run_id is not null)
+```

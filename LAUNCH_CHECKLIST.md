@@ -10,6 +10,9 @@
 | `SUPABASE_ANON_KEY` | Anon key (for admin JWT verification) |
 | `ANTHROPIC_API_KEY` | Claude API key for photo analysis |
 | `TURNSTILE_SECRET_KEY` | Cloudflare Turnstile server secret (optional — uploads work without it) |
+| `NODE_ENV` | Set to `test` only in test environments — never in production |
+| `ENABLE_TEST_ENDPOINTS` | Set to `true` only in test environments — never in production |
+| `TEST_LOOKUP_SECRET` | Secret for the test-only lookup endpoint — never in production |
 
 ### Vite (client-side, prefixed with `VITE_`)
 | Variable | Purpose |
@@ -21,8 +24,20 @@
 
 ## Required Supabase Migrations
 
-Run `supabase/migrations/001_initial_schema.sql` against the production database. This creates:
+Run all migrations in `supabase/migrations/` in order against the production database:
 
+| File | What It Creates |
+|---|---|
+| `001_initial_schema.sql` | Core tables, RLS policies, RPCs, triggers, storage bucket |
+| `002_business_goals.sql` | `business_goals`, `goal_snapshots` tables |
+| `003_decision_context.sql` | `decision_context JSONB` column on `quote_snapshots` |
+| `004_calibration.sql` | `calibration_records` table |
+| `005_route_cache.sql` | `location_cache`, `travel_cache`, geocoding columns on `bookings` |
+| `006_commercial_portal.sql` | `commercial_clients`, `properties`, `jobs`, `invoices` tables |
+| `007_service_area_admin.sql` | Admin service area config schema |
+| `008_expansion_leads_and_test_run_id.sql` | `expansion_leads` table; `test_run_id` column on `bookings` |
+
+Migration 001 creates:
 - 11 tables: `admin_users`, `rate_limits`, `upload_sessions`, `session_photos`, `bookings`, `booking_photos`, `quote_snapshots`, `quote_tokens`, `slot_reservations`, `quote_acceptances`, `audit_log`
 - Helper functions: `prevent_mutation()`, `set_updated_at()`, `is_admin()`, `check_rate_limit()`
 - Transactional RPCs: `accept_quote_atomic()`, `approve_quote_atomic()`, `cleanup_abandoned_data()`
@@ -123,3 +138,68 @@ INSERT INTO admin_users (user_id) VALUES ('paste-user-uuid-here');
 2. Open the quote URL in two browser tabs
 3. Accept in both tabs simultaneously
 4. Exactly one should succeed, the other should show "slot was just taken"
+
+---
+
+## Manual UI Release Checklist
+
+The Python regression suite tests API contracts and database persistence. These UI behaviors must be verified manually before each production release:
+
+**Booking flow:**
+- [ ] Hero ZIP entry → service area check → correct step progression
+- [ ] Photo upload: camera/file picker opens, preview shows, minimum 3 enforced
+- [ ] Date picker: Sundays excluded, 21-day window, backup date ordering correct
+- [ ] Out-of-zone ZIP shows warm messaging + "Notify Me" CTA
+- [ ] Unavailable ZIP shows correct message (distinct from outside-zone message)
+- [ ] Excluded ZIP shows correct message
+
+**Admin dashboard:**
+- [ ] Service area admin tab loads, ZIP chips render correctly
+- [ ] Decision card shows Take/Review/Pass with correct score and factors
+- [ ] Quote approval flow works end-to-end (decision context saved)
+- [ ] Goal/pace dashboard reflects current bookings
+- [ ] Learning dashboard shows calibration suggestions when data exists
+
+**Commercial portal:**
+- [ ] Portal login → dashboard renders correctly
+- [ ] New work order request form → submission confirmation
+- [ ] Completion packet PDF opens correctly in browser
+- [ ] Client cannot access another client's data (isolation)
+
+**Error states:**
+- [ ] Expired quote URL shows "no longer available"
+- [ ] Used quote URL shows "You're All Set"
+- [ ] Admin logout → redirect to login, session does not persist
+
+---
+
+## Python Regression Test Setup (Staging)
+
+Before running the Python regression suite against staging:
+
+1. Create a staging Supabase project (never use production)
+2. Run all migrations against staging
+3. Create test admin and client users in Supabase Auth
+4. Insert admin user into `admin_users` table
+5. Ensure admin user has a `commercial_clients` row for portal tests
+6. Configure `TEST_IN_ZONE_ZIP`, `TEST_EXCLUDED_ZIP`, `TEST_UNAVAILABLE_ZIP` to match a real seeded service area config
+7. Set `TEST_LOOKUP_SECRET` to a long random string; set the same value in both `.env.test` and the Netlify dev environment
+8. Run: `NODE_ENV=test ENABLE_TEST_ENDPOINTS=true TEST_LOOKUP_SECRET=<secret> netlify dev --port 8888`
+9. In a separate terminal: `pytest -m smoke -v` to verify setup
+
+**CI secrets required** (GitHub Actions → Settings → Secrets):
+
+| Secret | Notes |
+|---|---|
+| `SUPABASE_URL` | Staging project only |
+| `SUPABASE_ANON_KEY` | Staging |
+| `SUPABASE_SERVICE_ROLE_KEY` | Staging |
+| `TEST_ADMIN_EMAIL` | Must exist in staging auth |
+| `TEST_ADMIN_PASSWORD` | |
+| `TEST_CLIENT_EMAIL` | Must exist in staging auth with `commercial_clients` row |
+| `TEST_CLIENT_PASSWORD` | |
+| `TEST_IN_ZONE_ZIP` | Default: `30301` |
+| `TEST_OUT_OF_ZONE_ZIP` | Default: `10001` |
+| `TEST_EXCLUDED_ZIP` | Default: `30399` |
+| `TEST_UNAVAILABLE_ZIP` | Default: `30350` |
+| `TEST_LOOKUP_SECRET` | Long random string, same value in both server and test env |
