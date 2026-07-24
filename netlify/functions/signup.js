@@ -29,7 +29,7 @@ export default async function handler(req) {
       password,
       options: {
         data: { contact_name: contactName || '' },
-        redirectTo: `${siteUrl}/portal/login`,
+        redirectTo: `${siteUrl}/portal`,
       },
     });
 
