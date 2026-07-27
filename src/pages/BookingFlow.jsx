@@ -481,7 +481,8 @@ export default function BookingFlow() {
                           type="text"
                           inputMode="numeric"
                           maxLength={5}
-                          className="w-full bg-transparent py-3.5 text-sm text-white placeholder-gray-500 focus:outline-none font-mono tracking-widest"
+                          autoComplete="off"
+                          className="w-full bg-transparent py-3.5 text-sm text-white placeholder-gray-500 focus:outline-none font-mono tracking-widest [&:-webkit-autofill]:shadow-[inset_0_0_0_1000px_rgb(31,41,55)] [&:-webkit-autofill]:[-webkit-text-fill-color:white]"
                           placeholder="ZIP code"
                           value={heroZip}
                           onChange={e => { setHeroZip(e.target.value.replace(/\D/g, '').slice(0, 5)); setHeroCheckState(null); }}
