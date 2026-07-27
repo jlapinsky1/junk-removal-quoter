@@ -1,9 +1,10 @@
 import { getStore } from '@netlify/blobs';
+import zipcodes from 'zipcodes';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 export const DEFAULT_CONFIG = {
-  mode: 'zip-list',
+  mode: 'zip-list',   // 'zip-list' | 'radius'
   centerZip: '',
   radiusMiles: 30,
   serviceableZips: [],
@@ -46,6 +47,27 @@ export function normalizeAndDedupeZips(zips) {
 /** Parse a comma-separated env string of ZIPs into a clean array. */
 export function parseEnvZipList(envString) {
   return normalizeAndDedupeZips((envString || '').split(','));
+}
+
+// ─── Geo utilities ────────────────────────────────────────────────────────────
+
+/** Haversine distance between two lat/lon points, in miles. */
+function haversineDistance(lat1, lon1, lat2, lon2) {
+  const R = 3958.8; // Earth radius in miles
+  const toRad = d => d * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.asin(Math.sqrt(a));
+}
+
+/** Returns { lat, lon } for a ZIP code, or null if not found. */
+function getZipCoords(zip) {
+  const info = zipcodes.lookup(zip);
+  if (!info) return null;
+  return { lat: info.latitude, lon: info.longitude };
 }
 
 // ─── Config I/O ───────────────────────────────────────────────────────────────
@@ -136,7 +158,17 @@ export async function saveServiceAreaConfig(config) {
 /**
  * Pure ZIP evaluation against a loaded config object.
  *
- * Priority:
+ * Excluded and unavailable lists always apply regardless of mode.
+ *
+ * Radius mode priority:
+ *   1. Invalid format          → { serviceable: false, reason: 'invalid_zip' }
+ *   2. excludedZips            → { serviceable: false, reason: 'excluded' }
+ *   3. unavailableZips         → { serviceable: false, reason: 'unavailable' }
+ *   4. No centerZip configured → { serviceable: true,  reason: 'unconfigured' }
+ *   5. Within radius           → { serviceable: true,  reason: 'radius', distanceMiles }
+ *   6. Outside radius          → { serviceable: false, reason: 'outside', distanceMiles }
+ *
+ * ZIP list mode priority:
  *   1. Invalid format          → { serviceable: false, reason: 'invalid_zip' }
  *   2. excludedZips            → { serviceable: false, reason: 'excluded' }
  *   3. unavailableZips         → { serviceable: false, reason: 'unavailable' }
@@ -146,7 +178,7 @@ export async function saveServiceAreaConfig(config) {
  *
  * @param {string} zip
  * @param {object} config
- * @returns {{ serviceable: boolean, reason: string }}
+ * @returns {{ serviceable: boolean, reason: string, distanceMiles?: number }}
  */
 export function evaluateZip(zip, config) {
   if (!isValidZip((zip || '').trim())) {
@@ -155,16 +187,49 @@ export function evaluateZip(zip, config) {
 
   const z = zip.trim();
 
+  // Excluded and unavailable always win, regardless of mode
   if (config.excludedZips?.includes(z)) {
     return { serviceable: false, reason: 'excluded' };
   }
-
   if (config.unavailableZips?.includes(z)) {
     return { serviceable: false, reason: 'unavailable' };
   }
 
-  // If no lists have been configured yet, fail open so the site works
-  // before the admin has set anything up.
+  const mode = config.mode || 'zip-list';
+
+  // ── Radius mode ──────────────────────────────────────────────────────────────
+  if (mode === 'radius') {
+    const centerZip = (config.centerZip || '').trim();
+    const radiusMiles = Number(config.radiusMiles) || 30;
+
+    if (!centerZip) {
+      return { serviceable: true, reason: 'unconfigured' };
+    }
+
+    const centerCoords = getZipCoords(centerZip);
+    const zipCoords = getZipCoords(z);
+
+    if (!centerCoords) {
+      // Center ZIP not in database — fail open so valid customers aren't blocked
+      console.warn(`[serviceArea] Center ZIP ${centerZip} not found in database`);
+      return { serviceable: true, reason: 'unconfigured' };
+    }
+    if (!zipCoords) {
+      // Customer ZIP not in database — fail open
+      return { serviceable: true, reason: 'unknown_zip' };
+    }
+
+    const distanceMiles = Math.round(
+      haversineDistance(centerCoords.lat, centerCoords.lon, zipCoords.lat, zipCoords.lon) * 10
+    ) / 10;
+
+    if (distanceMiles <= radiusMiles) {
+      return { serviceable: true, reason: 'radius', distanceMiles };
+    }
+    return { serviceable: false, reason: 'outside', distanceMiles };
+  }
+
+  // ── ZIP list mode (default) ──────────────────────────────────────────────────
   const hasConfig =
     (config.serviceableZips?.length ?? 0) > 0 ||
     (config.excludedZips?.length ?? 0) > 0 ||
@@ -191,7 +256,7 @@ export function evaluateZip(zip, config) {
  * legitimate customers.
  *
  * @param {string} zipOrAddress
- * @returns {Promise<{ serviceable: boolean, reason: string }>}
+ * @returns {Promise<{ serviceable: boolean, reason: string, distanceMiles?: number }>}
  */
 export async function checkServiceAreaServer(zipOrAddress) {
   // If it's a bare 5-digit ZIP, use it directly; otherwise extract from address

@@ -41,6 +41,7 @@ async function handlePut(req) {
     unavailableZips,
     radiusMiles,
     centerZip,
+    mode,
   } = body;
 
   // Validate and normalize each list — invalid ZIPs are silently dropped
@@ -50,15 +51,21 @@ async function handlePut(req) {
     unavailableZips: normalizeAndDedupeZips(unavailableZips),
   };
 
-  // centerZip is optional reference data; validate if provided
+  // centerZip is required in radius mode; validate it if provided
   const normalizedCenterZip = (centerZip || '').trim();
   if (normalizedCenterZip && !isValidZip(normalizedCenterZip)) {
     return errorResponse('centerZip must be a five-digit ZIP code');
   }
+  if (mode === 'radius' && !normalizedCenterZip) {
+    return errorResponse('centerZip is required when using radius mode');
+  }
+
+  const validMode = ['zip-list', 'radius'].includes(mode) ? mode : DEFAULT_CONFIG.mode;
 
   const config = {
     ...DEFAULT_CONFIG,
     ...normalized,
+    mode: validMode,
     centerZip: normalizedCenterZip,
     radiusMiles: Math.max(1, Number(radiusMiles) || DEFAULT_CONFIG.radiusMiles),
     updatedAt: new Date().toISOString(),

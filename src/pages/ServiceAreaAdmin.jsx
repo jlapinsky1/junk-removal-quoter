@@ -101,13 +101,48 @@ function AddZipInput({ onAdd, placeholder = 'Enter ZIP code(s)' }) {
 function ZipTestPanel({ config }) {
   const [testZip, setTestZip] = useState('');
   const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(false);
 
-  function runTest() {
+  async function runTest() {
     const z = testZip.trim();
     if (!isValidZip(z)) {
       setResult({ status: 'invalid', message: 'Not a valid five-digit ZIP code.' });
       return;
     }
+
+    if (config.mode === 'radius') {
+      // Radius mode requires the ZIP database on the server — call the API
+      setLoading(true);
+      setResult(null);
+      try {
+        const res = await fetch('/api/check-service-area', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ zip: z }),
+        });
+        const data = await res.json();
+        if (data.serviceable) {
+          const dist = data.distanceMiles != null ? ` · ${data.distanceMiles} mi from your center ZIP` : '';
+          setResult({ status: 'serviceable', message: `${z} is within your service area${dist}. Customers here can book.` });
+        } else if (data.reason === 'excluded') {
+          setResult({ status: 'excluded', message: `${z} is on the excluded list. Customers in this ZIP will be rejected.` });
+        } else if (data.reason === 'unavailable') {
+          setResult({ status: 'unavailable', message: `${z} is temporarily unavailable. Customers will see a "check back soon" message.` });
+        } else if (data.reason === 'invalid_zip' || data.reason === 'unknown_zip') {
+          setResult({ status: 'invalid', message: `${z} was not recognized as a valid ZIP code.` });
+        } else {
+          const dist = data.distanceMiles != null ? ` (${data.distanceMiles} mi away)` : '';
+          setResult({ status: 'outside', message: `${z} is outside your ${config.radiusMiles}-mile radius${dist}. Customers here will see the out-of-area message.` });
+        }
+      } catch (e) {
+        setResult({ status: 'invalid', message: `Error: ${e.message}` });
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    // ZIP list mode — local check against current (unsaved) config
     if (config.excludedZips.includes(z)) {
       setResult({ status: 'excluded', message: `${z} is on the excluded list. Customers in this ZIP will be rejected.` });
     } else if (config.unavailableZips.includes(z)) {
@@ -144,11 +179,15 @@ function ZipTestPanel({ config }) {
         />
         <button
           onClick={runTest}
-          className="px-4 py-2 bg-gray-700 hover:bg-gray-800 text-white rounded-lg text-sm font-medium transition-colors"
+          disabled={loading}
+          className="px-4 py-2 bg-gray-700 hover:bg-gray-800 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-60"
         >
-          Test
+          {loading ? 'Checking...' : 'Test'}
         </button>
       </div>
+      {config.mode === 'radius' && (
+        <p className="text-xs text-gray-400">Tests the currently saved configuration. Save changes first if you've adjusted your radius or center ZIP.</p>
+      )}
       {result && (
         <p className={`text-sm px-3 py-2 rounded-lg border ${statusColors[result.status] || statusColors.invalid}`}>
           {result.message}
@@ -166,6 +205,7 @@ export default function ServiceAreaAdmin() {
   const [fetchError, setFetchError] = useState(null);
 
   const [config, setConfig] = useState({
+    mode: 'zip-list',
     serviceableZips: [],
     excludedZips: [],
     unavailableZips: [],
@@ -189,6 +229,7 @@ export default function ServiceAreaAdmin() {
       const data = await res.json();
       setConfig(c => ({
         ...c,
+        mode: data.mode || 'zip-list',
         serviceableZips: data.serviceableZips || [],
         excludedZips: data.excludedZips || [],
         unavailableZips: data.unavailableZips || [],
@@ -227,14 +268,12 @@ export default function ServiceAreaAdmin() {
   function toggleUnavailable(zip) {
     setConfig(c => {
       if (c.unavailableZips.includes(zip)) {
-        // Re-enable: move from unavailable back to serviceable
         return {
           ...c,
           unavailableZips: c.unavailableZips.filter(z => z !== zip),
           serviceableZips: [...new Set([...c.serviceableZips, zip])],
         };
       }
-      // Disable: move from serviceable to unavailable
       return {
         ...c,
         serviceableZips: c.serviceableZips.filter(z => z !== zip),
@@ -245,6 +284,10 @@ export default function ServiceAreaAdmin() {
   }
 
   async function handleSave() {
+    if (config.mode === 'radius' && !isValidZip(config.centerZip)) {
+      setSaveState('error');
+      return;
+    }
     setSaveState('saving');
     try {
       const headers = {
@@ -293,7 +336,16 @@ export default function ServiceAreaAdmin() {
     );
   }
 
+  const isRadiusMode = config.mode === 'radius';
   const totalServiceable = config.serviceableZips.length + config.unavailableZips.length;
+
+  const statusSummary = isRadiusMode
+    ? config.centerZip
+      ? `Radius mode · ZIPs within ${config.radiusMiles} miles of ${config.centerZip}`
+      : 'Radius mode · Set a center ZIP to activate'
+    : totalServiceable === 0
+      ? 'No ZIP codes configured. All areas will be accepted until you add at least one.'
+      : `${config.serviceableZips.length} active, ${config.unavailableZips.length} temporarily unavailable, ${config.excludedZips.length} excluded`;
 
   return (
     <div className="space-y-4 pb-8">
@@ -303,11 +355,7 @@ export default function ServiceAreaAdmin() {
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div>
             <h2 className="font-bold text-gray-800 text-lg">Service Area</h2>
-            <p className="text-sm text-gray-500 mt-0.5">
-              {totalServiceable === 0
-                ? 'No ZIP codes configured. All areas will be accepted until you add at least one.'
-                : `${config.serviceableZips.length} active, ${config.unavailableZips.length} temporarily unavailable, ${config.excludedZips.length} excluded`}
-            </p>
+            <p className="text-sm text-gray-500 mt-0.5">{statusSummary}</p>
           </div>
           {config.updatedAt && (
             <p className="text-xs text-gray-400">
@@ -317,47 +365,141 @@ export default function ServiceAreaAdmin() {
         </div>
       </div>
 
-      {/* Active ZIP codes */}
+      {/* Mode selector */}
       <div className="bg-white rounded-xl border p-4 space-y-3">
-        <h3 className="font-bold text-gray-800">Active ZIP Codes</h3>
-        <p className="text-sm text-gray-500">
-          Customers in these ZIPs can submit booking requests.
-        </p>
-
-        {config.serviceableZips.length > 0 ? (
-          <div className="flex flex-wrap gap-1.5">
-            {config.serviceableZips.sort().map(zip => (
-              <div key={zip} className="inline-flex items-center gap-1">
-                <ZipChip
-                  zip={zip}
-                  variant="default"
-                  onRemove={z => removeFromList('serviceableZips', z)}
-                />
-                <button
-                  onClick={() => toggleUnavailable(zip)}
-                  title="Temporarily disable this ZIP"
-                  className="text-xs text-amber-600 hover:text-amber-800 transition-colors px-1 py-0.5 rounded border border-amber-200 hover:bg-amber-50"
-                >
-                  Pause
-                </button>
+        <h3 className="font-bold text-gray-800">Coverage Mode</h3>
+        <div className="space-y-3">
+          <label className="flex items-start gap-3 cursor-pointer group">
+            <input
+              type="radio"
+              name="mode"
+              value="radius"
+              checked={isRadiusMode}
+              onChange={() => { setConfig(c => ({ ...c, mode: 'radius' })); setSaveState(null); }}
+              className="mt-0.5"
+            />
+            <div>
+              <div className="font-medium text-gray-800 text-sm group-hover:text-blue-700 transition-colors">Radius Mode</div>
+              <div className="text-xs text-gray-500 mt-0.5">
+                Automatically serve every ZIP code within a set distance of your base location.
+                No need to list ZIPs manually — you'll never miss one.
               </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-sm text-gray-400 italic">No active ZIP codes yet.</p>
-        )}
-
-        <AddZipInput
-          placeholder="30301, 30302, 30303 ..."
-          onAdd={zips => addToList('serviceableZips', zips)}
-        />
+            </div>
+          </label>
+          <label className="flex items-start gap-3 cursor-pointer group">
+            <input
+              type="radio"
+              name="mode"
+              value="zip-list"
+              checked={!isRadiusMode}
+              onChange={() => { setConfig(c => ({ ...c, mode: 'zip-list' })); setSaveState(null); }}
+              className="mt-0.5"
+            />
+            <div>
+              <div className="font-medium text-gray-800 text-sm group-hover:text-blue-700 transition-colors">ZIP List Mode</div>
+              <div className="text-xs text-gray-500 mt-0.5">
+                Manually specify every ZIP code you service. Use when your coverage isn't a simple circle
+                (e.g., you only serve certain corridors or municipalities).
+              </div>
+            </div>
+          </label>
+        </div>
       </div>
+
+      {/* Radius settings — only in radius mode */}
+      {isRadiusMode && (
+        <div className="bg-white rounded-xl border p-4 space-y-4">
+          <div>
+            <h3 className="font-bold text-gray-800">Radius Settings</h3>
+            <p className="text-sm text-gray-500 mt-0.5">
+              Any ZIP code whose centroid falls within the radius will be accepted.
+              Use the exclusion list below to block specific ZIPs inside your radius.
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Center ZIP <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                maxLength={5}
+                value={config.centerZip}
+                onChange={e => { setConfig(c => ({ ...c, centerZip: e.target.value.replace(/\D/g, '').slice(0, 5) })); setSaveState(null); }}
+                placeholder="30548"
+                className={`w-full border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-400 ${
+                  isRadiusMode && config.centerZip && !isValidZip(config.centerZip) ? 'border-red-400' : ''
+                }`}
+              />
+              <p className="text-xs text-gray-400 mt-1">Your base / dispatch location ZIP.</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Radius (miles)</label>
+              <input
+                type="number"
+                min="1"
+                max="500"
+                value={config.radiusMiles}
+                onChange={e => { setConfig(c => ({ ...c, radiusMiles: Number(e.target.value) })); setSaveState(null); }}
+                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+              />
+              <p className="text-xs text-gray-400 mt-1">How far out you'll travel.</p>
+            </div>
+          </div>
+          {isValidZip(config.centerZip) && config.radiusMiles > 0 && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 text-sm text-blue-800">
+              Serving all ZIP codes within <strong>{config.radiusMiles} miles</strong> of <strong>{config.centerZip}</strong>.
+              Excluded ZIPs below will still be blocked even if they're inside this radius.
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Active ZIP codes — only in zip-list mode */}
+      {!isRadiusMode && (
+        <div className="bg-white rounded-xl border p-4 space-y-3">
+          <h3 className="font-bold text-gray-800">Active ZIP Codes</h3>
+          <p className="text-sm text-gray-500">
+            Customers in these ZIPs can submit booking requests.
+          </p>
+
+          {config.serviceableZips.length > 0 ? (
+            <div className="flex flex-wrap gap-1.5">
+              {config.serviceableZips.sort().map(zip => (
+                <div key={zip} className="inline-flex items-center gap-1">
+                  <ZipChip
+                    zip={zip}
+                    variant="default"
+                    onRemove={z => removeFromList('serviceableZips', z)}
+                  />
+                  <button
+                    onClick={() => toggleUnavailable(zip)}
+                    title="Temporarily disable this ZIP"
+                    className="text-xs text-amber-600 hover:text-amber-800 transition-colors px-1 py-0.5 rounded border border-amber-200 hover:bg-amber-50"
+                  >
+                    Pause
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-gray-400 italic">No active ZIP codes yet.</p>
+          )}
+
+          <AddZipInput
+            placeholder="30301, 30302, 30303 ..."
+            onAdd={zips => addToList('serviceableZips', zips)}
+          />
+        </div>
+      )}
 
       {/* Temporarily unavailable */}
       <div className="bg-white rounded-xl border p-4 space-y-3">
         <h3 className="font-bold text-gray-800">Temporarily Unavailable</h3>
         <p className="text-sm text-gray-500">
-          These ZIPs are known service areas but are paused. Customers see a "check back soon" message instead of the out-of-area message.
+          {isRadiusMode
+            ? 'ZIPs within your radius that you\'re temporarily not servicing. Customers see a "check back soon" message.'
+            : 'These ZIPs are known service areas but are paused. Customers see a "check back soon" message instead of the out-of-area message.'}
         </p>
 
         {config.unavailableZips.length > 0 ? (
@@ -365,13 +507,15 @@ export default function ServiceAreaAdmin() {
             {config.unavailableZips.sort().map(zip => (
               <div key={zip} className="inline-flex items-center gap-1">
                 <ZipChip zip={zip} variant="unavailable" />
-                <button
-                  onClick={() => toggleUnavailable(zip)}
-                  title="Re-enable this ZIP"
-                  className="text-xs text-blue-600 hover:text-blue-800 transition-colors px-1 py-0.5 rounded border border-blue-200 hover:bg-blue-50"
-                >
-                  Resume
-                </button>
+                {!isRadiusMode && (
+                  <button
+                    onClick={() => toggleUnavailable(zip)}
+                    title="Re-enable this ZIP"
+                    className="text-xs text-blue-600 hover:text-blue-800 transition-colors px-1 py-0.5 rounded border border-blue-200 hover:bg-blue-50"
+                  >
+                    Resume
+                  </button>
+                )}
                 <button
                   onClick={() => removeFromList('unavailableZips', zip)}
                   className="text-xs text-red-500 hover:text-red-700 px-1"
@@ -385,13 +529,20 @@ export default function ServiceAreaAdmin() {
         ) : (
           <p className="text-sm text-gray-400 italic">None currently paused.</p>
         )}
+
+        <AddZipInput
+          placeholder="Enter ZIP(s) to pause ..."
+          onAdd={zips => addToList('unavailableZips', zips)}
+        />
       </div>
 
       {/* Excluded ZIPs */}
       <div className="bg-white rounded-xl border p-4 space-y-3">
         <h3 className="font-bold text-gray-800">Excluded ZIP Codes</h3>
         <p className="text-sm text-gray-500">
-          Customers in these ZIPs are rejected even if they would otherwise fall inside the service area. Use for areas that are logistically impractical.
+          {isRadiusMode
+            ? 'Customers in these ZIPs are permanently rejected even if they fall inside your radius. Use for areas that are logistically impractical.'
+            : 'Customers in these ZIPs are rejected even if they would otherwise fall inside the service area. Use for areas that are logistically impractical.'}
         </p>
 
         {config.excludedZips.length > 0 ? (
@@ -419,51 +570,20 @@ export default function ServiceAreaAdmin() {
       <div className="bg-white rounded-xl border p-4 space-y-3">
         <h3 className="font-bold text-gray-800">Test a ZIP Code</h3>
         <p className="text-sm text-gray-500">
-          Check how a specific ZIP would be handled with the current (unsaved) configuration.
+          {isRadiusMode
+            ? 'Check whether a ZIP falls inside your radius. Tests the saved configuration.'
+            : 'Check how a specific ZIP would be handled with the current (unsaved) configuration.'}
         </p>
         <ZipTestPanel config={config} />
-      </div>
-
-      {/* Settings */}
-      <div className="bg-white rounded-xl border p-4 space-y-3">
-        <h3 className="font-bold text-gray-800">Settings</h3>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Default radius (miles)
-            </label>
-            <input
-              type="number"
-              min="1"
-              max="500"
-              value={config.radiusMiles}
-              onChange={e => { setConfig(c => ({ ...c, radiusMiles: Number(e.target.value) })); setSaveState(null); }}
-              className="w-full border rounded-lg px-3 py-2 text-sm"
-            />
-            <p className="text-xs text-gray-400 mt-1">Stored for reference. ZIP list is the active enforcement mechanism.</p>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Center ZIP (reference)
-            </label>
-            <input
-              type="text"
-              maxLength={5}
-              value={config.centerZip}
-              onChange={e => { setConfig(c => ({ ...c, centerZip: e.target.value })); setSaveState(null); }}
-              placeholder="30301"
-              className="w-full border rounded-lg px-3 py-2 text-sm font-mono"
-            />
-            <p className="text-xs text-gray-400 mt-1">Optional reference ZIP for your dispatch location.</p>
-          </div>
-        </div>
       </div>
 
       {/* Save */}
       <div className="space-y-2">
         {saveState === 'error' && (
           <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">
-            Save failed. Your previous settings are still active. Check your connection and try again.
+            {isRadiusMode && !isValidZip(config.centerZip)
+              ? 'Center ZIP is required and must be a valid five-digit ZIP code.'
+              : 'Save failed. Your previous settings are still active. Check your connection and try again.'}
           </div>
         )}
 
