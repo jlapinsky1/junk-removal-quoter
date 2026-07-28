@@ -164,6 +164,59 @@ export default async function handler(req) {
       },
     });
 
+    // Send confirmation email if customer provided an email address
+    const customerEmail = body.customerEmail;
+    if (customerEmail) {
+      const resendKey = process.env.RESEND_API_KEY;
+      const fromEmail = process.env.RESEND_FROM_EMAIL || 'noreply@squatterz.com';
+      const confirmationCode = `#${booking.id.slice(0, 8).toUpperCase()}`;
+
+      if (resendKey) {
+        fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${resendKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            from: `Squatterz <${fromEmail}>`,
+            to: [customerEmail],
+            subject: `Request received – ${confirmationCode}`,
+            html: `
+              <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;background:#0a0f0d;color:#fff;border-radius:12px;">
+                <div style="text-align:center;margin-bottom:32px;">
+                  <span style="font-size:20px;font-weight:900;letter-spacing:0.15em;text-transform:uppercase;">SQUATTERZ</span>
+                  <div style="color:#22c55e;font-size:10px;letter-spacing:0.2em;font-weight:600;text-transform:uppercase;margin-top:4px;">We Haul It All</div>
+                </div>
+                <div style="background:#22c55e;border-radius:50%;width:56px;height:56px;margin:0 auto 24px;display:flex;align-items:center;justify-content:center;text-align:center;">
+                  <span style="font-size:28px;line-height:56px;">✓</span>
+                </div>
+                <h1 style="font-size:22px;font-weight:900;margin:0 0 12px;text-align:center;">Request received!</h1>
+                <p style="color:rgba(255,255,255,0.55);font-size:14px;line-height:1.6;margin:0 0 24px;text-align:center;">
+                  Hi${body.customerName ? ` ${body.customerName.split(' ')[0]}` : ''},<br><br>
+                  We've got your request and a real person is reviewing it now. Most customers hear back within a few hours.
+                </p>
+                <div style="background:#111;border:1px solid #222;border-radius:10px;padding:16px 20px;margin-bottom:28px;">
+                  <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+                    <span style="color:rgba(255,255,255,0.4);font-size:13px;">Confirmation</span>
+                    <span style="color:#22c55e;font-family:monospace;font-weight:700;font-size:13px;">${confirmationCode}</span>
+                  </div>
+                  <div style="display:flex;justify-content:space-between;">
+                    <span style="color:rgba(255,255,255,0.4);font-size:13px;">Status</span>
+                    <span style="color:#fff;font-size:13px;font-weight:600;">Under review</span>
+                  </div>
+                </div>
+                <p style="color:rgba(255,255,255,0.3);font-size:12px;line-height:1.5;text-align:center;">
+                  Keep this confirmation number handy — we may reference it when we reach out.<br>
+                  Questions? Call us at (813) 555-0123.
+                </p>
+              </div>
+            `,
+          }),
+        }).catch(err => console.error('Confirmation email failed (non-fatal):', err.message));
+      }
+    }
+
     return jsonResponse({ bookingId: booking.id }, 201);
   } catch (e) {
     console.error('create-booking error:', e);

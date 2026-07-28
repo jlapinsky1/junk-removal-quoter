@@ -405,10 +405,24 @@ export default function BookingFlow() {
                   <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                 </svg>
               </div>
-              <h1 className="text-3xl font-black text-white mb-3 tracking-tight">You're All Set!</h1>
-              <p className="text-gray-400 text-lg mb-10 leading-relaxed">
-                We'll review your photos and send you a firm estimate. No surprises.
+              <h1 className="text-3xl font-black text-white mb-3 tracking-tight">Request Received!</h1>
+              <p className="text-gray-400 text-lg mb-4 leading-relaxed">
+                A real person is reviewing your request now.
               </p>
+              <div className="space-y-2 mb-10 text-left">
+                <div className="flex items-start gap-2.5">
+                  <CheckCircleIcon className="w-5 h-5 text-green-400 mt-0.5 shrink-0" />
+                  <span className="text-gray-300 text-sm">A confirmation email is on its way to you</span>
+                </div>
+                <div className="flex items-start gap-2.5">
+                  <CheckCircleIcon className="w-5 h-5 text-green-400 mt-0.5 shrink-0" />
+                  <span className="text-gray-300 text-sm">Your booking number is below for reference</span>
+                </div>
+                <div className="flex items-start gap-2.5">
+                  <CheckCircleIcon className="w-5 h-5 text-green-400 mt-0.5 shrink-0" />
+                  <span className="text-gray-300 text-sm">Most customers hear back within a few hours</span>
+                </div>
+              </div>
 
               <div className="bg-gray-900/80 rounded-2xl p-6 text-left space-y-3.5 border border-gray-800/80 shadow-lg shadow-black/20 ring-1 ring-white/[0.03]">
                 <div className="flex justify-between items-center">
