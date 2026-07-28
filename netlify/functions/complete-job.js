@@ -322,9 +322,9 @@ async function sendCompletionAndFinalPaymentEmail(booking, rawPaymentToken, amou
       body: JSON.stringify({
         from: process.env.RESEND_FROM_EMAIL || 'noreply@squatterz.com',
         to: booking.customer_email,
-        subject: 'Your job is complete — view photos and pay the remaining balance',
+        subject: 'Your job is complete: view photos and pay the remaining balance',
         html: `<p>Hi ${firstName},</p>
-<p>Great news — your junk removal job is complete!</p>
+<p>Great news! Your junk removal job is complete.</p>
 <p>Click the link below to view your completion report (including before &amp; after photos) and pay the remaining balance of <strong>$${remainingDollars}</strong>.</p>
 <p><a href="${finalPageUrl}" style="background:#22c55e;color:#000;padding:12px 24px;text-decoration:none;border-radius:8px;font-weight:bold;display:inline-block;">View Job Report &amp; Pay $${remainingDollars}</a></p>
 <p>This link is secure and expires in 7 days.</p>

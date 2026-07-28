@@ -1,6 +1,6 @@
 import React from 'react';
 
-const COMPANY_NAME = 'Junk Pickup';
+const COMPANY_NAME = 'Squatterz';
 
 function buildQuoteHtml({ customerName, jobAddress, price, scopeText, validDateStr }) {
   return `<!DOCTYPE html>

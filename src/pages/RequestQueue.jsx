@@ -8,6 +8,7 @@ import { createQuoteSnapshot, createPriceOverrideAudit, CUSTOMER_TERMS } from '.
 import { calculateActuals, emptyActuals } from '../utils/completion';
 import { validateCompletionData } from '../utils/validation';
 import { getRepo } from '../utils/repository';
+import { supabase } from '../utils/supabaseClient';
 import { evaluateDecision, DECISION_COLORS, DECISION_LABELS } from '../utils/decisionEngine';
 import { calculateGoalProgress, getTodayProgress, calculateDynamicTargets } from '../utils/goalEngine';
 import { PACE_STATUS_COLORS, PACE_STATUS_LABELS } from '../utils/goalDefaults';
@@ -124,6 +125,7 @@ function RequestDetail({ booking, onBack }) {
   const [expiresIn, setExpiresIn] = useState(7);
   const [slots, setSlots] = useState(booking.availableSlots?.join('\n') || '');
   const [internalNotes, setInternalNotes] = useState(booking.internalNotes || '');
+  const [lastQuoteToken, setLastQuoteToken] = useState(null);
   const [showPhotos, setShowPhotos] = useState(false);
   const [showBreakdown, setShowBreakdown] = useState(false);
   const [overrideReason, setOverrideReason] = useState('');
@@ -284,10 +286,11 @@ function RequestDetail({ booking, onBack }) {
         await repo.updateBooking(data.id, { blocker_overrides: blockerOverrides });
       }
 
+      if (result.quoteToken) setLastQuoteToken(result.quoteToken);
       const quoteUrl = result.quoteToken
         ? `${window.location.origin}/quote/${result.quoteToken}`
-        : `${window.location.origin}/quote/${data.id}`;
-      alert(`Quote approved! Customer quote link: ${quoteUrl}`);
+        : null;
+      if (quoteUrl) alert(`Quote approved! Customer quote link: ${quoteUrl}`);
       onBack();
     } catch (err) {
       alert(`Approval failed: ${err.message}`);
@@ -318,8 +321,7 @@ function RequestDetail({ booking, onBack }) {
   }
 
   async function getAdminToken() {
-    const repo = await getRepo();
-    const session = await repo.getSession();
+    const { data: { session } } = await supabase.auth.getSession();
     return session?.access_token;
   }
 
@@ -346,22 +348,31 @@ function RequestDetail({ booking, onBack }) {
 
     for (const file of files) {
       try {
+        const contentType = file.type || 'image/jpeg';
         const urlRes = await fetch('/api/get-completion-photo-url', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ bookingId: data.id, fileName: file.name, contentType: file.type }),
+          body: JSON.stringify({ bookingId: data.id, fileName: file.name, contentType }),
         });
-        if (!urlRes.ok) continue;
+        if (!urlRes.ok) {
+          const err = await urlRes.json().catch(() => ({}));
+          setJobCompletionError(`Photo upload failed: ${err.error || urlRes.status}`);
+          continue;
+        }
         const { signedUploadUrl, storagePath } = await urlRes.json();
         const uploadRes = await fetch(signedUploadUrl, {
           method: 'PUT',
-          headers: { 'Content-Type': file.type },
+          headers: { 'Content-Type': contentType },
           body: file,
         });
         if (uploadRes.ok) {
           uploaded.push({ storagePath, fileName: file.name });
+        } else {
+          setJobCompletionError(`Photo storage upload failed: ${uploadRes.status}`);
         }
-      } catch {}
+      } catch (err) {
+        setJobCompletionError(`Photo upload error: ${err.message}`);
+      }
     }
 
     setAfterPhotos(prev => [...prev, ...uploaded]);
@@ -396,11 +407,12 @@ function RequestDetail({ booking, onBack }) {
       return;
     }
 
-    const approvedCents = data.approvedQuote
-      ? Math.round(Number(data.approvedQuote) * 100) : 0;
-    if (finalAmountCents !== approvedCents && !jobCompletionForm.priceAdjustmentReason.trim()) {
-      setJobCompletionError('Price adjustment reason is required when final amount differs from the approved quote.');
-      return;
+    if (data.approvedQuote) {
+      const approvedCents = Math.round(Number(data.approvedQuote) * 100);
+      if (finalAmountCents !== approvedCents && !jobCompletionForm.priceAdjustmentReason.trim()) {
+        setJobCompletionError('Price adjustment reason is required when the amount differs from the approved quote.');
+        return;
+      }
     }
 
     setJobCompletionSubmitting(true);
@@ -975,7 +987,10 @@ function RequestDetail({ booking, onBack }) {
           {/* Final amount */}
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">
-              Final amount ($) <span className="text-red-500">*</span>
+              Amount charged to customer
+              {data.approvedQuote && (
+                <span className="text-gray-400 font-normal ml-1">(quoted: ${Number(data.approvedQuote).toFixed(2)} — only change if adjusted on-site)</span>
+              )}
             </label>
             <input
               type="number"
@@ -983,12 +998,12 @@ function RequestDetail({ booking, onBack }) {
               className="w-full border rounded-lg px-3 py-2 text-sm"
               value={jobCompletionForm.finalAmountDollars}
               onChange={e => setJobCompletionForm(p => ({ ...p, finalAmountDollars: e.target.value }))}
-              placeholder={data.approvedQuote || '0.00'}
+              placeholder={data.approvedQuote ? Number(data.approvedQuote).toFixed(2) : '0.00'}
             />
             {data.approvedQuote && jobCompletionForm.finalAmountDollars &&
               Math.round(Number(jobCompletionForm.finalAmountDollars) * 100) !== Math.round(Number(data.approvedQuote) * 100) && (
               <div className="text-xs text-amber-600 mt-1">
-                Differs from approved quote (${data.approvedQuote}) — reason required below
+                Price changed from quoted amount — please explain below
               </div>
             )}
           </div>
@@ -998,14 +1013,14 @@ function RequestDetail({ booking, onBack }) {
             Math.round(Number(jobCompletionForm.finalAmountDollars) * 100) !== Math.round(Number(data.approvedQuote) * 100) && (
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">
-                Price adjustment reason <span className="text-red-500">*</span>
+                Reason for price change <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
                 className="w-full border rounded-lg px-3 py-2 text-sm"
                 value={jobCompletionForm.priceAdjustmentReason}
                 onChange={e => setJobCompletionForm(p => ({ ...p, priceAdjustmentReason: e.target.value }))}
-                placeholder="Why does the final amount differ?"
+                placeholder="e.g. Additional items found on-site"
               />
             </div>
           )}
@@ -1123,18 +1138,23 @@ function RequestDetail({ booking, onBack }) {
       </div>
 
       {/* ── Customer quote link ── */}
-      {data.status === 'quote_sent' && (
+      {data.status === 'quote_sent' && lastQuoteToken && (
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
           <div className="text-sm font-medium text-blue-800 mb-1">Customer quote link:</div>
           <div className="text-xs text-blue-600 break-all font-mono bg-white rounded p-2">
-            {window.location.origin}/quote/{data.id}
+            {window.location.origin}/quote/{lastQuoteToken}
           </div>
           <button
-            onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/quote/${data.id}`); alert('Link copied!'); }}
+            onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/quote/${lastQuoteToken}`); alert('Link copied!'); }}
             className="mt-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium w-full"
           >
             Copy Link
           </button>
+        </div>
+      )}
+      {data.status === 'quote_sent' && !lastQuoteToken && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-sm text-yellow-800">
+          Quote link was shown at approval. Re-approve to generate a new link.
         </div>
       )}
     </div>

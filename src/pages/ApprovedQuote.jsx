@@ -60,7 +60,7 @@ function PaymentForm({ token, depositCents, onPaymentSubmitted, onPaymentError }
       >
         {processing
           ? 'Processing...'
-          : `Pay Deposit — $${(depositCents / 100).toFixed(2)}`}
+          : `Pay Deposit ($${(depositCents / 100).toFixed(2)})`}
       </button>
     </form>
   );
@@ -334,7 +334,7 @@ export default function ApprovedQuote() {
             This usually takes a few seconds. You'll receive a confirmation email shortly.
           </p>
           <p className="text-xs text-gray-400">
-            You can close this tab — we'll send your receipt by email.
+            You can close this tab. We'll send your receipt by email.
           </p>
         </div>
       </div>
@@ -357,8 +357,8 @@ export default function ApprovedQuote() {
 
         {/* Header */}
         <div className="text-center">
-          <h1 className="text-2xl font-extrabold tracking-tight text-gray-900">Junk Pickup</h1>
-          <p className="text-xs text-gray-400 tracking-widest uppercase">We Haul It All</p>
+          <h1 className="text-2xl font-extrabold tracking-tight text-gray-900">Squatterz</h1>
+          <p className="text-xs text-gray-400 tracking-widest uppercase">Junk Removal</p>
           <p className="text-gray-500 mt-3">
             Hi {booking?.customerName?.split(' ')[0] || 'there'}, here's your estimate
           </p>
@@ -555,7 +555,7 @@ export default function ApprovedQuote() {
         {/* Footer */}
         <div className="text-center pb-4">
           <p className="text-sm text-gray-700">
-            Thank you for considering <span className="font-semibold text-gray-900">Junk Pickup</span>.
+            Thank you for considering <span className="font-semibold text-gray-900">Squatterz</span>.
           </p>
         </div>
 

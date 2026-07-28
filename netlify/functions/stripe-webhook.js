@@ -86,9 +86,9 @@ export default async function handler(req) {
             .eq('stripe_event_id', event.id);
 
           // Increment attempt_count separately (avoid race)
-          await supabase.rpc('increment_webhook_attempt', {
-            p_event_id: event.id,
-          }).catch(() => {}); // best-effort; not critical
+          try {
+            await supabase.rpc('increment_webhook_attempt', { p_event_id: event.id });
+          } catch (_) {} // best-effort; not critical
 
           isRetry = true;
         }
@@ -131,27 +131,33 @@ export default async function handler(req) {
 
   // ── Mark event processed or failed ───────────────────────────────────────
   if (processingError) {
-    await supabase
-      .from('processed_stripe_events')
-      .update({
-        processing_status: 'failed',
-        error_message: processingError.message?.slice(0, 500) || 'Unknown error',
-      })
-      .eq('stripe_event_id', event.id)
-      .catch(e => console.error('Failed to mark event failed:', e.message));
+    try {
+      await supabase
+        .from('processed_stripe_events')
+        .update({
+          processing_status: 'failed',
+          error_message: processingError.message?.slice(0, 500) || 'Unknown error',
+        })
+        .eq('stripe_event_id', event.id);
+    } catch (e) {
+      console.error('Failed to mark event failed:', e.message);
+    }
 
     // Return 500 so Stripe retries this webhook
     return respond({ error: 'Processing failed' }, 500);
   }
 
-  await supabase
-    .from('processed_stripe_events')
-    .update({
-      processing_status: 'processed',
-      processed_at: new Date().toISOString(),
-    })
-    .eq('stripe_event_id', event.id)
-    .catch(e => console.error('Failed to mark event processed:', e.message));
+  try {
+    await supabase
+      .from('processed_stripe_events')
+      .update({
+        processing_status: 'processed',
+        processed_at: new Date().toISOString(),
+      })
+      .eq('stripe_event_id', event.id);
+  } catch (e) {
+    console.error('Failed to mark event processed:', e.message);
+  }
 
   return respond({ received: true });
 }

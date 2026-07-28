@@ -54,7 +54,7 @@ function FinalPaymentForm({ token, amountRemainingCents, onPaymentSubmitted, onP
       >
         {processing
           ? 'Processing…'
-          : `Pay Remaining Balance — $${(amountRemainingCents / 100).toFixed(2)}`}
+          : `Pay Remaining Balance ($${(amountRemainingCents / 100).toFixed(2)})`}
       </button>
     </form>
   );

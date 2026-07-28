@@ -279,7 +279,7 @@ async function sendFinalPaymentEmail(booking, rawToken, amountRemainingCents) {
       body: JSON.stringify({
         from: process.env.RESEND_FROM_EMAIL || 'noreply@squatterz.com',
         to: booking.customer_email,
-        subject: 'Your final payment link — view job report and pay balance',
+        subject: 'Your final payment link: view job report and pay balance',
         html: `<p>Hi ${firstName},</p>
 <p>Here is your updated link to view your job completion report and pay the remaining balance${amountStr}.</p>
 <p><a href="${finalPageUrl}" style="background:#22c55e;color:#000;padding:12px 24px;text-decoration:none;border-radius:8px;font-weight:bold;display:inline-block;">View Job Report &amp; Pay Balance</a></p>
