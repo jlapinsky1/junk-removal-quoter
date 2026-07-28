@@ -67,241 +67,127 @@ export default async function handler(req) {
     return errorResponse('Completion data not found', 404);
   }
 
-  // ── Load photos (up to 2 before, up to 2 after for PDF) ───────────────────
-  const { data: photos } = await supabase
-    .from('booking_photos')
-    .select('storage_path, kind, sort_order')
-    .eq('booking_id', resolvedBookingId)
-    .in('kind', ['before', 'after'])
-    .order('kind', { ascending: true })
-    .order('sort_order', { ascending: true });
-
-  const beforePhotos = (photos ?? []).filter(p => p.kind === 'before').slice(0, 2);
-  const afterPhotos  = (photos ?? []).filter(p => p.kind === 'after').slice(0, 2);
-
-  // ── Fetch images via signed URLs → buffers (never use raw storage paths) ──
-  async function fetchImageBuffer(storagePath) {
-    try {
-      const { data, error } = await supabase.storage
-        .from('booking-photos')
-        .createSignedUrl(storagePath, 300); // 5-minute expiry for PDF generation
-
-      if (error || !data?.signedUrl) return null;
-      const res = await fetch(data.signedUrl);
-      if (!res.ok) return null;
-      const buf = await res.arrayBuffer();
-      return Buffer.from(buf);
-    } catch {
-      return null;
-    }
-  }
-
-  const [beforeImages, afterImages] = await Promise.all([
-    Promise.all(beforePhotos.map(p => fetchImageBuffer(p.storage_path))),
-    Promise.all(afterPhotos.map(p => fetchImageBuffer(p.storage_path))),
-  ]);
-
   // ── PDF generation ─────────────────────────────────────────────────────────
   const chunks = [];
   const doc = new PDFDocument({ size: 'LETTER', margin: 50 });
   doc.on('data', c => chunks.push(c));
 
-  const green   = '#22c55e';
-  const dark    = '#0a0f0d';
-  const cardBg  = '#141a16';
-  const mutedText = '#8a9a8f';
-  const white   = '#ffffff';
-  const bodyText = '#c8d8cc';
+  const green = '#16a34a';
+  const gray  = '#6b7280';
+  const dark  = '#111827';
 
-  const pw = doc.page.width - 100; // page width minus margins (50 each side)
+  const pw   = doc.page.width - 100;
   const col1 = 50;
   const col2 = 50 + pw / 2;
 
-  // ── Background ─────────────────────────────────────────────────────────────
-  doc.rect(0, 0, doc.page.width, doc.page.height).fill(dark);
-
-  // ── Header card ───────────────────────────────────────────────────────────
-  const headerY = 50;
-  doc.roundedRect(col1, headerY, pw, 70, 8).fill(cardBg);
-
-  // Green icon square
-  doc.roundedRect(65, headerY + 15, 40, 40, 8).fill('#1a3a24');
-  doc.fontSize(18).fillColor(green).text('✓', 75, headerY + 25, { width: 20, align: 'center' });
-
-  // Title + reference
   const bookingRef = `RES-${resolvedBookingId.slice(0, 8).toUpperCase()}`;
-  doc.fontSize(16).fillColor(white).font('Helvetica-Bold')
-    .text('Completion Report', 115, headerY + 18);
-  doc.fontSize(9).fillColor(mutedText).font('Helvetica')
-    .text(`Reference #${bookingRef}`, 115, headerY + 38);
 
-  // Completed badge
-  doc.roundedRect(pw - 50, headerY + 20, 90, 26, 13).fill('#1a3a24');
-  doc.fontSize(8).fillColor(green).font('Helvetica-Bold')
-    .text('COMPLETED', pw - 45, headerY + 28, { width: 80, align: 'center' });
+  // ── Header ────────────────────────────────────────────────────────────────
+  doc.fontSize(20).fillColor(dark).font('Helvetica-Bold')
+    .text('Completion Report', col1, 50);
+  doc.fontSize(10).fillColor(gray).font('Helvetica')
+    .text(`Squatterz LLC  |  Reference #${bookingRef}`, col1, 76);
+
+  doc.moveTo(col1, 96).lineTo(col1 + pw, 96).lineWidth(1).strokeColor('#e5e7eb').stroke();
 
   // ── Details grid ──────────────────────────────────────────────────────────
-  let y = headerY + 90;
+  let y = 110;
 
-  function label(text, x, yPos) {
-    doc.fontSize(8).fillColor(mutedText).font('Helvetica-Bold')
+  function fieldLabel(text, x, yPos) {
+    doc.fontSize(8).fillColor(gray).font('Helvetica-Bold')
       .text(text.toUpperCase(), x, yPos);
   }
-
-  function value(text, x, yPos) {
-    doc.fontSize(12).fillColor(white).font('Helvetica-Bold')
-      .text(text || '\u2014', x, yPos + 14);
+  function fieldValue(text, x, yPos) {
+    doc.fontSize(11).fillColor(dark).font('Helvetica')
+      .text(text || '-', x, yPos + 13, { width: pw / 2 - 15, lineBreak: false });
   }
 
-  label('Service Address', col1, y);
-  value(booking.full_address || '\u2014', col1, y);
+  fieldLabel('Service Address', col1, y);
+  fieldValue(booking.full_address || '-', col1, y);
 
-  label('Completion Date', col2, y);
   const completedStr = completion.completed_at
     ? new Date(completion.completed_at).toLocaleString('en-US', {
         month: 'short', day: 'numeric', year: 'numeric',
         hour: 'numeric', minute: '2-digit',
       })
-    : '\u2014';
-  value(completedStr, col2, y);
+    : '-';
+  fieldLabel('Completion Date', col2, y);
+  fieldValue(completedStr, col2, y);
+
+  y += 44;
+  fieldLabel('Crew / Technician', col1, y);
+  fieldValue(completion.technician_name || '-', col1, y);
+
+  fieldLabel('Booking Reference', col2, y);
+  fieldValue(bookingRef, col2, y);
 
   y += 50;
-  label('Crew / Technician', col1, y);
-  value(completion.technician_name, col1, y);
+  doc.moveTo(col1, y).lineTo(col1 + pw, y).lineWidth(1).strokeColor('#e5e7eb').stroke();
+  y += 16;
 
-  label('Booking Reference', col2, y);
-  value(bookingRef, col2, y);
-
-  y += 60;
-
-  // ── Before & After photos ─────────────────────────────────────────────────
-  const allImages = [
-    ...beforeImages.filter(Boolean).map(img => ({ img, kind: 'Before' })),
-    ...afterImages.filter(Boolean).map(img => ({ img, kind: 'After' })),
-  ];
-
-  if (allImages.length > 0) {
-    label('Before & After Photos', col1, y);
-    y += 18;
-
-    const photoW = allImages.length === 1 ? pw : (pw - 10) / 2;
-    const photoH = 160;
-
-    allImages.forEach(({ img, kind }, i) => {
-      const x = i % 2 === 0 ? col1 : col1 + photoW + 10;
-      if (i === 2) y += photoH + 12; // start second row
-
-      try {
-        doc.roundedRect(x, y, photoW, photoH, 8).fill('#0d1410');
-        doc.image(img, x + 2, y + 2, {
-          width: photoW - 4,
-          height: photoH - 4,
-          fit: [photoW - 4, photoH - 4],
-          align: 'center',
-          valign: 'center',
-        });
-
-        // Kind label badge
-        const lblBg    = kind === 'After' ? green : '#000000';
-        const lblColor = kind === 'After' ? dark : white;
-        doc.roundedRect(x + 8, y + 8, 42, 16, 3).fill(lblBg);
-        doc.fontSize(7).fillColor(lblColor).font('Helvetica-Bold')
-          .text(kind, x + 10, y + 12, { width: 38, align: 'center' });
-      } catch {
-        // Skip if image fails to render
-      }
-    });
-
-    const photoRows = Math.ceil(allImages.length / 2);
-    y += photoRows === 1 ? photoH + 20 : photoH + 32;
-  }
-
-  // ── Work summary card ─────────────────────────────────────────────────────
+  // ── Work summary ──────────────────────────────────────────────────────────
   const workParts = [];
-  if (completion.items_removed) {
-    workParts.push({ label: 'Items Removed', value: completion.items_removed });
-  }
-  if (completion.volume_estimate) {
-    workParts.push({ label: 'Volume / Load Size', value: completion.volume_estimate });
-  }
-  if (completion.completion_notes) {
-    workParts.push({ label: 'Completion Notes', value: completion.completion_notes });
-  }
-  if (completion.disposal_notes) {
-    workParts.push({ label: 'Disposal / Donation', value: completion.disposal_notes });
-  }
+  if (completion.items_removed)   workParts.push({ label: 'Items Removed',      value: completion.items_removed });
+  if (completion.volume_estimate) workParts.push({ label: 'Volume / Load Size', value: completion.volume_estimate });
+  if (completion.completion_notes) workParts.push({ label: 'Completion Notes',  value: completion.completion_notes });
+  if (completion.disposal_notes)  workParts.push({ label: 'Disposal / Donation', value: completion.disposal_notes });
 
   if (workParts.length > 0) {
-    // Measure card height
-    let totalHeight = 20;
-    workParts.forEach(part => {
-      totalHeight += 16; // label
-      totalHeight += doc.fontSize(11).font('Helvetica').heightOfString(part.value, { width: pw - 30 }) + 12;
-    });
-    totalHeight += 10;
+    doc.fontSize(11).fillColor(dark).font('Helvetica-Bold').text('Work Summary', col1, y);
+    y += 18;
 
-    doc.roundedRect(col1, y, pw, totalHeight, 8)
-      .lineWidth(1).strokeColor('#2a3a2e').fillAndStroke(cardBg, '#2a3a2e');
-
-    let contentY = y + 15;
     workParts.forEach(part => {
-      doc.fontSize(8).fillColor(mutedText).font('Helvetica-Bold')
-        .text(part.label.toUpperCase(), col1 + 15, contentY);
-      contentY += 16;
-      doc.fontSize(11).fillColor(bodyText).font('Helvetica')
-        .text(part.value, col1 + 15, contentY, { width: pw - 30 });
-      contentY += doc.heightOfString(part.value, { width: pw - 30 }) + 12;
+      doc.fontSize(8).fillColor(gray).font('Helvetica-Bold').text(part.label.toUpperCase(), col1, y);
+      y += 13;
+      doc.fontSize(11).fillColor(dark).font('Helvetica').text(part.value, col1, y, { width: pw });
+      y += doc.heightOfString(part.value, { width: pw }) + 10;
     });
 
-    y = contentY + 20;
+    y += 6;
+    doc.moveTo(col1, y).lineTo(col1 + pw, y).lineWidth(1).strokeColor('#e5e7eb').stroke();
+    y += 16;
   }
 
-  // ── Invoice summary card ──────────────────────────────────────────────────
+  // ── Invoice summary ───────────────────────────────────────────────────────
   const approvedCents  = Math.round(Number(booking.approved_quote) * 100);
   const depositCents   = Math.floor(approvedCents / 2);
   const finalCents     = completion.final_amount_cents;
   const remainingCents = Math.max(0, finalCents - depositCents);
-
   const fmt = cents => `$${(cents / 100).toFixed(2)}`;
 
-  const invoiceRows = [
+  doc.fontSize(11).fillColor(dark).font('Helvetica-Bold').text('Invoice Summary', col1, y);
+  y += 18;
+
+  const invoiceRows = [];
+  if (finalCents !== approvedCents) {
+    invoiceRows.push({ label: 'Final Job Total', value: fmt(finalCents), bold: true });
+  }
+  invoiceRows.push(
     { label: 'Approved Quote', value: fmt(approvedCents) },
     { label: 'Deposit Paid',   value: fmt(depositCents) },
     {
       label: remainingCents > 0 ? 'Balance Remaining' : 'Balance Paid',
       value: fmt(remainingCents > 0 ? remainingCents : depositCents),
-      highlight: remainingCents > 0,
+      bold: remainingCents > 0,
     },
-  ];
-  if (finalCents !== approvedCents) {
-    invoiceRows.unshift({ label: 'Final Job Total', value: fmt(finalCents), highlight: true });
-  }
+  );
 
-  const invoiceCardH = 20 + invoiceRows.length * 26 + 10;
-  doc.roundedRect(col1, y, pw, invoiceCardH, 8)
-    .lineWidth(1).strokeColor('#2a3a2e').fillAndStroke(cardBg, '#2a3a2e');
-
-  doc.fontSize(8).fillColor(mutedText).font('Helvetica-Bold')
-    .text('INVOICE SUMMARY', col1 + 15, y + 15);
-
-  let rowY = y + 31;
   invoiceRows.forEach(row => {
-    doc.fontSize(11).fillColor(row.highlight ? green : white).font('Helvetica-Bold')
-      .text(row.label, col1 + 15, rowY);
-    doc.fontSize(11).fillColor(row.highlight ? green : white).font('Helvetica-Bold')
-      .text(row.value, col1, rowY, { width: pw - 15, align: 'right' });
-    rowY += 26;
+    const color = row.bold ? green : dark;
+    doc.fontSize(11).fillColor(color).font(row.bold ? 'Helvetica-Bold' : 'Helvetica')
+      .text(row.label, col1, y);
+    doc.fontSize(11).fillColor(color).font(row.bold ? 'Helvetica-Bold' : 'Helvetica')
+      .text(row.value, col1, y, { width: pw, align: 'right' });
+    y += 20;
   });
 
-  // ── Footer branding ───────────────────────────────────────────────────────
-  const footerY = doc.page.height - 60;
-  doc.fontSize(8).fillColor(mutedText).font('Helvetica')
-    .text('Squatterz LLC · Gainesville, GA', col1, footerY, { width: pw, align: 'center' });
-  doc.fontSize(7).fillColor('#4a5a4e').font('Helvetica')
-    .text(
-      `Generated ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`,
-      col1, footerY + 14, { width: pw, align: 'center' }
-    );
+  // ── Footer ────────────────────────────────────────────────────────────────
+  y += 20;
+  doc.moveTo(col1, y).lineTo(col1 + pw, y).lineWidth(1).strokeColor('#e5e7eb').stroke();
+  y += 10;
+  const genDate = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  doc.fontSize(8).fillColor(gray).font('Helvetica')
+    .text(`Squatterz LLC  |  Generated ${genDate}`, col1, y, { width: pw, align: 'center' });
 
   doc.end();
 
