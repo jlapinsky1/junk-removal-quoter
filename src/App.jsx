@@ -15,6 +15,7 @@ import Commercial from './pages/Commercial';
 import ServiceAreaAdmin from './pages/ServiceAreaAdmin';
 import ClientLogin from './pages/ClientLogin';
 import ClientPortal from './pages/ClientPortal';
+import DispatchPage from './pages/DispatchPage';
 import { getSettings } from './utils/storage';
 import { getRepo } from './utils/repository';
 
@@ -110,6 +111,7 @@ export default function App() {
       <Route path="/portal/login" element={<ClientLogin />} />
       <Route path="/portal" element={<ClientPortal />} />
       <Route path="/admin" element={<AdminDashboard />} />
+      <Route path="/dispatch" element={<DispatchPage />} />
     </Routes>
   );
 }

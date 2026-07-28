@@ -425,6 +425,50 @@ const supabaseRepo = {
     const { error } = await supabase.from('audit_log').insert(entry);
     if (error) throw error;
   },
+
+  // ── Dispatch ──
+  async getDispatchJobsToday() {
+    return adminFetch('/api/dispatch-jobs-today');
+  },
+
+  async getDispatchJob(bookingId) {
+    return adminFetch(`/api/dispatch-job?bookingId=${encodeURIComponent(bookingId)}`);
+  },
+
+  async updateDispatchStatus(bookingId, targetStatus, idempotencyKey) {
+    return adminFetch('/api/dispatch-status', {
+      method: 'POST',
+      body: JSON.stringify({ bookingId, targetStatus, idempotencyKey }),
+    });
+  },
+
+  async getDispatchPhotoUploadUrl(bookingId, fileName, contentType, kind) {
+    return adminFetch('/api/dispatch-photo-upload-url', {
+      method: 'POST',
+      body: JSON.stringify({ bookingId, fileName, contentType, kind }),
+    });
+  },
+
+  async saveDispatchPhoto(data) {
+    return adminFetch('/api/dispatch-photo', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async reportDispatchIssue(data) {
+    return adminFetch('/api/dispatch-report-issue', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async dispatchCompleteJob(data) {
+    return adminFetch('/api/dispatch-complete', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
 };
 
 export default supabaseRepo;

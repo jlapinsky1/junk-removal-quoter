@@ -94,8 +94,17 @@ function createMockSupabase(overrides = {}) {
         filters.push(r => values.includes(r[field]));
         return chain;
       },
+      neq(field, value) {
+        filters.push(r => r[field] !== value);
+        return chain;
+      },
+      is(field, value) {
+        filters.push(r => r[field] === value);
+        return chain;
+      },
       order() { return chain; },
       limit() { return chain; },
+      then(cb) { return resolve('many').then(cb); },
       single() {
         return resolve('single');
       },
@@ -964,14 +973,26 @@ describe('Job completion', () => {
     bookingId = crypto.randomUUID();
     mockSupabase._db.bookings.push({
       id: bookingId, status: 'scheduled',
+      deposit_confirmed_at: new Date().toISOString(),
+      approved_quote: '350.00',
     });
   });
 
-  it('completes a scheduled booking', async () => {
-    const res = await completeJob(makeRequest('POST', {
+  // Helper — builds a valid completion body using the current bookingId.
+  function validBody() {
+    return {
       bookingId,
-      actuals: { finalAmount: 350, disposalCost: 40 },
-    }, { authorization: 'Bearer valid-admin-token' }));
+      afterPhotoStoragePaths: [`completions/${bookingId}/after/photo.jpg`],
+      completionNotes: 'All items removed cleanly',
+      itemsRemoved: 'Couch, table',
+      technicianName: 'John Smith',
+      finalAmountCents: 35000,
+      completedAt: new Date().toISOString(),
+    };
+  }
+
+  it('completes a scheduled booking', async () => {
+    const res = await completeJob(makeRequest('POST', validBody(), { authorization: 'Bearer valid-admin-token' }));
     const { status, body } = await parseResponse(res);
     expect(status).toBe(200);
     expect(body.success).toBe(true);
@@ -979,40 +1000,30 @@ describe('Job completion', () => {
 
   it('rejects completion of a pending_review booking', async () => {
     mockSupabase._db.bookings[0].status = 'pending_review';
-    const res = await completeJob(makeRequest('POST', {
-      bookingId,
-      actuals: { finalAmount: 350 },
-    }, { authorization: 'Bearer valid-admin-token' }));
+    const res = await completeJob(makeRequest('POST', validBody(), { authorization: 'Bearer valid-admin-token' }));
     const { status, body } = await parseResponse(res);
     expect(status).toBe(400);
     expect(body.error).toContain('pending_review');
   });
 
   it('rejects duplicate completion', async () => {
-    // First completion
-    await completeJob(makeRequest('POST', {
-      bookingId,
-      actuals: { finalAmount: 350 },
-    }, { authorization: 'Bearer valid-admin-token' }));
+    // First completion — succeeds, sets booking.status = 'completed'
+    await completeJob(makeRequest('POST', validBody(), { authorization: 'Bearer valid-admin-token' }));
 
-    // Second attempt — status is now 'completed'
-    const res = await completeJob(makeRequest('POST', {
-      bookingId,
-      actuals: { finalAmount: 400 },
-    }, { authorization: 'Bearer valid-admin-token' }));
+    // Second attempt — booking is now 'completed'
+    const res = await completeJob(makeRequest('POST', validBody(), { authorization: 'Bearer valid-admin-token' }));
     const { status, body } = await parseResponse(res);
     expect(status).toBe(409);
     expect(body.error).toContain('already been completed');
   });
 
-  it('validates actuals.finalAmount', async () => {
-    const res = await completeJob(makeRequest('POST', {
-      bookingId,
-      actuals: { disposalCost: 40 }, // missing finalAmount
-    }, { authorization: 'Bearer valid-admin-token' }));
-    const { status, body } = await parseResponse(res);
+  it('validates finalAmountCents is required', async () => {
+    const body = { ...validBody() };
+    delete body.finalAmountCents;
+    const res = await completeJob(makeRequest('POST', body, { authorization: 'Bearer valid-admin-token' }));
+    const { status, body: resBody } = await parseResponse(res);
     expect(status).toBe(400);
-    expect(body.error).toContain('finalAmount');
+    expect(resBody.error).toContain('finalAmount');
   });
 });
 
