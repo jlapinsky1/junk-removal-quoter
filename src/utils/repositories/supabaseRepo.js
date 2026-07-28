@@ -53,6 +53,12 @@ function normalizeBooking(row) {
     depositConfirmedAt: row.deposit_confirmed_at,
     // Completion
     completedAt: row.completed_at,
+    // Geocoding / distance
+    geocodedLat: row.geocoded_lat,
+    geocodedLng: row.geocoded_lng,
+    geocodingStatus: row.geocoding_status,
+    distanceMiles: row.distance_miles != null ? Number(row.distance_miles) : null,
+    travelMinutes: row.travel_minutes_one_way ?? null,
     // Timestamps
     createdAt: row.created_at,
     updatedAt: row.updated_at,

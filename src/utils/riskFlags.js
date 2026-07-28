@@ -61,8 +61,6 @@ export function detectRiskFlags(booking, estimate) {
   // --- Photo quality ---
   if ((booking.photoCount || 0) < 3) {
     flags.push({ flag: 'low_photos', severity: 'warning', message: `Only ${booking.photoCount || 0} photo(s) uploaded (minimum 3 recommended)` });
-  } else if ((booking.photoCount || 0) === 3) {
-    flags.push({ flag: 'minimal_photos', severity: 'info', message: 'Only 3 photos — may not show everything' });
   }
 
   // --- Item mismatch ---
@@ -141,9 +139,9 @@ export function detectRiskFlags(booking, estimate) {
     flags.push({ flag: 'hidden_items', severity: 'warning', message: 'Customer description suggests additional items not in photos' });
   }
 
-  // --- No item info at all ---
-  if ((!booking.detectedItems || booking.detectedItems.length === 0) && !booking.description) {
-    flags.push({ flag: 'no_item_info', severity: 'warning', message: 'No item list or description — review photos carefully' });
+  // --- No item info at all (and no photos to compensate) ---
+  if ((!booking.detectedItems || booking.detectedItems.length === 0) && !booking.description && (booking.photoCount || 0) === 0) {
+    flags.push({ flag: 'no_item_info', severity: 'warning', message: 'No item list, description, or photos — contact customer for details' });
   }
 
   // --- Weight risk from estimate ---

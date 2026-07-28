@@ -224,6 +224,28 @@ function RequestDetail({ booking, onBack }) {
     }
   }, []);
 
+  // Trigger geocoding if travel time is unknown (existing bookings or new ones not yet geocoded)
+  useEffect(() => {
+    if (data.travelMinutes != null || data.geocodingStatus === 'success') return;
+    (async () => {
+      try {
+        const res = await fetch('/api/geocode-booking', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ bookingId: data.id }),
+        });
+        if (res.ok) {
+          const { travelMinutes, distanceMiles } = await res.json();
+          if (travelMinutes != null) {
+            setData(prev => ({ ...prev, travelMinutes, distanceMiles, geocodingStatus: 'success' }));
+          }
+        }
+      } catch (e) {
+        // Non-fatal — estimate will show default
+      }
+    })();
+  }, []);
+
   // Lazy-load photos when the accordion is opened
   useEffect(() => {
     if (!showPhotos || photoUrls !== null) return;

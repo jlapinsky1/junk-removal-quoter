@@ -217,6 +217,16 @@ export default async function handler(req) {
       }
     }
 
+    // Fire-and-forget geocoding (non-blocking — failure does not affect booking creation)
+    const siteUrl = process.env.URL || '';
+    if (siteUrl && process.env.SHOP_LAT && process.env.SHOP_LNG) {
+      fetch(`${siteUrl}/api/geocode-booking`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bookingId: booking.id }),
+      }).catch(err => console.error('Geocode fire-and-forget failed (non-fatal):', err.message));
+    }
+
     return jsonResponse({ bookingId: booking.id }, 201);
   } catch (e) {
     console.error('create-booking error:', e);

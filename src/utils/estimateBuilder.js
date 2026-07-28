@@ -157,14 +157,17 @@ export function buildEstimate(booking, settingsOverride) {
   // We do NOT have actual distance data at estimate time.
   // Flag this explicitly rather than defaulting to zero.
 
-  const hasDistanceData = false;
-  missingInputs.push({
-    field: 'distance',
-    message: 'No distance data — travel cost estimated at default.',
-    financial: false,
-  });
+  const hasDistanceData = booking.travelMinutes != null;
+  if (!hasDistanceData) {
+    missingInputs.push({
+      field: 'distance',
+      message: 'Travel time estimated — geocoding pending.',
+      financial: false,
+    });
+  }
 
-  const estimatedTravelMinutes = 60; // Default assumption: 30 min each way
+  // Use geocoded travel time if available; fall back to 30 min (conservative short-run default)
+  const estimatedTravelMinutes = hasDistanceData ? booking.travelMinutes : 30;
   const estimatedFuelCost = Math.round((estimatedTravelMinutes / 60) * (settings.gasPrice || 3.50) / (settings.mpg || 15) * 40);
 
   // --- On-site duration ---
