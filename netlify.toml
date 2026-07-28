@@ -2,6 +2,13 @@
   command = "npm run build"
   publish = "dist"
 
+# Force HTTPS — redirect all HTTP traffic to HTTPS
+[[redirects]]
+  from = "http://squatterz.com/*"
+  to = "https://squatterz.com/:splat"
+  status = 301
+  force = true
+
 [[redirects]]
   from = "/*"
   to = "/index.html"
