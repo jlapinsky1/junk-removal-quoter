@@ -9,7 +9,11 @@
 | `SUPABASE_SERVICE_ROLE_KEY` | Service role key (bypasses RLS) |
 | `SUPABASE_ANON_KEY` | Anon key (for admin JWT verification) |
 | `ANTHROPIC_API_KEY` | Claude API key for photo analysis |
-| `TURNSTILE_SECRET_KEY` | Cloudflare Turnstile server secret (optional — uploads work without it) |
+| `RESEND_API_KEY` | Resend API key for transactional email |
+| `RESEND_FROM_EMAIL` | Verified sender address (e.g. `jobs@yourdomain.com`) |
+| `STRIPE_SECRET_KEY` | Stripe secret key — **never** use a live key locally or in CI |
+| `STRIPE_WEBHOOK_SECRET` | `whsec_...` from `stripe listen` output |
+| `TURNSTILE_SECRET_KEY` | Cloudflare Turnstile server secret (optional) |
 | `NODE_ENV` | Set to `test` only in test environments — never in production |
 | `ENABLE_TEST_ENDPOINTS` | Set to `true` only in test environments — never in production |
 | `TEST_LOOKUP_SECRET` | Secret for the test-only lookup endpoint — never in production |
@@ -19,6 +23,7 @@
 |---|---|
 | `VITE_SUPABASE_URL` | Supabase project URL |
 | `VITE_SUPABASE_ANON_KEY` | Supabase anon key |
+| `VITE_STRIPE_PUBLISHABLE_KEY` | Stripe publishable key (`pk_live_...` in prod, `pk_test_...` in dev) |
 | `VITE_GOOGLE_MAPS_API_KEY` | Google Maps Distance Matrix (optional) |
 | `VITE_TURNSTILE_SITE_KEY` | Cloudflare Turnstile site key (optional) |
 
@@ -36,6 +41,7 @@ Run all migrations in `supabase/migrations/` in order against the production dat
 | `006_commercial_portal.sql` | `commercial_clients`, `properties`, `jobs`, `invoices` tables |
 | `007_service_area_admin.sql` | Admin service area config schema |
 | `008_expansion_leads_and_test_run_id.sql` | `expansion_leads` table; `test_run_id` column on `bookings` |
+| `009_stripe_payment.sql` | Stripe columns on `bookings`; `slot_reservations.expires_at`; `payment_access_tokens`; `processed_stripe_events`; `booking_completions`; `booking_photos.kind`; updated audit event types; `initiate_payment_atomic`, `confirm_deposit_atomic`, `cleanup_expired_slot_reservations` |
 
 Migration 001 creates:
 - 11 tables: `admin_users`, `rate_limits`, `upload_sessions`, `session_photos`, `bookings`, `booking_photos`, `quote_snapshots`, `quote_tokens`, `slot_reservations`, `quote_acceptances`, `audit_log`
@@ -61,8 +67,13 @@ All created by the migration. Summary:
 | `slot_reservations` | SELECT | `is_admin()` |
 | `quote_acceptances` | SELECT | `is_admin()` |
 | `audit_log` | SELECT | `is_admin()` |
+| `booking_completions` | SELECT | `is_admin()` |
+| `payment_access_tokens` | SELECT | `is_admin()` |
+| `processed_stripe_events` | SELECT | `is_admin()` |
 
 No anonymous or generic authenticated access to any table.
+
+Writes to `booking_completions`, `payment_access_tokens`, and `processed_stripe_events` go through the service role only (no authenticated INSERT policy).
 
 ## Required Storage Policies
 
@@ -112,20 +123,35 @@ INSERT INTO admin_users (user_id) VALUES ('paste-user-uuid-here');
    - Quote URL displayed with raw token
 6. Sign out and sign back in — session persists
 
-### Customer Quote Acceptance
+### Customer Deposit Flow (requires Stripe test mode + `stripe listen` running)
 1. Open the quote URL from step 5 (`/quote/{token}`)
 2. Verify only customer-safe fields are shown (no margins, costs, internal notes)
-3. Check all 3 confirmation boxes
-4. Select a time slot and accept
-5. Verify confirmation screen
-6. Check Supabase: `quote_acceptances`, `slot_reservations` (status=reserved), booking status=scheduled, token used_at set
-7. Revisit the same URL — should show "You're All Set" (not re-acceptance form)
+3. Verify the deposit split card: total / deposit due today / remaining after service
+4. Check all 3 confirmation boxes, select a time slot
+5. Click "Proceed to Payment" — verify Payment Element loads
+6. Enter test card `4242 4242 4242 4242`, exp `12/29`, CVC `123`
+7. Verify deposit confirmed screen + booking status=`scheduled`, `deposit_confirmed_at` set
+8. Verify `slot_reservations` status=`confirmed`, `quote_tokens.used_at` set
+9. In admin panel: verify "DEPOSIT CONFIRMED — dispatch allowed" shown
+10. Revisit quote URL — should show "You're All Set" (slot confirmed)
 
 ### Job Completion
 1. In admin, open the scheduled booking
-2. Click "Mark Job Complete" and fill in actuals
-3. Save — verify booking status=completed, actuals stored
-4. Try completing again — should fail with "already completed"
+2. Scroll to "Complete Job" section
+3. Upload at least one after photo
+4. Fill in technician name, items removed, completion notes, final amount, job completed at
+5. Click "Complete Job & Request Final Balance"
+6. Verify: `booking_completions` row created, booking status=`completed`
+7. Verify customer email sent with `/invoice/:token/final` link
+8. Open the final page link — verify completion summary, before/after photos (signed URLs), payment element
+9. Pay with test card — verify `invoice.paid` webhook → `financially_completed_at` set
+10. Try completing the job a second time — should succeed (idempotent, no duplicate DB row)
+
+### Admin Override Flow
+1. Approve a booking and force `status=scheduled` without `deposit_confirmed_at` (via Supabase SQL editor)
+2. Try "Complete Job" — should be blocked with "deposit not confirmed" error
+3. Add `override=true` + `overrideReason` — should succeed
+4. Verify `audit_log` contains `dispatch_override` event
 
 ### Security Checks
 1. Try `/admin` without signing in — should see login form
@@ -157,8 +183,21 @@ The Python regression suite tests API contracts and database persistence. These 
 - [ ] Service area admin tab loads, ZIP chips render correctly
 - [ ] Decision card shows Take/Review/Pass with correct score and factors
 - [ ] Quote approval flow works end-to-end (decision context saved)
+- [ ] Stripe payment panel shows in booking detail once approved
+- [ ] "DEPOSIT CONFIRMED" / "DEPOSIT REQUIRED" indicator shown correctly
+- [ ] Complete Job form: after photo upload, all required fields, submit
 - [ ] Goal/pace dashboard reflects current bookings
 - [ ] Learning dashboard shows calibration suggestions when data exists
+
+**Payment flow (Stripe test mode):**
+- [ ] Quote page shows deposit split (total / 50% deposit / 50% balance)
+- [ ] Stripe Payment Element loads (not CardElement)
+- [ ] Test card `4242...` → deposit confirmed, booking scheduled
+- [ ] Test card `4000 0025 0000 3155` (3DS) → redirect → return → deposit confirmed
+- [ ] Declined card `4000 0000 0000 9995` → slot stays reserved, customer can retry
+- [ ] `/invoice/:token/final` shows completion summary, before/after photos, Payment Element
+- [ ] Final payment → invoice.paid → financially_completed_at set
+- [ ] PDF download link works; PDF shows Squatterz branding + photos
 
 **Commercial portal:**
 - [ ] Portal login → dashboard renders correctly
@@ -169,6 +208,8 @@ The Python regression suite tests API contracts and database persistence. These 
 **Error states:**
 - [ ] Expired quote URL shows "no longer available"
 - [ ] Used quote URL shows "You're All Set"
+- [ ] Invalid/expired payment token → 400 error page
+- [ ] Quote token rejected on `/invoice/:token/final` (wrong purpose)
 - [ ] Admin logout → redirect to login, session does not persist
 
 ---
@@ -178,14 +219,18 @@ The Python regression suite tests API contracts and database persistence. These 
 Before running the Python regression suite against staging:
 
 1. Create a staging Supabase project (never use production)
-2. Run all migrations against staging
+2. Run all migrations (001–009) against staging
 3. Create test admin and client users in Supabase Auth
 4. Insert admin user into `admin_users` table
 5. Ensure admin user has a `commercial_clients` row for portal tests
 6. Configure `TEST_IN_ZONE_ZIP`, `TEST_EXCLUDED_ZIP`, `TEST_UNAVAILABLE_ZIP` to match a real seeded service area config
 7. Set `TEST_LOOKUP_SECRET` to a long random string; set the same value in both `.env.test` and the Netlify dev environment
-8. Run: `NODE_ENV=test ENABLE_TEST_ENDPOINTS=true TEST_LOOKUP_SECRET=<secret> netlify dev --port 8888`
-9. In a separate terminal: `pytest -m smoke -v` to verify setup
+8. Install Stripe CLI: `brew install stripe/stripe-cli/stripe` then `stripe login`
+9. Start webhook forwarding: `stripe listen --forward-to localhost:8888/api/stripe-webhook`
+   Copy the printed `whsec_...` → `STRIPE_WEBHOOK_SECRET` in `.env` and `.env.test`
+10. Run: `NODE_ENV=test ENABLE_TEST_ENDPOINTS=true TEST_LOOKUP_SECRET=<secret> netlify dev --port 8888`
+11. In a separate terminal: `pytest -m smoke -v` to verify setup
+12. Run payment tests: `pytest -m payment -v` (requires `STRIPE_SECRET_KEY=sk_test_...`)
 
 **CI secrets required** (GitHub Actions → Settings → Secrets):
 
@@ -203,3 +248,8 @@ Before running the Python regression suite against staging:
 | `TEST_EXCLUDED_ZIP` | Default: `30399` |
 | `TEST_UNAVAILABLE_ZIP` | Default: `30350` |
 | `TEST_LOOKUP_SECRET` | Long random string, same value in both server and test env |
+| `STRIPE_SECRET_KEY` | **Test mode only** (`sk_test_...`) — never a live key |
+| `STRIPE_WEBHOOK_SECRET` | `whsec_...` from `stripe listen` running in CI |
+| `VITE_STRIPE_PUBLISHABLE_KEY` | **Test mode only** (`pk_test_...`) |
+| `RESEND_API_KEY` | Resend API key for transactional email in staging |
+| `RESEND_FROM_EMAIL` | Verified sender address for staging emails |

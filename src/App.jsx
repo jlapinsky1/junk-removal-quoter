@@ -9,6 +9,7 @@ import Dashboard from './pages/Dashboard';
 import LearningDashboard from './pages/LearningDashboard';
 import BookingFlow from './pages/BookingFlow';
 import ApprovedQuote from './pages/ApprovedQuote';
+import FinalPaymentPage from './pages/FinalPaymentPage';
 import AdminLogin from './pages/AdminLogin';
 import Commercial from './pages/Commercial';
 import ServiceAreaAdmin from './pages/ServiceAreaAdmin';
@@ -104,6 +105,7 @@ export default function App() {
       <Route path="/" element={<BookingFlow />} />
       <Route path="/book" element={<BookingFlow />} />
       <Route path="/quote/:id" element={<ApprovedQuote />} />
+      <Route path="/invoice/:token/final" element={<FinalPaymentPage />} />
       <Route path="/commercial" element={<Commercial />} />
       <Route path="/portal/login" element={<ClientLogin />} />
       <Route path="/portal" element={<ClientPortal />} />

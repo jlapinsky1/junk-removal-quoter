@@ -137,6 +137,28 @@ function RequestDetail({ booking, onBack }) {
   const [scheduleCtx, setScheduleCtx] = useState(null);
   const [showDecisionRules, setShowDecisionRules] = useState(false);
 
+  // Stripe payment summary
+  const [paymentSummary, setPaymentSummary] = useState(null);
+  const [paymentLoading, setPaymentLoading] = useState(false);
+
+  // New job completion form (for scheduled/in_progress bookings)
+  const [showJobCompletion, setShowJobCompletion] = useState(false);
+  const [jobCompletionForm, setJobCompletionForm] = useState({
+    technicianName: '',
+    itemsRemoved: '',
+    volumeEstimate: '',
+    completionNotes: '',
+    disposalNotes: '',
+    finalAmountDollars: booking.approvedQuote ? String(booking.approvedQuote) : '',
+    priceAdjustmentReason: '',
+    completedAt: new Date(Date.now() - new Date().getTimezoneOffset() * 60000)
+      .toISOString().slice(0, 16),
+  });
+  const [afterPhotos, setAfterPhotos] = useState([]); // [{ storagePath, fileName }]
+  const [uploadingPhotos, setUploadingPhotos] = useState(false);
+  const [jobCompletionSubmitting, setJobCompletionSubmitting] = useState(false);
+  const [jobCompletionError, setJobCompletionError] = useState(null);
+
   const settings = getSettings();
   const estimate = buildEstimate(data, settings);
   const riskFlags = detectRiskFlags(data, estimate);
@@ -178,6 +200,13 @@ function RequestDetail({ booking, onBack }) {
         }
       } catch { /* goal tables may not exist yet */ }
     })();
+  }, []);
+
+  // Load Stripe payment summary for bookings with approved quotes
+  useEffect(() => {
+    if (data.approvedQuote) {
+      loadPaymentSummary();
+    }
   }, []);
 
   // Evaluate decision
@@ -286,6 +315,132 @@ function RequestDetail({ booking, onBack }) {
     const repo = await getRepo();
     await repo.updateBooking(data.id, { internal_notes: internalNotes });
     alert('Notes saved');
+  }
+
+  async function getAdminToken() {
+    const repo = await getRepo();
+    const session = await repo.getSession();
+    return session?.access_token;
+  }
+
+  async function loadPaymentSummary() {
+    setPaymentLoading(true);
+    try {
+      const token = await getAdminToken();
+      const res = await fetch(`/api/payment-summary?bookingId=${encodeURIComponent(data.id)}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        setPaymentSummary(await res.json());
+      }
+    } catch {}
+    setPaymentLoading(false);
+  }
+
+  async function handleAfterPhotoUpload(e) {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    setUploadingPhotos(true);
+    const token = await getAdminToken();
+    const uploaded = [];
+
+    for (const file of files) {
+      try {
+        const urlRes = await fetch('/api/get-completion-photo-url', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ bookingId: data.id, fileName: file.name, contentType: file.type }),
+        });
+        if (!urlRes.ok) continue;
+        const { signedUploadUrl, storagePath } = await urlRes.json();
+        const uploadRes = await fetch(signedUploadUrl, {
+          method: 'PUT',
+          headers: { 'Content-Type': file.type },
+          body: file,
+        });
+        if (uploadRes.ok) {
+          uploaded.push({ storagePath, fileName: file.name });
+        }
+      } catch {}
+    }
+
+    setAfterPhotos(prev => [...prev, ...uploaded]);
+    setUploadingPhotos(false);
+    // Reset file input so the same file can be re-selected after removal
+    e.target.value = '';
+  }
+
+  async function handleCompleteJob() {
+    setJobCompletionError(null);
+
+    if (afterPhotos.length === 0) {
+      setJobCompletionError('At least one after photo is required.');
+      return;
+    }
+    if (!jobCompletionForm.completionNotes.trim()) {
+      setJobCompletionError('Completion notes are required.');
+      return;
+    }
+    if (!jobCompletionForm.itemsRemoved.trim()) {
+      setJobCompletionError('Items removed description is required.');
+      return;
+    }
+    if (!jobCompletionForm.technicianName.trim()) {
+      setJobCompletionError('Technician name is required.');
+      return;
+    }
+
+    const finalAmountCents = Math.round(Number(jobCompletionForm.finalAmountDollars) * 100);
+    if (!finalAmountCents || finalAmountCents <= 0) {
+      setJobCompletionError('Final amount must be a positive number.');
+      return;
+    }
+
+    const approvedCents = data.approvedQuote
+      ? Math.round(Number(data.approvedQuote) * 100) : 0;
+    if (finalAmountCents !== approvedCents && !jobCompletionForm.priceAdjustmentReason.trim()) {
+      setJobCompletionError('Price adjustment reason is required when final amount differs from the approved quote.');
+      return;
+    }
+
+    setJobCompletionSubmitting(true);
+    try {
+      const token = await getAdminToken();
+      const res = await fetch('/api/complete-job', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          bookingId: data.id,
+          completedAt: new Date(jobCompletionForm.completedAt).toISOString(),
+          technicianName: jobCompletionForm.technicianName.trim(),
+          itemsRemoved: jobCompletionForm.itemsRemoved.trim(),
+          volumeEstimate: jobCompletionForm.volumeEstimate.trim() || undefined,
+          completionNotes: jobCompletionForm.completionNotes.trim(),
+          disposalNotes: jobCompletionForm.disposalNotes.trim() || undefined,
+          finalAmountCents,
+          priceAdjustmentReason: jobCompletionForm.priceAdjustmentReason.trim() || undefined,
+          afterPhotoStoragePaths: afterPhotos.map(p => p.storagePath),
+        }),
+      });
+
+      const result = await res.json();
+      if (!res.ok) {
+        setJobCompletionError(result.error || 'Failed to complete job.');
+        return;
+      }
+
+      setData(prev => ({ ...prev, status: 'completed' }));
+      setShowJobCompletion(false);
+      alert(
+        result.finalPaymentLinkSent
+          ? 'Job completed! Final payment link sent to customer.'
+          : 'Job completed! Note: final payment link was not sent — check the email on file.'
+      );
+    } catch {
+      setJobCompletionError('Network error. Please try again.');
+    } finally {
+      setJobCompletionSubmitting(false);
+    }
   }
 
   async function handleComplete() {
@@ -646,56 +801,246 @@ function RequestDetail({ booking, onBack }) {
         </button>
       </div>
 
-      {/* ── Completion tracking ── */}
-      {data.status === 'scheduled' && !showCompletion && (
+      {/* ── Stripe payment summary ── */}
+      {(paymentSummary || paymentLoading) && (
+        <div className="bg-white rounded-xl border p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="font-bold text-gray-800">Stripe Financial Summary</h3>
+            <button
+              onClick={loadPaymentSummary}
+              disabled={paymentLoading}
+              className="text-xs text-blue-600 disabled:opacity-50"
+            >
+              {paymentLoading ? 'Loading…' : 'Refresh'}
+            </button>
+          </div>
+
+          {paymentSummary && (
+            <>
+              {paymentSummary.depositConfirmed ? (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-800 font-medium">
+                  ✓ Deposit confirmed — dispatch allowed
+                </div>
+              ) : (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800 font-medium">
+                  ⚠ Deposit not confirmed — do not dispatch
+                </div>
+              )}
+
+              <div className="space-y-1">
+                <PRow label="Invoice total" value={`$${(paymentSummary.invoiceTotalCents / 100).toFixed(2)}`} />
+                <PRow label="Amount paid" value={`$${(paymentSummary.amountPaidCents / 100).toFixed(2)}`} />
+                <PRow label="Amount remaining" value={`$${(paymentSummary.amountRemainingCents / 100).toFixed(2)}`} />
+                <PRow label="Invoice status" value={paymentSummary.invoiceStatus} />
+                {paymentSummary.depositConfirmedAt && (
+                  <PRow label="Deposit confirmed" value={new Date(paymentSummary.depositConfirmedAt).toLocaleString()} />
+                )}
+                {paymentSummary.financiallyCompletedAt && (
+                  <PRow label="Financially complete" value={new Date(paymentSummary.financiallyCompletedAt).toLocaleString()} />
+                )}
+              </div>
+
+              <div className="border-t pt-2 space-y-0.5 text-xs text-gray-400 font-mono break-all">
+                <div>Customer: {paymentSummary.stripeCustomerId || '—'}</div>
+                <div>Invoice: {paymentSummary.stripeInvoiceId || '—'}</div>
+              </div>
+
+              {paymentSummary.hostedInvoiceUrl && (
+                <a
+                  href={paymentSummary.hostedInvoiceUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="block text-center text-xs text-blue-600 underline"
+                >
+                  View invoice on Stripe →
+                </a>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ── Complete job (new completion form for Stripe flow) ── */}
+      {['scheduled', 'in_progress'].includes(data.status) && !showJobCompletion && (
         <button
-          onClick={() => setShowCompletion(true)}
+          onClick={() => setShowJobCompletion(true)}
           className="w-full bg-green-50 text-green-700 py-3 rounded-xl font-bold border border-green-200"
         >
-          Mark Job Complete
+          Complete Job &amp; Request Final Balance
         </button>
       )}
 
-      {showCompletion && (
+      {showJobCompletion && (
         <div className="bg-white rounded-xl border p-4 space-y-3">
-          <h3 className="font-bold text-gray-800">Job Completion</h3>
-          <CompletionField label="Final amount collected ($)" value={completionData.finalAmount} error={completionErrors?.finalAmount}
-            onChange={v => setCompletionData(p => ({ ...p, finalAmount: v }))} required />
-          <CompletionField label="Actual disposal fee ($)" value={completionData.disposalCost}
-            onChange={v => setCompletionData(p => ({ ...p, disposalCost: v }))} />
-          <CompletionField label="Actual fuel / travel cost ($)" value={completionData.fuelCost}
-            onChange={v => setCompletionData(p => ({ ...p, fuelCost: v }))} />
-          <CompletionField label="Paid labor cost ($)" value={completionData.paidLabor}
-            onChange={v => setCompletionData(p => ({ ...p, paidLabor: v }))} />
-          <CompletionField label="Owner labor allowance ($)" value={completionData.ownerLabor}
-            onChange={v => setCompletionData(p => ({ ...p, ownerLabor: v }))} />
-          <CompletionField label="Payment / processing fees ($)" value={completionData.paymentFees}
-            onChange={v => setCompletionData(p => ({ ...p, paymentFees: v }))} />
-          <CompletionField label="Other direct costs ($)" value={completionData.otherCosts}
-            onChange={v => setCompletionData(p => ({ ...p, otherCosts: v }))} />
-          <CompletionField label="Actual travel time (minutes)" value={completionData.actualTravelMinutes}
-            onChange={v => setCompletionData(p => ({ ...p, actualTravelMinutes: v }))} />
-          <CompletionField label="Actual on-site time (minutes)" value={completionData.actualOnSiteMinutes}
-            onChange={v => setCompletionData(p => ({ ...p, actualOnSiteMinutes: v }))} />
-          <CompletionField label="Actual truck volume used (%)" value={completionData.actualTruckVolumePct}
-            onChange={v => setCompletionData(p => ({ ...p, actualTruckVolumePct: v }))} />
+          <h3 className="font-bold text-gray-800">Complete Job</h3>
+
+          {/* After photos */}
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Additional items discovered</label>
-            <textarea className="w-full border rounded-lg px-3 py-2 text-sm" rows={2}
-              value={completionData.additionalItems} onChange={e => setCompletionData(p => ({ ...p, additionalItems: e.target.value }))}
-              placeholder="Items found on-site not in original request..." />
+            <label className="block text-xs font-medium text-gray-700 mb-1">
+              After photos <span className="text-red-500">*</span>
+              <span className="text-gray-400 font-normal ml-1">(at least 1 required)</span>
+            </label>
+            <input
+              type="file"
+              accept="image/jpeg,image/jpg,image/png,image/webp,image/heic,image/heif"
+              multiple
+              onChange={handleAfterPhotoUpload}
+              className="block w-full text-sm text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-gray-100 file:text-gray-700"
+            />
+            {uploadingPhotos && <div className="text-xs text-gray-500 mt-1">Uploading…</div>}
+            {afterPhotos.length > 0 && (
+              <div className="mt-2 space-y-1">
+                {afterPhotos.map((p, i) => (
+                  <div key={i} className="flex items-center gap-1 text-xs text-green-700">
+                    <span>✓</span>
+                    <span className="flex-1 truncate">{p.fileName}</span>
+                    <button
+                      onClick={() => setAfterPhotos(prev => prev.filter((_, j) => j !== i))}
+                      className="text-red-400 hover:text-red-600 ml-1"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
+
+          {/* Technician name */}
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Completion notes</label>
-            <textarea className="w-full border rounded-lg px-3 py-2 text-sm" rows={2}
-              value={completionData.notes} onChange={e => setCompletionData(p => ({ ...p, notes: e.target.value }))}
-              placeholder="How did the job go?" />
+            <label className="block text-xs font-medium text-gray-700 mb-1">
+              Technician name <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              className="w-full border rounded-lg px-3 py-2 text-sm"
+              value={jobCompletionForm.technicianName}
+              onChange={e => setJobCompletionForm(p => ({ ...p, technicianName: e.target.value }))}
+              placeholder="Who performed the work?"
+            />
           </div>
+
+          {/* Items removed */}
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">
+              Items removed <span className="text-red-500">*</span>
+            </label>
+            <textarea
+              className="w-full border rounded-lg px-3 py-2 text-sm"
+              rows={2}
+              value={jobCompletionForm.itemsRemoved}
+              onChange={e => setJobCompletionForm(p => ({ ...p, itemsRemoved: e.target.value }))}
+              placeholder="What was removed? (shown to customer)"
+            />
+          </div>
+
+          {/* Volume estimate */}
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Volume / load size</label>
+            <input
+              type="text"
+              className="w-full border rounded-lg px-3 py-2 text-sm"
+              value={jobCompletionForm.volumeEstimate}
+              onChange={e => setJobCompletionForm(p => ({ ...p, volumeEstimate: e.target.value }))}
+              placeholder="e.g. 3/4 truck, full load"
+            />
+          </div>
+
+          {/* Completion notes */}
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">
+              Completion notes <span className="text-red-500">*</span>
+            </label>
+            <textarea
+              className="w-full border rounded-lg px-3 py-2 text-sm"
+              rows={3}
+              value={jobCompletionForm.completionNotes}
+              onChange={e => setJobCompletionForm(p => ({ ...p, completionNotes: e.target.value }))}
+              placeholder="Summary of the job for the customer…"
+            />
+          </div>
+
+          {/* Disposal / donation notes */}
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Disposal / donation notes</label>
+            <input
+              type="text"
+              className="w-full border rounded-lg px-3 py-2 text-sm"
+              value={jobCompletionForm.disposalNotes}
+              onChange={e => setJobCompletionForm(p => ({ ...p, disposalNotes: e.target.value }))}
+              placeholder="e.g. Donated 3 boxes to Habitat for Humanity"
+            />
+          </div>
+
+          {/* Final amount */}
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">
+              Final amount ($) <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="number"
+              step="0.01"
+              className="w-full border rounded-lg px-3 py-2 text-sm"
+              value={jobCompletionForm.finalAmountDollars}
+              onChange={e => setJobCompletionForm(p => ({ ...p, finalAmountDollars: e.target.value }))}
+              placeholder={data.approvedQuote || '0.00'}
+            />
+            {data.approvedQuote && jobCompletionForm.finalAmountDollars &&
+              Math.round(Number(jobCompletionForm.finalAmountDollars) * 100) !== Math.round(Number(data.approvedQuote) * 100) && (
+              <div className="text-xs text-amber-600 mt-1">
+                Differs from approved quote (${data.approvedQuote}) — reason required below
+              </div>
+            )}
+          </div>
+
+          {/* Price adjustment reason — shown only when amount differs */}
+          {data.approvedQuote && jobCompletionForm.finalAmountDollars &&
+            Math.round(Number(jobCompletionForm.finalAmountDollars) * 100) !== Math.round(Number(data.approvedQuote) * 100) && (
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                Price adjustment reason <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                className="w-full border rounded-lg px-3 py-2 text-sm"
+                value={jobCompletionForm.priceAdjustmentReason}
+                onChange={e => setJobCompletionForm(p => ({ ...p, priceAdjustmentReason: e.target.value }))}
+                placeholder="Why does the final amount differ?"
+              />
+            </div>
+          )}
+
+          {/* Job completed at */}
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">
+              Job completed at <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="datetime-local"
+              className="w-full border rounded-lg px-3 py-2 text-sm"
+              value={jobCompletionForm.completedAt}
+              onChange={e => setJobCompletionForm(p => ({ ...p, completedAt: e.target.value }))}
+            />
+          </div>
+
+          {jobCompletionError && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
+              {jobCompletionError}
+            </div>
+          )}
+
           <div className="flex gap-2">
-            <button onClick={handleComplete} className="flex-1 bg-green-600 text-white py-3 rounded-xl font-bold">
-              Save & Complete
+            <button
+              onClick={handleCompleteJob}
+              disabled={jobCompletionSubmitting || uploadingPhotos || afterPhotos.length === 0}
+              className="flex-1 bg-green-600 text-white py-3 rounded-xl font-bold disabled:opacity-40"
+            >
+              {jobCompletionSubmitting ? 'Completing…' : 'Complete Job & Request Final Balance'}
             </button>
-            <button onClick={() => setShowCompletion(false)} className="flex-1 bg-gray-100 text-gray-600 py-3 rounded-xl font-medium">
+            <button
+              onClick={() => { setShowJobCompletion(false); setJobCompletionError(null); }}
+              className="flex-1 bg-gray-100 text-gray-600 py-3 rounded-xl font-medium"
+            >
               Cancel
             </button>
           </div>
@@ -803,6 +1148,15 @@ function Row({ label, value }) {
     <div className="flex justify-between text-sm">
       <span className="text-gray-600">{label}</span>
       <span className="font-medium">{value}</span>
+    </div>
+  );
+}
+
+function PRow({ label, value }) {
+  return (
+    <div className="flex justify-between text-sm">
+      <span className="text-gray-500">{label}</span>
+      <span className="font-medium text-gray-800">{value}</span>
     </div>
   );
 }

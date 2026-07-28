@@ -12,9 +12,11 @@ A full-stack platform for a junk removal business: residential booking flow, adm
 | API | Netlify Functions (ES modules) |
 | Database | Supabase (Postgres + RLS) |
 | Blob storage | Netlify Blobs (service area config) |
-| File storage | Supabase Storage (booking photos) |
+| File storage | Supabase Storage (booking photos, private bucket) |
 | Auth | Supabase Auth (JWT) |
+| Payments | Stripe (deposit + final balance via invoice) |
 | Photo analysis | Anthropic Claude API |
+| Email | Resend |
 | CAPTCHA | Cloudflare Turnstile (optional) |
 
 ---
@@ -42,11 +44,23 @@ SUPABASE_URL=
 SUPABASE_SERVICE_ROLE_KEY=
 SUPABASE_ANON_KEY=
 ANTHROPIC_API_KEY=
+RESEND_API_KEY=
+RESEND_FROM_EMAIL=
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
 VITE_SUPABASE_URL=
 VITE_SUPABASE_ANON_KEY=
+VITE_STRIPE_PUBLISHABLE_KEY=pk_test_...
 VITE_GOOGLE_MAPS_API_KEY=   # optional
 TURNSTILE_SECRET_KEY=        # optional
 VITE_TURNSTILE_SITE_KEY=    # optional
+```
+
+For payment testing, also start Stripe CLI webhook forwarding:
+
+```bash
+stripe listen --forward-to localhost:8888/api/stripe-webhook
+# Copy the whsec_... value → STRIPE_WEBHOOK_SECRET in .env
 ```
 
 ---
@@ -92,10 +106,15 @@ pytest -m smoke                                           # fast critical-path g
 pytest -m "regression and not smoke"                      # full regression suite
 pytest -m security                                        # security regression
 pytest -m integration                                     # all integration tests
+pytest -m payment                                         # payment flow tests (Stripe required)
+pytest -m completion                                      # completion package tests
+pytest -m dispatch                                        # dispatch enforcement tests
 pytest tests/unit/                                        # date logic (Node subprocess)
 pytest --junitxml=reports/junit.xml                       # CI output
 pytest -m smoke --junitxml=reports/smoke-junit.xml -v     # verbose CI smoke run
 ```
+
+Payment tests require `STRIPE_SECRET_KEY` (test mode) and `stripe listen` running for webhook-dependent tests.
 
 ### Test suite structure
 
@@ -123,8 +142,14 @@ tests/
     test_check_service_area.py  # full ZIP parameter matrix
     test_create_booking.py      # field matrix, server-side enforcement
     test_upload_flow.py         # session lifecycle, file validation
-    test_quote_lifecycle.py     # approve → view → accept → complete
+    test_quote_lifecycle.py     # approve → view → deposit → complete
     test_admin_endpoints.py     # admin auth, service area config CRUD
+    test_payment_flow.py        # deposit calculation, create-deposit-payment, payment-summary
+    test_completion_package.py  # complete-job validation, photo paths, PDF access control
+
+  integration/
+    ...
+    test_dispatch_enforcement.py   # deposit must be confirmed before job completion
 
   fixtures/
     factories.py           # make_booking(), make_work_order(), make_email(), etc.
@@ -162,10 +187,18 @@ Returns 404 (not 403) when disabled — does not reveal its existence. Secret co
 | `/api/create-upload-session` | POST | none | Create photo upload session |
 | `/api/get-upload-url` | POST | none | Signed URL for photo upload |
 | `/api/create-booking` | POST | none | Submit residential booking |
-| `/api/approve-quote` | POST | admin JWT | Admin approves quote with price |
-| `/api/accept-quote` | POST | quote token | Customer confirms booking slot |
-| `/api/complete-job` | POST | admin JWT | Mark job complete, record actuals |
+| `/api/approve-quote` | POST | admin JWT | Admin approves quote; creates Stripe customer + invoice |
 | `/api/get-customer-quote` | GET | quote token | Customer quote view (DTO — no internal costs) |
+| `/api/create-deposit-payment` | POST | quote token | Reserve slot + create deposit PaymentIntent (50%) |
+| `/api/stripe-webhook` | POST | Stripe sig | Handle `invoice_payment.paid`, `invoice.paid`, `payment_intent.payment_failed` |
+| `/api/payment-summary` | GET | token or admin JWT | Safe payment DTO for customer or admin |
+| `/api/get-completion-photo-url` | POST | admin JWT | Signed upload URL for after-job photos |
+| `/api/complete-job` | POST | admin JWT | Save completion package + trigger final payment request |
+| `/api/get-final-job-page` | GET | payment token | Customer final page: completion data + signed photo URLs + final PI secret |
+| `/api/residential-completion-pdf` | GET | payment token or admin JWT | Completion report PDF (pdfkit, dark theme) |
+| `/api/reconcile-stripe` | POST | admin JWT | Re-link or repair Stripe ↔ Supabase state |
+| `/api/admin-payment-action` | POST | admin JWT | Refresh status, resend final link, reconcile |
+| `/api/accept-quote` | POST | quote token | Legacy slot reservation (pre-payment flow) |
 | `/api/admin/service-area` | GET + PUT | admin JWT | Read/write service area ZIP config |
 | `/api/signup` | POST | none | Portal account signup |
 | `/api/reset-password` | POST | none | Password reset email |
@@ -220,6 +253,7 @@ The commercial portal is a separate authenticated experience for recurring busin
 | `006_commercial_portal.sql` | `commercial_clients`, `properties`, `jobs`, `invoices` |
 | `007_service_area_admin.sql` | Admin service area config |
 | `008_expansion_leads_and_test_run_id.sql` | `expansion_leads` table, `test_run_id` column on `bookings` |
+| `009_stripe_payment.sql` | Stripe columns on `bookings`, `slot_reservations.expires_at`, `payment_access_tokens`, `processed_stripe_events`, `booking_completions`, `booking_photos.kind`; updated audit event types; `initiate_payment_atomic`, `confirm_deposit_atomic`, `cleanup_expired_slot_reservations` RPCs |
 
 ---
 
@@ -228,14 +262,15 @@ The commercial portal is a separate authenticated experience for recurring busin
 `.github/workflows/regression.yml` runs on push to master and pull requests:
 
 1. Checkout, Node 22, Python 3.12, `npm ci`, `pip install -r requirements-test.txt`
-2. Install `netlify-cli`, write `.env.test` from GitHub Secrets
+2. Install `netlify-cli` and Stripe CLI, write `.env.test` from GitHub Secrets
 3. Start `netlify dev --port 8888` in background with `NODE_ENV=test ENABLE_TEST_ENDPOINTS=true`
-4. Wait for `/api/health` to return 200 (retry loop, max 60s)
-5. Seed service area ZIP config via admin API
-6. Run smoke tests (fail-fast gate) — blocks deploy on failure
-7. Run full regression suite (on push to master)
-8. Run security tests (on push to master)
-9. Upload JUnit XML artifacts to GitHub Actions
+4. Start `stripe listen --forward-to localhost:8888/api/stripe-webhook` in background
+5. Wait for `/api/health` to return 200 (retry loop, max 60s)
+6. Seed service area ZIP config via admin API
+7. Run smoke tests (fail-fast gate) — blocks deploy on failure
+8. Run full regression suite (on push to master)
+9. Run security tests (on push to master)
+10. Upload JUnit XML artifacts to GitHub Actions
 
 ---
 

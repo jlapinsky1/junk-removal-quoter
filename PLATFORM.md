@@ -17,6 +17,7 @@ This document covers the full operational platform built on top of the junk-remo
 - [Phase 2: Decision Engine](#phase-2-decision-engine)
 - [Phase 3: Estimate Accuracy & Learning](#phase-3-estimate-accuracy--learning)
 - [Phase 4: Route & Schedule Optimization](#phase-4-route--schedule-optimization)
+- [Stripe Payment Workflow](#stripe-payment-workflow)
 - [How It All Connects](#how-it-all-connects)
 - [Test Coverage](#test-coverage)
 
@@ -676,3 +677,136 @@ create table expansion_leads (
 alter table bookings add column test_run_id text;
 -- Index: idx_bookings_test_run_id (partial, where test_run_id is not null)
 ```
+
+---
+
+## Stripe Payment Workflow
+
+### Booking Status Flow
+
+```
+pending_review
+  → quote_sent          admin approves; Stripe customer + invoice created (send_invoice)
+  → awaiting_deposit    customer initiates payment; slot tentatively reserved (30-min expiry)
+  → scheduled           deposit webhook confirmed; deposit_confirmed_at set; slot confirmed
+  → in_progress         admin dispatches crew (requires deposit_confirmed_at)
+  → completed           admin submits completion package; final PaymentIntent created
+  financially_completed_at set by invoice.paid webhook (independent of booking status)
+```
+
+### Stripe Object Model
+
+One Stripe invoice per job. Both the deposit and final balance are attached as separate PaymentIntents to the same invoice.
+
+```
+Stripe Invoice (in_xxx)
+  collection_method: send_invoice
+  metadata: { booking_id, quote_version, environment }
+  │
+  ├── InvoiceItem: "Residential junk removal – {address}"
+  │     amount: approvedPriceCents (full total)
+  │
+  ├── InvoicePayment #1 — deposit
+  │     amount_requested: Math.floor(invoiceTotal / 2)   ← floor, never ceiling
+  │     payment.payment_intent: pi_xxx_deposit
+  │
+  └── InvoicePayment #2 — final balance
+        amount_requested: invoice.amount_remaining
+        payment.payment_intent: pi_xxx_final
+```
+
+**Stripe API version**: `2025-05-28.basil` (required for `attach_payment` and `invoice_payment.paid`).
+
+### Deposit Calculation
+
+```
+invoiceTotalCents = Math.round(approvedPrice * 100)
+depositCents      = Math.floor(invoiceTotalCents / 2)   // floor — never rounds up
+finalCents        = invoiceTotalCents - depositCents     // remainder (covers odd cents)
+```
+
+The server always calculates the deposit amount from Stripe's authoritative `invoice.amount_due`. Client-supplied `depositCents` is silently ignored.
+
+### Token Lifecycle
+
+**Quote token** (existing): issued at `approve-quote`, used to load `/quote/:token` and call `create-deposit-payment`. Consumed by the `confirm_deposit_atomic` RPC when the deposit webhook fires — not at payment initiation (so the customer can retry on card failure).
+
+**Payment access token** (new): issued by `complete-job` after the completion package is saved. Hashed SHA-256, `purpose='final_payment'`, 7-day expiry. Used for `/invoice/:token/final` and `residential-completion-pdf`. Admin can revoke and reissue via `admin-payment-action`.
+
+### Slot Reservation Expiry
+
+Slots are reserved for 30 minutes when the customer initiates payment. If the deposit is not confirmed within that window the slot is canceled by `cleanup_expired_slot_reservations()` (called at the start of each `create-deposit-payment` call). Card failures do NOT cancel the slot — the customer can retry within the window.
+
+### Webhook Idempotency
+
+All Stripe webhook events are recorded in `processed_stripe_events` before processing begins. State machine: `processing → processed | failed`. A `failed` event is retried on the next Stripe delivery. An event already `processed` returns 200 immediately without re-running business logic.
+
+### Dispatch Enforcement
+
+`complete-job` requires `deposit_confirmed_at IS NOT NULL` before saving the completion package. Admin override: send `override=true` + `overrideReason` — this succeeds but writes a `dispatch_override` audit log entry.
+
+### Price Adjustment
+
+If `finalAmountCents ≠ booking.approved_quote * 100`, a `priceAdjustmentReason` string is required. The reason is stored on `booking_completions` and shown in the admin panel.
+
+### Database Additions (Migration 009)
+
+```
+bookings (new columns)
+├── stripe_customer_id               TEXT
+├── stripe_invoice_id                TEXT
+├── stripe_deposit_payment_intent_id TEXT
+├── stripe_final_payment_intent_id   TEXT
+├── deposit_confirmed_at             TIMESTAMPTZ
+└── financially_completed_at         TIMESTAMPTZ
+
+slot_reservations (new column)
+└── expires_at  TIMESTAMPTZ   (30-minute window)
+
+payment_access_tokens
+├── booking_id   UUID → bookings
+├── token_hash   TEXT UNIQUE
+├── purpose      TEXT CHECK ('final_payment')
+├── expires_at   TIMESTAMPTZ
+├── used_at      TIMESTAMPTZ
+└── revoked_at   TIMESTAMPTZ
+
+processed_stripe_events
+├── stripe_event_id   TEXT UNIQUE
+├── event_type        TEXT
+├── processing_status TEXT ('processing' | 'processed' | 'failed')
+├── attempt_count     INTEGER
+└── error_message     TEXT
+
+booking_completions
+├── booking_id              UUID UNIQUE → bookings
+├── completed_at            TIMESTAMPTZ
+├── technician_name         TEXT
+├── items_removed           TEXT
+├── volume_estimate         TEXT
+├── completion_notes        TEXT
+├── disposal_notes          TEXT
+├── final_amount_cents      INTEGER
+└── price_adjustment_reason TEXT
+
+booking_photos (new column)
+└── kind  TEXT CHECK ('before' | 'after')   default 'before'
+```
+
+### Key Files
+
+| File | Purpose |
+|---|---|
+| `netlify/functions/_shared/stripe.js` | Stripe client, `toCents`, `calculateDepositCents`, idempotency key helpers |
+| `netlify/functions/approve-quote.js` | Creates Stripe customer + invoice; voids old invoice on re-approval |
+| `netlify/functions/create-deposit-payment.js` | Reserves slot, creates deposit PI, attaches to invoice |
+| `netlify/functions/stripe-webhook.js` | Handles `invoice_payment.paid` (deposit), `invoice.paid` (financial completion) |
+| `netlify/functions/payment-summary.js` | Safe payment DTO; hides `hostedInvoiceUrl` until final PI created |
+| `netlify/functions/get-completion-photo-url.js` | Admin: signed upload URL for after-job photos |
+| `netlify/functions/complete-job.js` | Saves completion package + creates final PI + sends single customer email |
+| `netlify/functions/get-final-job-page.js` | Customer final page: completion data, signed photo URLs, final PI secret |
+| `netlify/functions/residential-completion-pdf.js` | Completion PDF (pdfkit, dark theme, embedded photos via signed URLs) |
+| `netlify/functions/reconcile-stripe.js` | Admin: re-link Stripe → Supabase on partial failure |
+| `netlify/functions/admin-payment-action.js` | Admin: refresh, resend final link, reconcile |
+| `src/pages/ApprovedQuote.jsx` | Customer quote page with Stripe Payment Element (deposit) |
+| `src/pages/FinalPaymentPage.jsx` | Customer final page: completion package display + final payment |
