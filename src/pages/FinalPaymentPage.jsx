@@ -41,7 +41,10 @@ function FinalPaymentForm({ token, amountRemainingCents, onPaymentSubmitted, onP
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <PaymentElement options={{ layout: 'tabs' }} />
+      <PaymentElement options={{
+        layout: 'tabs',
+        wallets: { applePay: 'auto', googlePay: 'auto' },
+      }} />
       {localError && (
         <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700">
           {localError}
@@ -56,6 +59,12 @@ function FinalPaymentForm({ token, amountRemainingCents, onPaymentSubmitted, onP
           ? 'Processing…'
           : `Pay Remaining Balance ($${(amountRemainingCents / 100).toFixed(2)})`}
       </button>
+      <div className="flex items-center justify-center gap-1.5 text-xs text-gray-400 pt-1">
+        <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 fill-gray-400" aria-hidden="true">
+          <path d="M12 2a5 5 0 0 0-5 5v2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2h-2V7a5 5 0 0 0-5-5zm-3 7V7a3 3 0 0 1 6 0v2H9zm3 4a2 2 0 1 1 0 4 2 2 0 0 1 0-4z"/>
+        </svg>
+        <span>Secured by <span className="font-semibold text-gray-500">Stripe</span></span>
+      </div>
     </form>
   );
 }

@@ -130,7 +130,7 @@ export default async function handler(req) {
           amount: depositCents,
           currency: 'usd',
           customer: booking.stripe_customer_id,
-          automatic_payment_methods: { enabled: true },
+          payment_method_types: ['card'],
           metadata: {
             booking_id: bookingId,
             invoice_id: booking.stripe_invoice_id,
