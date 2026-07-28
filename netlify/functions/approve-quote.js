@@ -6,6 +6,62 @@ import {
   getStripeClient, getOrCreateStripeCustomer, toCents, ikey,
 } from './_shared/stripe.js';
 
+/**
+ * Sends the customer their quote link via Resend.
+ * Fire-and-forget — email failure never blocks the approval response.
+ */
+async function sendQuoteEmail({ customerName, customerEmail, fullAddress, approvedPrice, quoteUrl }) {
+  const resendKey = process.env.RESEND_API_KEY;
+  const fromEmail = process.env.RESEND_FROM_EMAIL || 'noreply@squatterz.com';
+  if (!resendKey || !customerEmail) return;
+
+  const firstName = customerName ? customerName.split(' ')[0] : 'there';
+  const priceFormatted = `$${Number(approvedPrice).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+
+  await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${resendKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from: `Squatterz <${fromEmail}>`,
+      to: [customerEmail],
+      subject: `Your junk removal quote — ${priceFormatted}`,
+      html: `
+        <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;background:#0a0f0d;color:#fff;border-radius:12px;">
+          <div style="text-align:center;margin-bottom:32px;">
+            <span style="font-size:20px;font-weight:900;letter-spacing:0.15em;text-transform:uppercase;">SQUATTERZ</span>
+            <div style="color:#22c55e;font-size:10px;letter-spacing:0.2em;font-weight:600;text-transform:uppercase;margin-top:4px;">We Haul It All</div>
+          </div>
+          <h1 style="font-size:22px;font-weight:900;margin:0 0 12px;">Your quote is ready, ${firstName}!</h1>
+          <p style="color:rgba(255,255,255,0.55);font-size:14px;line-height:1.6;margin:0 0 8px;">
+            We've reviewed your request for:
+          </p>
+          <p style="color:#fff;font-size:14px;font-weight:600;margin:0 0 24px;">${fullAddress}</p>
+          <div style="background:#111;border:1px solid #222;border-radius:10px;padding:16px 20px;margin-bottom:28px;text-align:center;">
+            <div style="color:rgba(255,255,255,0.4);font-size:12px;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.1em;">Your firm quote</div>
+            <div style="color:#22c55e;font-size:36px;font-weight:900;">${priceFormatted}</div>
+            <div style="color:rgba(255,255,255,0.4);font-size:12px;margin-top:4px;">No surprises. Price locked in.</div>
+          </div>
+          <p style="color:rgba(255,255,255,0.55);font-size:14px;line-height:1.6;margin:0 0 24px;">
+            Review your quote, choose a pickup time, and secure your spot with a 50% deposit. The remaining balance is due after the job is complete.
+          </p>
+          <div style="text-align:center;margin-bottom:28px;">
+            <a href="${quoteUrl}" style="display:inline-block;background:#22c55e;color:#000;font-weight:700;font-size:15px;padding:14px 36px;border-radius:10px;text-decoration:none;">
+              Review &amp; Accept Quote
+            </a>
+          </div>
+          <p style="color:rgba(255,255,255,0.3);font-size:12px;line-height:1.5;text-align:center;">
+            This quote expires in 7 days.<br>
+            Questions? Call us at (813) 555-0123.
+          </p>
+        </div>
+      `,
+    }),
+  }).catch(err => console.error('Quote email failed (non-fatal):', err.message));
+}
+
 export default async function handler(req) {
   if (req.method !== 'POST') return errorResponse('Method not allowed', 405);
 
@@ -64,25 +120,26 @@ export default async function handler(req) {
 
     const quoteVersion = data.version;
 
+    // ── Load booking (needed for Stripe + customer email) ───────────────────
+
+    const { data: booking, error: bookingErr } = await supabase
+      .from('bookings')
+      .select(
+        'id, customer_name, customer_email, full_address, ' +
+        'stripe_customer_id, stripe_invoice_id, deposit_confirmed_at'
+      )
+      .eq('id', bookingId)
+      .single();
+
+    if (bookingErr || !booking) {
+      return errorResponse('Booking not found after approval', 500);
+    }
+
     // ── Stripe: create or reuse customer + invoice ──────────────────────────
 
     let stripeError = null;
     try {
       const stripe = getStripeClient();
-
-      // Load booking to check existing Stripe objects + get customer info
-      const { data: booking, error: bookingErr } = await supabase
-        .from('bookings')
-        .select(
-          'id, customer_name, customer_email, full_address, ' +
-          'stripe_customer_id, stripe_invoice_id, deposit_confirmed_at'
-        )
-        .eq('id', bookingId)
-        .single();
-
-      if (bookingErr || !booking) {
-        throw new Error('Booking not found after approval');
-      }
 
       // If a new version but deposit already paid, block invoice replacement
       if (quoteVersion > 1 && booking.deposit_confirmed_at) {
@@ -175,6 +232,16 @@ export default async function handler(req) {
         })
         .eq('id', bookingId);
 
+      const siteUrl = process.env.URL || '';
+      const quoteUrl = `${siteUrl}/quote/${rawToken}`;
+      sendQuoteEmail({
+        customerName: booking.customer_name,
+        customerEmail: booking.customer_email,
+        fullAddress: booking.full_address,
+        approvedPrice,
+        quoteUrl,
+      });
+
       return jsonResponse({
         ...data,
         quoteToken: rawToken, // only returned once — admin sends this to customer
@@ -191,7 +258,17 @@ export default async function handler(req) {
     }
 
     // Quote approval in DB succeeded even if Stripe failed.
-    // Return the token so admin can share the link; reconcile Stripe later.
+    // Still send the customer their quote link.
+    const siteUrl = process.env.URL || '';
+    const quoteUrl = `${siteUrl}/quote/${rawToken}`;
+    sendQuoteEmail({
+      customerName: booking.customer_name,
+      customerEmail: booking.customer_email,
+      fullAddress: booking.full_address,
+      approvedPrice,
+      quoteUrl,
+    });
+
     return jsonResponse({
       ...data,
       quoteToken: rawToken,
