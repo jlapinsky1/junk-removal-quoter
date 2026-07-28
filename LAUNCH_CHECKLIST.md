@@ -13,6 +13,8 @@
 | `RESEND_FROM_EMAIL` | Verified sender address (e.g. `jobs@yourdomain.com`) |
 | `STRIPE_SECRET_KEY` | Stripe secret key — **never** use a live key locally or in CI |
 | `STRIPE_WEBHOOK_SECRET` | `whsec_...` from `stripe listen` output |
+| `SHOP_LAT` | Latitude of shop / home base (enables real travel time via geocoding) |
+| `SHOP_LNG` | Longitude of shop / home base (enables real travel time via geocoding) |
 | `TURNSTILE_SECRET_KEY` | Cloudflare Turnstile server secret (optional) |
 | `NODE_ENV` | Set to `test` only in test environments — never in production |
 | `ENABLE_TEST_ENDPOINTS` | Set to `true` only in test environments — never in production |
@@ -44,6 +46,9 @@ Run all migrations in `supabase/migrations/` in order against the production dat
 | `009_stripe_payment.sql` | Stripe columns on `bookings`; `slot_reservations.expires_at`; `payment_access_tokens`; `processed_stripe_events`; `booking_completions`; `booking_photos.kind`; updated audit event types; `initiate_payment_atomic`, `confirm_deposit_atomic`, `cleanup_expired_slot_reservations` |
 | `010_fix_approve_quote_atomic.sql` | Recreates `approve_quote_atomic` with `p_decision_context JSONB DEFAULT NULL`; stores it on `quote_snapshots` |
 | `011_fix_sessions_booking_fk.sql` | Changes `fk_sessions_booking` to `ON DELETE SET NULL` to allow booking deletion without FK violation |
+| `012_support_notes.sql` | `support_notes` table; RLS via `is_admin()` |
+| `013_dispatch.sql` | `dispatch_tokens`, `dispatch_events` tables for crew dispatch interface |
+| `014_distance_fields.sql` | `distance_miles`, `travel_minutes_one_way` columns on `bookings` |
 
 Migration 001 creates:
 - 11 tables: `admin_users`, `rate_limits`, `upload_sessions`, `session_photos`, `bookings`, `booking_photos`, `quote_snapshots`, `quote_tokens`, `slot_reservations`, `quote_acceptances`, `audit_log`
@@ -241,7 +246,7 @@ The Python regression suite tests API contracts and database persistence. These 
 Before running the Python regression suite against staging:
 
 1. Create a staging Supabase project (never use production)
-2. Run all migrations (001–011) against staging
+2. Run all migrations (001–014) against staging
 3. Create test admin and client users in Supabase Auth
 4. Insert admin user into `admin_users` table
 5. Ensure admin user has a `commercial_clients` row for portal tests

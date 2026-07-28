@@ -51,6 +51,8 @@ STRIPE_WEBHOOK_SECRET=whsec_...
 VITE_SUPABASE_URL=
 VITE_SUPABASE_ANON_KEY=
 VITE_STRIPE_PUBLISHABLE_KEY=pk_test_...
+SHOP_LAT=                    # shop/home-base latitude — enables real travel time
+SHOP_LNG=                    # shop/home-base longitude — enables real travel time
 VITE_GOOGLE_MAPS_API_KEY=   # optional
 TURNSTILE_SECRET_KEY=        # optional
 VITE_TURNSTILE_SITE_KEY=    # optional
@@ -198,6 +200,7 @@ Returns 404 (not 403) when disabled — does not reveal its existence. Secret co
 | `/api/residential-completion-pdf` | GET | payment token or admin JWT | Completion report PDF (pdfkit, clean text-only summary) |
 | `/api/reconcile-stripe` | POST | admin JWT | Re-link or repair Stripe ↔ Supabase state |
 | `/api/admin-payment-action` | POST | admin JWT | Refresh status, resend final link, reconcile |
+| `/api/geocode-booking` | POST | none | Geocode customer address via Nominatim; compute Haversine travel time from shop origin; store on booking |
 | `/api/accept-quote` | POST | quote token | Legacy slot reservation (pre-payment flow) |
 | `/api/admin/service-area` | GET + PUT | admin JWT | Read/write service area ZIP config |
 | `/api/signup` | POST | none | Portal account signup |
@@ -205,6 +208,16 @@ Returns 404 (not 403) when disabled — does not reveal its existence. Secret co
 | `/api/notify-expansion` | POST | none | Out-of-zone expansion lead capture |
 | `/api/completion-packet` | GET | client JWT | Completion PDF for commercial clients |
 | `/api/analyze-photos` | POST | admin JWT | Claude AI photo analysis |
+| `/api/get-admin-completed-bookings` | GET | admin JWT | Paginated, server-side search of completed bookings |
+| `/api/get-admin-completion-detail` | GET | admin JWT | Full completion detail for a single booking (support view) |
+| `/api/admin-support-note` | POST | admin JWT | Add a timestamped internal support note |
+| `/api/dispatch-job` | POST | dispatch token | Mark job in_progress (requires deposit confirmed) |
+| `/api/dispatch-complete` | POST | dispatch token | Submit job completion package from dispatch interface |
+| `/api/dispatch-status` | GET | dispatch token | Get current job status for dispatch |
+| `/api/dispatch-photo` | POST | dispatch token | Upload a completion photo from dispatch |
+| `/api/dispatch-photo-upload-url` | POST | dispatch token | Get signed URL for dispatch photo upload |
+| `/api/dispatch-report-issue` | POST | dispatch token | Report a job issue from dispatch |
+| `/api/dispatch-jobs-today` | GET | dispatch token | List today's jobs for dispatch |
 | `/api/test/lookup` | GET + DELETE | X-Test-Secret | Test-only record lookup (disabled in prod) |
 
 ---
@@ -256,6 +269,9 @@ The commercial portal is a separate authenticated experience for recurring busin
 | `009_stripe_payment.sql` | Stripe columns on `bookings`, `slot_reservations.expires_at`, `payment_access_tokens`, `processed_stripe_events`, `booking_completions`, `booking_photos.kind`; updated audit event types; `initiate_payment_atomic`, `confirm_deposit_atomic`, `cleanup_expired_slot_reservations` RPCs |
 | `010_fix_approve_quote_atomic.sql` | Recreates `approve_quote_atomic` with `p_decision_context JSONB DEFAULT NULL` parameter and stores it on `quote_snapshots` |
 | `011_fix_sessions_booking_fk.sql` | Changes `fk_sessions_booking` FK (`upload_sessions.consumed_by_booking → bookings`) to `ON DELETE SET NULL` to allow booking deletion without FK violation |
+| `012_support_notes.sql` | `support_notes` table for admin-only timestamped notes on completed bookings; RLS via `is_admin()` |
+| `013_dispatch.sql` | Dispatch interface tables and auth: `dispatch_tokens`, `dispatch_events`; status transitions for `in_progress` enforcement |
+| `014_distance_fields.sql` | Adds `distance_miles` and `travel_minutes_one_way` columns to `bookings`; populated by `geocode-booking` function |
 
 ---
 

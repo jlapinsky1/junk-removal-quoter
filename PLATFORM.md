@@ -118,6 +118,46 @@ bookings (new columns)
 
 All tables have RLS policies restricting access to admin users.
 
+### Migration 012: Support Notes
+
+```
+support_notes
+├── booking_id   UUID → bookings
+├── admin_id     UUID → auth.users
+├── body         TEXT
+└── created_at   TIMESTAMPTZ
+```
+
+Admin-only timestamped notes attached to completed bookings. Used by the Completed tab support view.
+
+### Migration 013: Dispatch
+
+Adds dispatch authentication and event tracking for the crew-facing Dispatch interface.
+
+```
+dispatch_tokens
+├── booking_id    UUID → bookings
+├── token_hash    TEXT UNIQUE
+├── expires_at    TIMESTAMPTZ
+└── revoked_at    TIMESTAMPTZ
+
+dispatch_events
+├── booking_id    UUID → bookings
+├── event_type    TEXT
+├── payload       JSONB
+└── created_at    TIMESTAMPTZ
+```
+
+### Migration 014: Distance Fields
+
+```
+bookings (new columns)
+├── distance_miles           NUMERIC(8,1)   — straight-line miles, set by geocode-booking
+└── travel_minutes_one_way   INTEGER        — estimated one-way travel time
+```
+
+Populated by the `geocode-booking` Netlify function. Used by `estimateBuilder.js` to display accurate travel time in the admin quote panel instead of the hardcoded 60-minute default.
+
 ---
 
 ## Phase 1: Goal Tracking & Pace Dashboard
@@ -489,6 +529,152 @@ This accounts for the real cost of extra dump trips. Two nearby jobs that fill t
 
 ---
 
+## Geocoding & Travel Time
+
+Customer addresses are geocoded via **Nominatim** (free, no API key required) after booking submission. Travel time is estimated from the shop's home base using the Haversine formula with a 1.3× road-distance multiplier at 30 mph average speed.
+
+### Configuration
+
+Set two environment variables in Netlify:
+
+| Variable | Example | Purpose |
+|---|---|---|
+| `SHOP_LAT` | `34.1234` | Shop latitude |
+| `SHOP_LNG` | `-83.5678` | Shop longitude |
+
+### Flow
+
+1. Customer submits booking → `create-booking.js` fires `POST /api/geocode-booking` (non-blocking)
+2. `geocode-booking.js` calls Nominatim with the `full_address`, computes Haversine distance, stores `distance_miles` + `travel_minutes_one_way` on the booking row
+3. If the booking is opened in the admin panel before geocoding completes, `RequestDetail` re-triggers geocoding on mount and updates the estimate in real-time
+4. `estimateBuilder.js` uses `booking.travelMinutes` if set; falls back to 30 min
+
+### Risk Flags & Travel
+
+- No risk flag is generated for travel time unless it exceeds 90 minutes
+- The "no distance data" entry is non-financial and suppressed while geocoding is in progress
+- Once geocoded, the actual travel time drives the fuel cost and travel efficiency scoring in the decision engine
+
+---
+
+## Squatterz Dispatch Interface
+
+The Dispatch interface is a separate crew-facing view (`/dispatch`) giving field technicians a streamlined mobile-first experience for managing job status without access to the full admin panel.
+
+### Authentication
+
+Dispatch uses token-based auth (separate from admin JWT). Each token is tied to a booking or daily job list, hashed and stored in `dispatch_tokens`. Tokens expire and can be revoked.
+
+### Job Lifecycle via Dispatch
+
+```
+in admin: scheduled → admin dispatches → dispatch token issued
+                                              │
+                                    ┌─────────┴──────────┐
+                                    │  Dispatch Interface  │
+                                    │  View job details    │
+                                    │  Mark in_progress   │  (requires deposit_confirmed_at)
+                                    │  Upload after photos │
+                                    │  Submit completion  │
+                                    │  Report issues       │
+                                    └─────────┬────────────┘
+                                              │
+                              booking status → completed
+```
+
+### Dispatch Enforcement
+
+- `in_progress` transition requires `deposit_confirmed_at IS NOT NULL`
+- Job completion from dispatch goes through the same `runCompleteJob()` core as admin completion — fully idempotent
+- All dispatch events are logged to `dispatch_events` for audit
+
+### Key Files
+
+| File | Purpose |
+|---|---|
+| `netlify/functions/dispatch-job.js` | Mark job in_progress |
+| `netlify/functions/dispatch-complete.js` | Submit completion package |
+| `netlify/functions/dispatch-status.js` | Current job status |
+| `netlify/functions/dispatch-photo.js` | Upload after photo |
+| `netlify/functions/dispatch-photo-upload-url.js` | Signed URL for photo upload |
+| `netlify/functions/dispatch-report-issue.js` | Report job issue |
+| `netlify/functions/dispatch-jobs-today.js` | Today's job list |
+| `netlify/functions/_shared/completeJobCore.js` | Shared resumable completion logic |
+
+---
+
+## Completed Bookings — Admin Support View
+
+Completed bookings route to a dedicated support-focused view rather than the standard request detail. This gives the admin a customer case file instead of the quote workflow.
+
+### Component Tree (`src/components/admin/completed/`)
+
+| Component | Purpose |
+|---|---|
+| `CompletedTab.jsx` | Server-side paginated list with debounced search |
+| `CompletedJobCard.jsx` | Card with paid/balance-due badge |
+| `CompletedDetail.jsx` | Orchestrates all sub-panels |
+| `CustomerSupportHeader.jsx` | Contact info + quick actions |
+| `PaymentSummaryPanel.jsx` | Live Stripe data via `/api/payment-summary` |
+| `CompletionPackagePanel.jsx` | Before/after photos + completion notes |
+| `PhotoGallery.jsx` | Side-by-side with lightbox |
+| `SupportTimeline.jsx` | Audit log rendered as milestone timeline |
+| `SupportNotesPanel.jsx` | Admin-only timestamped notes (migration 012) |
+
+### Routing
+
+In `RequestQueue.jsx`: if `selected.status === 'completed'` → `CompletedDetail`; if `filter === 'completed'` → `CompletedTab`. All other statuses use the original `RequestDetail`.
+
+### Payment Quick Actions (from admin)
+
+1. **Copy Customer Link** — `generate_customer_link` action → copies `/invoice/{token}/final`
+2. **Resend Customer Link** — `resend_final_link` action (sends email via Resend)
+3. **Stripe Dashboard** — admin link to `dashboard.stripe.com` (never shared with customer)
+4. **Download Invoice PDF** — `invoicePdfUrl` from Stripe DTO
+5. **Download Completion Report** — `/api/residential-completion-pdf?bookingId=`
+
+---
+
+## Customer Submission Confirmation Email
+
+When a booking is created, `create-booking.js` sends a Resend confirmation email to the customer (if `customer_email` is provided). The email includes:
+
+- A confirmation code matching the admin view (`#XXXXXXXX`)
+- A "real person is reviewing your request" message
+- Shop phone number for questions
+- Non-blocking: email failure never prevents booking creation
+
+The submission success screen (`BookingFlow.jsx`) also shows these three points inline:
+1. A confirmation email is on its way
+2. Your booking number is below for reference
+3. Most customers hear back within a few hours
+
+---
+
+## Admin Booking Detail — snake_case Normalization
+
+Supabase returns all columns in snake_case. The admin UI and all utility functions (`estimateBuilder`, `riskFlags`, `decisionEngine`) expect camelCase. `supabaseRepo.js` includes a `normalizeBooking()` function applied to every row returned by `getBookings()` and `getBookingById()`.
+
+Key mappings:
+
+| DB column | JS field |
+|---|---|
+| `customer_name` | `customerName` |
+| `full_address` | `fullAddress` |
+| `photo_count` | `photoCount` |
+| `detected_items` | `detectedItems` |
+| `ai_detected_items` | `aiDetectedItems` |
+| `access_type` | `accessType` |
+| `created_at` | `createdAt` |
+| `approved_quote` | `approvedQuote` |
+| `available_slots` | `availableSlots` |
+| `distance_miles` | `distanceMiles` |
+| `travel_minutes_one_way` | `travelMinutes` |
+
+Booking photos are not on the booking row — they are fetched lazily from `booking_photos` via `getPhotoUrls()` when the admin expands the photo accordion.
+
+---
+
 ## How It All Connects
 
 ### Job Lifecycle Through the Platform
@@ -799,6 +985,9 @@ booking_photos (new column)
 |---|---|
 | `010_fix_approve_quote_atomic.sql` | Recreates `approve_quote_atomic` RPC with the `p_decision_context JSONB DEFAULT NULL` parameter that was missing from the original migration. Stores decision context on `quote_snapshots`. |
 | `011_fix_sessions_booking_fk.sql` | Changes `fk_sessions_booking` (`upload_sessions.consumed_by_booking → bookings`) from `ON DELETE RESTRICT` to `ON DELETE SET NULL`. This allows bookings to be deleted from the admin panel without a FK violation from the circular reference (`bookings.upload_session_id → upload_sessions`). |
+| `012_support_notes.sql` | `support_notes` table with `is_admin()` RLS policy. Powers the admin support note panel in the Completed booking view. |
+| `013_dispatch.sql` | Dispatch authentication (`dispatch_tokens`) and event log (`dispatch_events`). Required for the Squatterz Dispatch crew interface. |
+| `014_distance_fields.sql` | Adds `distance_miles` and `travel_minutes_one_way` to `bookings`. Populated by the `geocode-booking` Netlify function via Nominatim geocoding. |
 
 ### Completion PDF
 
