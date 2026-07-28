@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import CompletedTab from '../components/admin/completed/CompletedTab';
+import CompletedDetail from '../components/admin/completed/CompletedDetail';
 import { STATUS_LABELS, STATUS_COLORS } from '../utils/bookings';
 import { getSettings } from '../utils/storage';
 import { buildEstimate } from '../utils/estimateBuilder';
@@ -45,8 +47,17 @@ export default function RequestQueue() {
 
   const filtered = filter === 'all' ? bookings : bookings.filter(b => b.status === filter);
 
+  // Route completed bookings to the dedicated support view
   if (selected) {
+    if (selected.status === 'completed') {
+      return <CompletedDetail bookingId={selected.id} onBack={() => { setSelected(null); refresh(); }} />;
+    }
     return <RequestDetail booking={selected} onBack={() => { setSelected(null); refresh(); }} />;
+  }
+
+  // Completed filter gets the full-featured support tab
+  if (filter === 'completed') {
+    return <CompletedTab onBack={() => setFilter('all')} />;
   }
 
   const pendingCount = bookings.filter(b => b.status === 'pending_review').length;

@@ -364,6 +364,51 @@ const supabaseRepo = {
     if (error) throw error;
   },
 
+  // ── Completed bookings (admin, server-side search) ──
+  async searchCompletedBookings({ search = '', dateFrom = '', dateTo = '', paymentStatus = '', page = 1 } = {}) {
+    const params = new URLSearchParams();
+    if (search) params.set('search', search);
+    if (dateFrom) params.set('dateFrom', dateFrom);
+    if (dateTo) params.set('dateTo', dateTo);
+    if (paymentStatus) params.set('paymentStatus', paymentStatus);
+    params.set('page', String(page));
+    return adminFetch(`/api/get-admin-completed-bookings?${params.toString()}`);
+  },
+
+  async getCompletionDetail(bookingId) {
+    return adminFetch(`/api/get-admin-completion-detail?bookingId=${encodeURIComponent(bookingId)}`);
+  },
+
+  // ── Support notes ──
+  async getSupportNotes(bookingId) {
+    const { data, error } = await supabase
+      .from('support_notes')
+      .select('id, note_text, admin_email, created_at')
+      .eq('booking_id', bookingId)
+      .order('created_at', { ascending: true });
+    if (error) throw error;
+    return data || [];
+  },
+
+  async addSupportNote(bookingId, noteText) {
+    return adminFetch('/api/admin-support-note', {
+      method: 'POST',
+      body: JSON.stringify({ bookingId, noteText }),
+    });
+  },
+
+  // ── Payment actions (admin) ──
+  async adminPaymentAction(bookingId, action) {
+    return adminFetch('/api/admin-payment-action', {
+      method: 'POST',
+      body: JSON.stringify({ bookingId, action }),
+    });
+  },
+
+  async getPaymentSummary(bookingId) {
+    return adminFetch(`/api/payment-summary?bookingId=${encodeURIComponent(bookingId)}`);
+  },
+
   // ── Audit (admin reads) ──
   async getAuditLog(bookingId) {
     let query = supabase

@@ -126,6 +126,47 @@ const local = {
   async upsertLocationCache() {},
   async getTravelCache() { return null; },
   async upsertTravelCache() {},
+
+  // ── Completed bookings & support (stubs for local — requires Supabase) ──
+  async searchCompletedBookings() {
+    const all = _getBookings().filter(b => b.status === 'completed');
+    return { data: all, total: all.length, page: 1, perPage: 25, totalPages: 1 };
+  },
+  async getCompletionDetail(bookingId) {
+    const booking = _getBookingById(bookingId);
+    if (!booking) throw new Error('Booking not found');
+    return {
+      booking: {
+        id: booking.id,
+        bookingRef: `RES-${booking.id.slice(0, 8).toUpperCase()}`,
+        status: booking.status,
+        customerName: booking.customerName || null,
+        customerPhone: booking.customerPhone || null,
+        customerEmail: booking.customerEmail || null,
+        fullAddress: booking.fullAddress || null,
+        approvedQuote: booking.approvedQuote || null,
+        completedAt: booking.completedAt || null,
+        depositConfirmedAt: null,
+        financiallyCompletedAt: null,
+        stripeCustomerId: null,
+        stripeInvoiceId: null,
+        stripeFinalPaymentIntentId: null,
+        internalEstimate: booking.estimate || null,
+        actuals: booking.actuals || null,
+        createdAt: booking.createdAt || null,
+      },
+      completion: null,
+      photos: { before: [], after: [] },
+      timeline: [],
+      supportNotes: [],
+    };
+  },
+  async getSupportNotes() { return []; },
+  async addSupportNote(bookingId, noteText) {
+    return { note: { id: crypto.randomUUID(), noteText, adminEmail: 'local@dev', createdAt: new Date().toISOString() } };
+  },
+  async adminPaymentAction() { throw new Error('Payment actions require Supabase'); },
+  async getPaymentSummary() { throw new Error('Payment summary requires Supabase'); },
 };
 
 export default local;

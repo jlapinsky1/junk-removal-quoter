@@ -27,6 +27,9 @@ export default async function handler(req) {
       case 'reconcile':
         return await handleReconcile(supabase, bookingId, admin, req);
 
+      case 'generate_customer_link':
+        return await handleGenerateCustomerLink(supabase, bookingId, admin);
+
       default:
         return errorResponse(`Unknown action: ${action}`);
     }
@@ -254,6 +257,61 @@ async function handleReconcile(supabase, bookingId, admin, req) {
   }
 
   return jsonResponse({ mismatches, actions });
+}
+
+// ── generate_customer_link ─────────────────────────────────────────────────
+// Issues a new payment_access_token and returns the customer URL without
+// sending an email. Used by admins to copy the link to clipboard.
+
+async function handleGenerateCustomerLink(supabase, bookingId, admin) {
+  const { data: booking, error: bookingErr } = await supabase
+    .from('bookings')
+    .select('id, stripe_final_payment_intent_id, financially_completed_at')
+    .eq('id', bookingId)
+    .single();
+
+  if (bookingErr || !booking) return errorResponse('Booking not found', 404);
+
+  if (!booking.stripe_final_payment_intent_id) {
+    return errorResponse(
+      'No final payment has been requested yet. Complete the job first.',
+      400
+    );
+  }
+
+  // Revoke existing tokens
+  await supabase
+    .from('payment_access_tokens')
+    .update({ revoked_at: new Date().toISOString() })
+    .eq('booking_id', bookingId)
+    .eq('purpose', 'final_payment')
+    .is('revoked_at', null);
+
+  const rawToken = generateToken();
+  const tokenHash = await sha256(rawToken);
+  const tokenExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
+  const { error: insertErr } = await supabase.from('payment_access_tokens').insert({
+    booking_id: bookingId,
+    token_hash: tokenHash,
+    purpose: 'final_payment',
+    expires_at: tokenExpiry,
+  });
+
+  if (insertErr) {
+    console.error('Failed to insert payment_access_token:', insertErr);
+    return errorResponse('Failed to generate customer link', 500);
+  }
+
+  await supabase.from('audit_log').insert({
+    booking_id: bookingId,
+    event_type: 'token_revoked',
+    admin_id: admin.id,
+    metadata: { action: 'generate_customer_link' },
+  });
+
+  const baseUrl = process.env.URL || 'https://squatterz.com';
+  return jsonResponse({ customerUrl: `${baseUrl}/invoice/${rawToken}/final` });
 }
 
 // ── Email helper ───────────────────────────────────────────────────────────
