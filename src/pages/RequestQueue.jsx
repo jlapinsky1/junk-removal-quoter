@@ -138,6 +138,8 @@ function RequestDetail({ booking, onBack }) {
   const [internalNotes, setInternalNotes] = useState(booking.internalNotes || '');
   const [lastQuoteToken, setLastQuoteToken] = useState(null);
   const [showPhotos, setShowPhotos] = useState(false);
+  const [photoUrls, setPhotoUrls] = useState(null);
+  const [photosLoading, setPhotosLoading] = useState(false);
   const [showBreakdown, setShowBreakdown] = useState(false);
   const [overrideReason, setOverrideReason] = useState('');
   const [blockerOverrides, setBlockerOverrides] = useState({});
@@ -221,6 +223,24 @@ function RequestDetail({ booking, onBack }) {
       loadPaymentSummary();
     }
   }, []);
+
+  // Lazy-load photos when the accordion is opened
+  useEffect(() => {
+    if (!showPhotos || photoUrls !== null) return;
+    (async () => {
+      setPhotosLoading(true);
+      try {
+        const repo = await getRepo();
+        const urls = await repo.getPhotoUrls(data.id);
+        setPhotoUrls(urls);
+      } catch (e) {
+        console.error('Failed to load photos:', e);
+        setPhotoUrls([]);
+      } finally {
+        setPhotosLoading(false);
+      }
+    })();
+  }, [showPhotos]);
 
   // Evaluate decision
   const decision = estimate ? evaluateDecision({
@@ -709,11 +729,17 @@ function RequestDetail({ booking, onBack }) {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
           </svg>
         </button>
-        {showPhotos && data.photos && (
-          <div className="grid grid-cols-2 gap-2 mt-3">
-            {data.photos.map((photo, i) => (
-              <img key={i} src={photo} alt={`Photo ${i + 1}`} className="w-full rounded-lg" />
-            ))}
+        {showPhotos && (
+          <div className="mt-3">
+            {photosLoading && <p className="text-sm text-gray-400">Loading photos…</p>}
+            {!photosLoading && photoUrls?.length === 0 && <p className="text-sm text-gray-400">No photos found.</p>}
+            {!photosLoading && photoUrls?.length > 0 && (
+              <div className="grid grid-cols-2 gap-2">
+                {photoUrls.map((photo, i) => (
+                  <img key={i} src={photo.url} alt={`Photo ${i + 1}`} className="w-full rounded-lg" />
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -7,6 +7,62 @@
 
 import { supabase } from '../supabaseClient';
 
+/**
+ * Converts a raw Supabase booking row (snake_case) to the camelCase shape
+ * expected by the admin UI and utility functions (estimateBuilder, riskFlags, etc.).
+ */
+function normalizeBooking(row) {
+  if (!row) return row;
+  return {
+    // Pass-through fields that are already fine (id, status, address, city, state, zip, quantity, stairs, elevator, description, actuals)
+    ...row,
+    // Customer
+    customerName: row.customer_name,
+    customerPhone: row.customer_phone,
+    customerEmail: row.customer_email,
+    // Address
+    fullAddress: row.full_address,
+    // Request details
+    accessType: row.access_type,
+    detectedItems: row.detected_items ?? [],
+    aiDetectedItems: row.ai_detected_items ?? [],
+    photoCount: row.photo_count ?? 0,
+    // Scheduling
+    preferredDate: row.preferred_date,
+    secondChoiceDate: row.second_choice_date,
+    timePreference: row.time_preference,
+    // Quote lifecycle
+    quoteVersion: row.quote_version,
+    approvedQuote: row.approved_quote,
+    quoteExpiresAt: row.quote_expires_at,
+    approvedAt: row.approved_at,
+    quoteTokenHash: row.quote_token_hash,
+    availableSlots: row.available_slots ?? [],
+    // Acceptance
+    acceptedAt: row.accepted_at,
+    scheduledPickup: row.scheduled_pickup,
+    // Internal
+    internalNotes: row.internal_notes ?? '',
+    internalEstimate: row.internal_estimate,
+    riskFlags: row.risk_flags,
+    jobRating: row.job_rating,
+    blockerOverrides: row.blocker_overrides ?? {},
+    // Stripe
+    stripeCustomerId: row.stripe_customer_id,
+    stripeInvoiceId: row.stripe_invoice_id,
+    depositConfirmedAt: row.deposit_confirmed_at,
+    // Completion
+    completedAt: row.completed_at,
+    // Timestamps
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    // Misc
+    idempotencyKey: row.idempotency_key,
+    uploadSessionId: row.upload_session_id,
+    testRunId: row.test_run_id,
+  };
+}
+
 async function adminFetch(path, options = {}) {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error('Not authenticated');
@@ -59,7 +115,7 @@ const supabaseRepo = {
       .select('*')
       .order('created_at', { ascending: false });
     if (error) throw error;
-    return data;
+    return (data || []).map(normalizeBooking);
   },
 
   async getBookingById(id) {
@@ -69,7 +125,7 @@ const supabaseRepo = {
       .eq('id', id)
       .single();
     if (error) throw error;
-    return data;
+    return normalizeBooking(data);
   },
 
   async getSnapshotsForBooking(bookingId) {

@@ -160,8 +160,8 @@ export function buildEstimate(booking, settingsOverride) {
   const hasDistanceData = false;
   missingInputs.push({
     field: 'distance',
-    message: 'No distance data — travel cost estimated at default. Enter distances in the quote form for accuracy.',
-    financial: true,
+    message: 'No distance data — travel cost estimated at default.',
+    financial: false,
   });
 
   const estimatedTravelMinutes = 60; // Default assumption: 30 min each way
