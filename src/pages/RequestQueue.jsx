@@ -1197,25 +1197,83 @@ function RequestDetail({ booking, onBack }) {
       </div>
 
       {/* ── Customer quote link ── */}
-      {data.status === 'quote_sent' && lastQuoteToken && (
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-          <div className="text-sm font-medium text-blue-800 mb-1">Customer quote link:</div>
-          <div className="text-xs text-blue-600 break-all font-mono bg-white rounded p-2">
-            {window.location.origin}/quote/{lastQuoteToken}
+      {(data.status === 'quote_sent' || data.status === 'awaiting_deposit') && (
+        <QuoteLinkPanel
+          booking={data}
+          lastQuoteToken={lastQuoteToken}
+          onNewToken={token => setLastQuoteToken(token)}
+          getAdminToken={getAdminToken}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Quote link panel (resend / copy) ────────────────────────
+
+function QuoteLinkPanel({ booking, lastQuoteToken, onNewToken, getAdminToken }) {
+  const [sending, setSending] = React.useState(false);
+  const [sent, setSent] = React.useState(false);
+  const [error, setError] = React.useState(null);
+  const [freshToken, setFreshToken] = React.useState(lastQuoteToken);
+
+  const quoteUrl = freshToken ? `${window.location.origin}/quote/${freshToken}` : null;
+
+  async function handleResend() {
+    setSending(true);
+    setError(null);
+    setSent(false);
+    try {
+      const token = await getAdminToken();
+      const res = await fetch('/api/resend-quote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ bookingId: booking.id }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Resend failed');
+      setFreshToken(json.quoteToken);
+      onNewToken(json.quoteToken);
+      setSent(true);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-3">
+      <div className="text-sm font-semibold text-blue-800">Customer Quote Link</div>
+
+      {quoteUrl ? (
+        <>
+          <div className="text-xs text-blue-600 break-all font-mono bg-white rounded p-2 border border-blue-100">
+            {quoteUrl}
           </div>
           <button
-            onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/quote/${lastQuoteToken}`); alert('Link copied!'); }}
-            className="mt-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium w-full"
+            onClick={() => { navigator.clipboard.writeText(quoteUrl); }}
+            className="w-full bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium"
           >
             Copy Link
           </button>
-        </div>
+        </>
+      ) : (
+        <p className="text-xs text-blue-700">
+          The original link is no longer available in this session. Use the button below to generate a fresh link and resend the email.
+        </p>
       )}
-      {data.status === 'quote_sent' && !lastQuoteToken && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-sm text-yellow-800">
-          Quote link was shown at approval. Re-approve to generate a new link.
-        </div>
-      )}
+
+      <button
+        onClick={handleResend}
+        disabled={sending}
+        className="w-full bg-white border border-blue-300 text-blue-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-50 disabled:opacity-50"
+      >
+        {sending ? 'Sending…' : 'Resend Quote Email to Customer'}
+      </button>
+
+      {sent && <p className="text-xs text-green-700 font-medium">Email sent — new link generated above.</p>}
+      {error && <p className="text-xs text-red-600">{error}</p>}
     </div>
   );
 }
