@@ -793,6 +793,38 @@ booking_photos (new column)
 └── kind  TEXT CHECK ('before' | 'after')   default 'before'
 ```
 
+### Additional Migrations (Post-009)
+
+| Migration | Purpose |
+|---|---|
+| `010_fix_approve_quote_atomic.sql` | Recreates `approve_quote_atomic` RPC with the `p_decision_context JSONB DEFAULT NULL` parameter that was missing from the original migration. Stores decision context on `quote_snapshots`. |
+| `011_fix_sessions_booking_fk.sql` | Changes `fk_sessions_booking` (`upload_sessions.consumed_by_booking → bookings`) from `ON DELETE RESTRICT` to `ON DELETE SET NULL`. This allows bookings to be deleted from the admin panel without a FK violation from the circular reference (`bookings.upload_session_id → upload_sessions`). |
+
+### Completion PDF
+
+The completion PDF (`residential-completion-pdf.js`) is a clean text-only document generated with pdfkit. It contains:
+
+- Header with booking reference (`RES-{8-char ID}`) and Squatterz branding
+- Details grid: service address, completion date, crew/technician, booking reference
+- Work summary: items removed, volume estimate, completion notes, disposal notes
+- Invoice summary: approved quote, deposit paid, balance remaining/paid (final total shown if it differs from quote)
+- Footer with generation date
+
+Photos are intentionally excluded from the PDF — they are displayed on the live `/invoice/:token/final` web page via signed URLs. Embedding photos in pdfkit with absolute `y` positioning caused overflow into multiple blank pages.
+
+### Bugs Fixed During E2E Testing
+
+These bugs were discovered and fixed during end-to-end sandbox testing:
+
+| Bug | Root Cause | Fix |
+|---|---|---|
+| `approve_quote_atomic` function not found | Original migration 001 RPC missing `p_decision_context` parameter | Migration 010 recreates the function |
+| Booking delete blocked by FK violation | `fk_sessions_booking` was `ON DELETE RESTRICT` on circular reference | Migration 011 changes to `ON DELETE SET NULL` |
+| `stripe-webhook.js: .catch is not a function` | Supabase JS v2 query builder is thenable but not a full Promise — `.catch()` is not defined on it | Changed all `.catch()` chains to `try/catch` blocks |
+| Photo upload returns 401 | `getAdminToken()` in `RequestQueue.jsx` called `repo.getSession()` which returns the user object, not the session. `session?.access_token` was always `undefined` | Changed to `supabase.auth.getSession()` which returns `{ data: { session } }` with a real `access_token` |
+| "Price adjustment required" on matching amounts | `approvedCents` was computed as `data.approvedQuote ? Math.round(...) : 0` — if `approvedQuote` was falsy, any non-zero final amount would differ from 0 | Guard check only runs when `data.approvedQuote` is truthy |
+| Completion PDF generating 8+ blank pages | `doc.image()` with absolute `y` coordinates pushed past the page boundary; pdfkit auto-added overflow pages | Removed photo embedding entirely; PDF is now text-only |
+
 ### Key Files
 
 | File | Purpose |
@@ -805,7 +837,7 @@ booking_photos (new column)
 | `netlify/functions/get-completion-photo-url.js` | Admin: signed upload URL for after-job photos |
 | `netlify/functions/complete-job.js` | Saves completion package + creates final PI + sends single customer email |
 | `netlify/functions/get-final-job-page.js` | Customer final page: completion data, signed photo URLs, final PI secret |
-| `netlify/functions/residential-completion-pdf.js` | Completion PDF (pdfkit, dark theme, embedded photos via signed URLs) |
+| `netlify/functions/residential-completion-pdf.js` | Completion PDF (pdfkit, clean text-only layout: header, job details, work summary, invoice breakdown) |
 | `netlify/functions/reconcile-stripe.js` | Admin: re-link Stripe → Supabase on partial failure |
 | `netlify/functions/admin-payment-action.js` | Admin: refresh, resend final link, reconcile |
 | `src/pages/ApprovedQuote.jsx` | Customer quote page with Stripe Payment Element (deposit) |

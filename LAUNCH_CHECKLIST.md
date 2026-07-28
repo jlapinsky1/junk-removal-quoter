@@ -42,6 +42,8 @@ Run all migrations in `supabase/migrations/` in order against the production dat
 | `007_service_area_admin.sql` | Admin service area config schema |
 | `008_expansion_leads_and_test_run_id.sql` | `expansion_leads` table; `test_run_id` column on `bookings` |
 | `009_stripe_payment.sql` | Stripe columns on `bookings`; `slot_reservations.expires_at`; `payment_access_tokens`; `processed_stripe_events`; `booking_completions`; `booking_photos.kind`; updated audit event types; `initiate_payment_atomic`, `confirm_deposit_atomic`, `cleanup_expired_slot_reservations` |
+| `010_fix_approve_quote_atomic.sql` | Recreates `approve_quote_atomic` with `p_decision_context JSONB DEFAULT NULL`; stores it on `quote_snapshots` |
+| `011_fix_sessions_booking_fk.sql` | Changes `fk_sessions_booking` to `ON DELETE SET NULL` to allow booking deletion without FK violation |
 
 Migration 001 creates:
 - 11 tables: `admin_users`, `rate_limits`, `upload_sessions`, `session_photos`, `bookings`, `booking_photos`, `quote_snapshots`, `quote_tokens`, `slot_reservations`, `quote_acceptances`, `audit_log`
@@ -102,6 +104,26 @@ INSERT INTO admin_users (user_id) VALUES ('paste-user-uuid-here');
 ```
 
 **Important:** The `admin_users` table has no INSERT policy — you must use the Supabase Dashboard SQL editor (which runs as superuser) or the service role.
+
+## Production Stripe Setup
+
+Before going live with real payments:
+
+1. **Switch to live keys** in Stripe Dashboard (toggle off "Test mode")
+2. **Add to Netlify** (Site configuration → Environment variables):
+   - `STRIPE_SECRET_KEY` = `sk_live_...`
+   - `VITE_STRIPE_PUBLISHABLE_KEY` = `pk_live_...`
+   - `STRIPE_WEBHOOK_SECRET` = (from step 3)
+3. **Create production webhook** in Stripe Dashboard → Developers → Webhooks:
+   - Endpoint URL: `https://yourdomain.com/api/stripe-webhook`
+   - Events: `invoice_payment.paid`, `invoice.paid`, `payment_intent.payment_failed`
+   - Copy the signing secret (`whsec_...`) → `STRIPE_WEBHOOK_SECRET` in Netlify
+4. **Redeploy** Netlify (env var changes require a redeploy)
+5. **Verify** with a real small test transaction before going fully live
+
+> **Note:** `STRIPE_WEBHOOK_SECRET` is different for test vs live endpoints and per-endpoint. Always copy it from the specific webhook endpoint you created.
+
+---
 
 ## Manual Smoke-Test Steps
 
@@ -197,7 +219,7 @@ The Python regression suite tests API contracts and database persistence. These 
 - [ ] Declined card `4000 0000 0000 9995` → slot stays reserved, customer can retry
 - [ ] `/invoice/:token/final` shows completion summary, before/after photos, Payment Element
 - [ ] Final payment → invoice.paid → financially_completed_at set
-- [ ] PDF download link works; PDF shows Squatterz branding + photos
+- [ ] PDF download link works; PDF shows Squatterz branding, job details, work summary, and invoice breakdown (text-only, no embedded photos)
 
 **Commercial portal:**
 - [ ] Portal login → dashboard renders correctly
@@ -219,7 +241,7 @@ The Python regression suite tests API contracts and database persistence. These 
 Before running the Python regression suite against staging:
 
 1. Create a staging Supabase project (never use production)
-2. Run all migrations (001–009) against staging
+2. Run all migrations (001–011) against staging
 3. Create test admin and client users in Supabase Auth
 4. Insert admin user into `admin_users` table
 5. Ensure admin user has a `commercial_clients` row for portal tests

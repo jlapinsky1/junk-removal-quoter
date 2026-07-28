@@ -195,7 +195,7 @@ Returns 404 (not 403) when disabled — does not reveal its existence. Secret co
 | `/api/get-completion-photo-url` | POST | admin JWT | Signed upload URL for after-job photos |
 | `/api/complete-job` | POST | admin JWT | Save completion package + trigger final payment request |
 | `/api/get-final-job-page` | GET | payment token | Customer final page: completion data + signed photo URLs + final PI secret |
-| `/api/residential-completion-pdf` | GET | payment token or admin JWT | Completion report PDF (pdfkit, dark theme) |
+| `/api/residential-completion-pdf` | GET | payment token or admin JWT | Completion report PDF (pdfkit, clean text-only summary) |
 | `/api/reconcile-stripe` | POST | admin JWT | Re-link or repair Stripe ↔ Supabase state |
 | `/api/admin-payment-action` | POST | admin JWT | Refresh status, resend final link, reconcile |
 | `/api/accept-quote` | POST | quote token | Legacy slot reservation (pre-payment flow) |
@@ -254,6 +254,8 @@ The commercial portal is a separate authenticated experience for recurring busin
 | `007_service_area_admin.sql` | Admin service area config |
 | `008_expansion_leads_and_test_run_id.sql` | `expansion_leads` table, `test_run_id` column on `bookings` |
 | `009_stripe_payment.sql` | Stripe columns on `bookings`, `slot_reservations.expires_at`, `payment_access_tokens`, `processed_stripe_events`, `booking_completions`, `booking_photos.kind`; updated audit event types; `initiate_payment_atomic`, `confirm_deposit_atomic`, `cleanup_expired_slot_reservations` RPCs |
+| `010_fix_approve_quote_atomic.sql` | Recreates `approve_quote_atomic` with `p_decision_context JSONB DEFAULT NULL` parameter and stores it on `quote_snapshots` |
+| `011_fix_sessions_booking_fk.sql` | Changes `fk_sessions_booking` FK (`upload_sessions.consumed_by_booking → bookings`) to `ON DELETE SET NULL` to allow booking deletion without FK violation |
 
 ---
 
