@@ -23,6 +23,18 @@ export async function submitAuthenticatedDraft(supabase, draft) {
 
   if (clientErr || !client) throw new Error('Commercial profile not found');
 
+  const profilePatch = {
+    company_name: draft.company,
+    contact_name: draft.name,
+    phone: draft.phone,
+    job_title: draft.jobTitle || null,
+  };
+
+  await supabase
+    .from('commercial_clients')
+    .update(profilePatch)
+    .eq('id', client.id);
+
   if (draft.idempotencyKey) {
     const { data: existingJob } = await supabase
       .from('jobs')
@@ -33,7 +45,7 @@ export async function submitAuthenticatedDraft(supabase, draft) {
     if (existingJob) {
       await supabase
         .from('commercial_clients')
-        .update({ onboarding_status: 'complete', last_onboarding_step: 3 })
+        .update({ ...profilePatch, onboarding_status: 'complete', last_onboarding_step: 3 })
         .eq('id', client.id);
 
       clearDraft();
@@ -82,7 +94,7 @@ export async function submitAuthenticatedDraft(supabase, draft) {
 
   await supabase
     .from('commercial_clients')
-    .update({ onboarding_status: 'complete', last_onboarding_step: 3 })
+    .update({ ...profilePatch, onboarding_status: 'complete', last_onboarding_step: 3 })
     .eq('id', client.id);
 
   clearDraft();

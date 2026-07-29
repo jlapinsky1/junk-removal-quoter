@@ -7,6 +7,63 @@ function sanitizeSearchTerm(value) {
   return String(value || '').trim().replace(/[%_,]/g, '');
 }
 
+async function findPropertyIdsForSearch(supabase, search) {
+  const term = `%${search}%`;
+  const propertyIds = new Set();
+
+  const { data: clients } = await supabase
+    .from('commercial_clients')
+    .select('id')
+    .or(`company_name.ilike.${term},contact_name.ilike.${term}`);
+
+  const clientIds = (clients || []).map((c) => c.id);
+  if (clientIds.length > 0) {
+    const { data: clientProps } = await supabase
+      .from('properties')
+      .select('id')
+      .in('client_id', clientIds);
+    (clientProps || []).forEach((p) => propertyIds.add(p.id));
+  }
+
+  const { data: namedProps } = await supabase
+    .from('properties')
+    .select('id')
+    .or(`name.ilike.${term},address.ilike.${term}`);
+  (namedProps || []).forEach((p) => propertyIds.add(p.id));
+
+  return [...propertyIds];
+}
+
+function formatJobRow(j, clientMap) {
+  const property = j.properties || {};
+  const client = clientMap[property.client_id] || {};
+
+  return {
+    id: j.id,
+    status: j.status,
+    unit: j.unit,
+    description: j.description,
+    preferredDate: j.preferred_date,
+    createdAt: j.created_at,
+    estimate: j.estimate,
+    depositConfirmedAt: j.deposit_confirmed_at,
+    financiallyCompletedAt: j.financially_completed_at,
+    quoteSentAt: j.quote_sent_at,
+    scheduledDate: j.scheduled_date,
+    property: {
+      id: property.id,
+      name: property.name,
+      address: property.address,
+    },
+    client: {
+      id: client.id || null,
+      companyName: client.company_name || null,
+      contactName: client.contact_name || null,
+      phone: client.phone || null,
+    },
+  };
+}
+
 export default async function handler(req) {
   if (req.method !== 'GET') return errorResponse('Method not allowed', 405);
 
@@ -23,31 +80,66 @@ export default async function handler(req) {
 
     const supabase = getServiceClient();
 
-    let query = supabase
-      .from('jobs')
-      .select(`
-        id, status, unit, description, preferred_date, created_at,
-        estimate, deposit_confirmed_at, financially_completed_at,
-        quote_sent_at, scheduled_date, property_id,
-        properties(id, name, address, client_id)
-      `, { count: 'exact' })
-      .order('created_at', { ascending: false })
-      .range(offset, offset + limit - 1);
+    const selectFields = `
+      id, status, unit, description, preferred_date, created_at,
+      estimate, deposit_confirmed_at, financially_completed_at,
+      quote_sent_at, scheduled_date, property_id,
+      properties(id, name, address, client_id)
+    `;
 
-    if (status && status !== 'all') {
-      query = query.eq('status', status);
-    }
+    let jobs = [];
+    let total = 0;
+
     if (search) {
-      query = query.or(`description.ilike.%${search}%,unit.ilike.%${search}%`);
+      const propertyIds = await findPropertyIdsForSearch(supabase, search);
+      const term = `%${search}%`;
+      const orParts = [`description.ilike.${term}`, `unit.ilike.${term}`];
+      if (propertyIds.length > 0) {
+        orParts.push(`property_id.in.(${propertyIds.join(',')})`);
+      }
+
+      let query = supabase
+        .from('jobs')
+        .select(selectFields)
+        .or(orParts.join(','))
+        .order('created_at', { ascending: false })
+        .limit(200);
+
+      if (status && status !== 'all') {
+        query = query.eq('status', status);
+      }
+
+      const { data, error } = await query;
+      if (error) {
+        console.error('get-admin-commercial-jobs search error:', error.message || error);
+        return errorResponse('Failed to load jobs', 500);
+      }
+
+      jobs = data || [];
+      total = jobs.length;
+      jobs = jobs.slice(offset, offset + limit);
+    } else {
+      let query = supabase
+        .from('jobs')
+        .select(selectFields, { count: 'exact' })
+        .order('created_at', { ascending: false })
+        .range(offset, offset + limit - 1);
+
+      if (status && status !== 'all') {
+        query = query.eq('status', status);
+      }
+
+      const { data, error, count } = await query;
+      if (error) {
+        console.error('get-admin-commercial-jobs error:', error.message || error);
+        return errorResponse('Failed to load jobs', 500);
+      }
+
+      jobs = data || [];
+      total = count ?? jobs.length;
     }
 
-    const { data: jobs, error, count } = await query;
-    if (error) {
-      console.error('get-admin-commercial-jobs error:', error.message || error);
-      return errorResponse('Failed to load jobs', 500);
-    }
-
-    const clientIds = [...new Set((jobs || []).map((j) => j.properties?.client_id).filter(Boolean))];
+    const clientIds = [...new Set(jobs.map((j) => j.properties?.client_id).filter(Boolean))];
     let clientMap = {};
 
     if (clientIds.length > 0) {
@@ -63,50 +155,11 @@ export default async function handler(req) {
       }
     }
 
-    let formatted = (jobs || []).map((j) => {
-      const property = j.properties || {};
-      const client = clientMap[property.client_id] || {};
-
-      return {
-        id: j.id,
-        status: j.status,
-        unit: j.unit,
-        description: j.description,
-        preferredDate: j.preferred_date,
-        createdAt: j.created_at,
-        estimate: j.estimate,
-        depositConfirmedAt: j.deposit_confirmed_at,
-        financiallyCompletedAt: j.financially_completed_at,
-        quoteSentAt: j.quote_sent_at,
-        scheduledDate: j.scheduled_date,
-        property: {
-          id: property.id,
-          name: property.name,
-          address: property.address,
-        },
-        client: {
-          id: client.id || null,
-          companyName: client.company_name || null,
-          contactName: client.contact_name || null,
-          phone: client.phone || null,
-        },
-      };
-    });
-
-    if (search) {
-      const term = search.toLowerCase();
-      formatted = formatted.filter((j) =>
-        j.description?.toLowerCase().includes(term) ||
-        j.unit?.toLowerCase().includes(term) ||
-        j.property.name?.toLowerCase().includes(term) ||
-        j.client.companyName?.toLowerCase().includes(term) ||
-        j.client.contactName?.toLowerCase().includes(term)
-      );
-    }
+    const formatted = jobs.map((j) => formatJobRow(j, clientMap));
 
     return jsonResponse({
       jobs: formatted,
-      total: search ? formatted.length : (count ?? formatted.length),
+      total,
       page,
       limit,
     });
