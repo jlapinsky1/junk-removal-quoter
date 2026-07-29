@@ -1,9 +1,20 @@
 export const DRAFT_STORAGE_KEY = 'squatterz_commercial_request_draft';
 
+function newIdempotencyKey() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
 export function emptyDraft(attribution = {}) {
   return {
     version: 1,
-    idempotencyKey: crypto.randomUUID(),
+    idempotencyKey: newIdempotencyKey(),
     uploadSessionId: null,
     photoPreviews: [],
     propName: '',
@@ -43,7 +54,11 @@ export function loadDraft() {
 }
 
 export function saveDraft(draft) {
-  sessionStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft));
+  try {
+    sessionStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft));
+  } catch {
+    // Ignore during prerender or private browsing
+  }
 }
 
 export function clearDraft() {

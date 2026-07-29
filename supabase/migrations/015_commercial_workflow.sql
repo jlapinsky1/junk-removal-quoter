@@ -6,14 +6,16 @@
 
 -- ── 1. Expand status values ────────────────────────────────────────────────
 ALTER TABLE jobs DROP CONSTRAINT IF EXISTS jobs_status_check;
+
+-- Migrate legacy 'open' rows before adding the new check
+UPDATE jobs SET status = 'pending_review' WHERE status = 'open';
+
 ALTER TABLE jobs ADD CONSTRAINT jobs_status_check
   CHECK (status IN (
     'pending_review', 'quote_sent', 'awaiting_payment',
     'scheduled', 'in_progress', 'completed', 'cancelled'
   ));
 
--- Migrate any legacy 'open' rows
-UPDATE jobs SET status = 'pending_review' WHERE status = 'open';
 ALTER TABLE jobs ALTER COLUMN status SET DEFAULT 'pending_review';
 
 -- ── 2. Add payment & quote lifecycle columns ───────────────────────────────

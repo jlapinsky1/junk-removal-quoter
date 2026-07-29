@@ -15,6 +15,10 @@
 
 -- ── 1. Add 'draft' job status ──────────────────────────────────────────────
 ALTER TABLE jobs DROP CONSTRAINT IF EXISTS jobs_status_check;
+
+-- Migrate legacy statuses from migration 006 ('open') before adding the new check
+UPDATE jobs SET status = 'pending_review' WHERE status = 'open';
+
 ALTER TABLE jobs ADD CONSTRAINT jobs_status_check
   CHECK (status IN (
     'draft', 'pending_review', 'quote_sent', 'awaiting_payment',
