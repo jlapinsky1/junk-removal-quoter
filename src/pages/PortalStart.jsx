@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import {
   Trash2, Mail, Lock, User, Phone, Building2, Briefcase,
   MapPin, AlertTriangle, CheckCircle, ArrowLeft, ArrowRight,
-  ClipboardList, Camera, Calendar, X,
+  ClipboardList, Camera, X,
 } from "lucide-react";
-import { localDateString } from "../utils/dateLogic";
+import { getAvailableBookingDates } from "../utils/dateLogic";
 import { supabase } from "../utils/supabaseClient";
 import { trackEvent } from "../utils/analytics";
 import { getRepo } from "../utils/repository";
@@ -91,6 +91,14 @@ function InputRow({ icon: Icon, children }) {
 const inputCls = "w-full bg-transparent text-sm text-white placeholder:text-white/25 outline-none";
 const selectCls = "w-full bg-transparent text-sm text-white outline-none [&>option]:bg-[#111a14]";
 
+function formatDateShort(dateStr) {
+  const d = new Date(`${dateStr}T12:00:00`);
+  return {
+    weekday: d.toLocaleDateString("en-US", { weekday: "short" }),
+    date: d.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+  };
+}
+
 function formatPreferredDate(isoDate) {
   const d = new Date(`${isoDate}T12:00:00`);
   return d.toLocaleDateString(undefined, {
@@ -136,6 +144,12 @@ export default function PortalStart() {
   const [submitted, setSubmitted] = useState(false);
   const [uploadingPhotos, setUploadingPhotos] = useState(false);
   const [existingEmailPrompt, setExistingEmailPrompt] = useState(false);
+  const [showMoreDates, setShowMoreDates] = useState(false);
+
+  const availableDays = useMemo(
+    () => getAvailableBookingDates({ referenceDate: new Date() }),
+    [],
+  );
 
   // Initialize draft from sessionStorage
   useEffect(() => {
@@ -540,36 +554,41 @@ export default function PortalStart() {
               </FieldWrap>
 
               <FieldWrap label="Preferred Date">
-                <div className="relative">
-                  <div
-                    className={`flex items-center gap-3 bg-[#111a14] border rounded-xl px-4 py-3 min-h-[48px] pointer-events-none transition-colors ${
-                      draft.jobDate ? "border-[#22c55e]/30" : "border-white/10"
-                    }`}
-                  >
-                    <Calendar className="w-4 h-4 text-[#22c55e] shrink-0" />
-                    <span className={`text-sm flex-1 ${draft.jobDate ? "text-white" : "text-white/40"}`}>
-                      {draft.jobDate ? formatPreferredDate(draft.jobDate) : "Tap to choose a date"}
-                    </span>
-                  </div>
-                  {draft.jobDate && (
-                    <button
-                      type="button"
-                      onClick={() => updateDraft({ jobDate: "" })}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 z-10 p-1 text-white/30 hover:text-white/70 transition-colors"
-                      aria-label="Clear preferred date"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  )}
-                  <input
-                    type="date"
-                    value={draft.jobDate}
-                    min={localDateString(new Date())}
-                    onChange={(e) => updateDraft({ jobDate: e.target.value })}
-                    className="absolute inset-0 z-[1] w-full h-full opacity-0 cursor-pointer [color-scheme:dark]"
-                    aria-label="Preferred date"
-                  />
+                <p className="text-xs text-white/35 -mt-1 mb-3">Optional — click a day that works best.</p>
+                <div className="grid grid-cols-3 gap-2.5">
+                  {(showMoreDates ? availableDays : availableDays.slice(0, 12)).map((day) => {
+                    const { weekday, date } = formatDateShort(day);
+                    const isSelected = draft.jobDate === day;
+                    return (
+                      <button
+                        key={day}
+                        type="button"
+                        onClick={() => updateDraft({ jobDate: isSelected ? "" : day })}
+                        className={`p-3 rounded-xl border text-center transition-all ${
+                          isSelected
+                            ? "bg-[#22c55e]/10 border-[#22c55e]/50 ring-1 ring-[#22c55e]/40"
+                            : "bg-[#111a14] border-white/10 hover:border-white/25"
+                        }`}
+                      >
+                        <span className={`text-[10px] font-bold block tracking-wide ${isSelected ? "text-[#22c55e]" : "text-white/40"}`}>
+                          {weekday}
+                        </span>
+                        <span className={`text-sm font-semibold block mt-0.5 ${isSelected ? "text-white" : "text-white/70"}`}>
+                          {date}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
+                {availableDays.length > 12 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowMoreDates((v) => !v)}
+                    className="mt-3 text-xs text-white/40 hover:text-white/60 underline underline-offset-2 transition-colors"
+                  >
+                    {showMoreDates ? "Show fewer dates" : `View more dates (${availableDays.length - 12} more)`}
+                  </button>
+                )}
               </FieldWrap>
 
               <FieldWrap label="Access Notes">
@@ -642,6 +661,7 @@ export default function PortalStart() {
                   propAddress && ["Address", propAddress],
                   draft.jobUnit && ["Unit / Location", draft.jobUnit],
                   ["Service", draft.jobService],
+                  draft.jobDate && ["Preferred Date", formatPreferredDate(draft.jobDate)],
                   ["Contact", draft.name],
                   ["Company", draft.company],
                   ["Email", draft.email],
