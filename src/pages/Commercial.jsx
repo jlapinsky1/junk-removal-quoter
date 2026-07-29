@@ -4,7 +4,6 @@ import { Helmet } from "react-helmet-async";
 import {
   Phone,
   Camera,
-  Shield,
   CheckCircle,
   ArrowRight,
   ChevronDown,
@@ -30,7 +29,7 @@ import { makeCanonical, makeTitle, SITE_URL, DEFAULT_OG_IMAGE } from "../utils/s
 import { trackEvent } from "../utils/analytics";
 
 const VENDOR_PROOF = [
-  { icon: Shield, label: "Insured crew · COI available" },
+  { icon: Package, label: "One item to full cleanouts" },
   { icon: Camera, label: "Before-and-after on every job" },
   { icon: FileText, label: "Written estimates before dispatch" },
   { icon: Receipt, label: "Property & unit-labeled invoices" },
@@ -156,8 +155,8 @@ const FAQS = [
     a: "Yes. Weekly, biweekly, or monthly pickups across multiple properties, all scheduled and tracked in the portal.",
   },
   {
-    q: "Are you insured?",
-    a: "Fully insured. We provide a Certificate of Insurance and can list your management company as additional insured when required.",
+    q: "Do you handle small pickups, or only full cleanouts?",
+    a: "Both. One mattress beside a dumpster, a couch in a breezeway, or a full unit-turn cleanout — same portal, same documentation. No minimum project size.",
   },
   {
     q: "What if the load is larger than estimated?",
@@ -275,7 +274,7 @@ export default function Commercial() {
                   <span className="text-[#22c55e]">Every Cleanup Documented.</span>
                 </h1>
                 <p className="mt-5 text-lg md:text-xl text-white/70 leading-relaxed max-w-xl">
-                  Request apartment cleanouts, eviction cleanup, unit-turn debris removal, bulk pickups, and recurring property cleanup across Northeast Georgia — then manage every property, estimate, open job, completion record, and invoice from one commercial portal.
+                  From a single mattress or trash pickup to full unit cleanouts and recurring portfolio work — request apartment cleanouts, eviction cleanup, unit-turn debris removal, bulk pickups, and property cleanup across Northeast Georgia, then manage every property, estimate, open job, completion record, and invoice from one commercial portal.
                 </p>
               </div>
 
@@ -299,7 +298,7 @@ export default function Commercial() {
               </div>
 
               <div className="flex flex-wrap gap-x-5 gap-y-2">
-                {["Multi-unit job tracking", "Completion packets with photos", "Free portal access"].map((t) => (
+                {["One mattress to full cleanouts", "Completion packets with photos", "Free portal access"].map((t) => (
                   <div key={t} className="flex items-center gap-2 text-sm text-white/45">
                     <CheckCircle className="w-4 h-4 text-[#22c55e]" />
                     <span>{t}</span>
@@ -333,7 +332,7 @@ export default function Commercial() {
               A cleanup crew with a system behind it
             </h2>
             <p className="mt-3 text-sm md:text-base text-white/50 leading-relaxed">
-              Squatterz combines real-world property cleanup with a client portal built for recurring property operations. Every request stays connected to the right property, estimate, completion record, and invoice.
+              Squatterz combines real-world property cleanup with a client portal built for recurring property operations. Need someone to grab one item before an inspection? Planning a full turnover or recurring pickups across a portfolio? Every request — small or large — stays connected to the right property, estimate, completion record, and invoice.
             </p>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4 md:gap-6">
