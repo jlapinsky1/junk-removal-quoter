@@ -183,6 +183,7 @@ function Dashboard({ go }) {
   const [draftSubmitting, setDraftSubmitting] = useState(false);
   const [draftError, setDraftError] = useState(null);
   const [draftSuccess, setDraftSuccess] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const loadData = async () => {
     setLoading(true);
@@ -229,11 +230,13 @@ function Dashboard({ go }) {
       await trySubmitSavedDraft(supabase);
       setSavedDraft(null);
       setDraftSuccess(true);
+      setRefreshing(true);
       await loadData();
     } catch (e) {
       setDraftError(e?.message || "Failed to submit saved request.");
     } finally {
       setDraftSubmitting(false);
+      setRefreshing(false);
     }
   }
 
@@ -260,6 +263,10 @@ function Dashboard({ go }) {
         <div className="bg-[#22c55e]/10 border border-[#22c55e]/25 rounded-2xl p-5 text-sm text-white/80">
           Your saved estimate request was submitted. It should appear below shortly.
         </div>
+      )}
+
+      {refreshing && (
+        <p className="text-xs text-white/40">Refreshing dashboard…</p>
       )}
 
       {savedDraft && (
@@ -641,7 +648,7 @@ function JobsView({ go }) {
   if (error) return <ErrorState message={error} />;
 
   const filtered = filter === "all" ? jobs : jobs.filter((j) => j.status === filter);
-  const filters = ["all", "open", "scheduled", "in_progress", "completed", "cancelled"];
+  const filters = ["all", "pending_review", "quote_sent", "awaiting_payment", "scheduled", "in_progress", "completed", "cancelled"];
 
   return (
     <div className="space-y-6">

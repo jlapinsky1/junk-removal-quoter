@@ -1,11 +1,22 @@
 import React from "react";
 
 export const STATUS_META = {
-  open:        { label: "Open",        dot: "bg-amber-400",   text: "text-amber-300",   bg: "bg-amber-400/10 border-amber-400/20" },
-  scheduled:   { label: "Scheduled",   dot: "bg-sky-400",     text: "text-sky-300",     bg: "bg-sky-400/10 border-sky-400/20" },
-  in_progress: { label: "In Progress", dot: "bg-violet-400",  text: "text-violet-300",  bg: "bg-violet-400/10 border-violet-400/20" },
-  completed:   { label: "Completed",   dot: "bg-[#22c55e]",   text: "text-[#22c55e]",   bg: "bg-[#22c55e]/10 border-[#22c55e]/20" },
-  cancelled:   { label: "Cancelled",   dot: "bg-white/30",    text: "text-white/40",    bg: "bg-white/5 border-white/10" },
+  open:            { label: "Open",              dot: "bg-amber-400",   text: "text-amber-300",   bg: "bg-amber-400/10 border-amber-400/20" },
+  pending_review:  { label: "Pending Review",    dot: "bg-amber-400",   text: "text-amber-300",   bg: "bg-amber-400/10 border-amber-400/20" },
+  quote_sent:      { label: "Quote Ready",       dot: "bg-sky-400",     text: "text-sky-300",     bg: "bg-sky-400/10 border-sky-400/20" },
+  awaiting_payment:{ label: "Awaiting Payment",  dot: "bg-orange-400",  text: "text-orange-300",  bg: "bg-orange-400/10 border-orange-400/20" },
+  scheduled:       { label: "Scheduled",         dot: "bg-sky-400",     text: "text-sky-300",     bg: "bg-sky-400/10 border-sky-400/20" },
+  in_progress:     { label: "In Progress",       dot: "bg-violet-400",  text: "text-violet-300",  bg: "bg-violet-400/10 border-violet-400/20" },
+  completed:       { label: "Completed",         dot: "bg-[#22c55e]",   text: "text-[#22c55e]",   bg: "bg-[#22c55e]/10 border-[#22c55e]/20" },
+  cancelled:       { label: "Cancelled",         dot: "bg-white/30",    text: "text-white/40",    bg: "bg-white/5 border-white/10" },
+  draft:           { label: "Draft",             dot: "bg-white/30",    text: "text-white/40",    bg: "bg-white/5 border-white/10" },
+};
+
+const DEFAULT_STATUS_META = {
+  label: "Unknown",
+  dot: "bg-white/30",
+  text: "text-white/40",
+  bg: "bg-white/5 border-white/10",
 };
 
 export const INVOICE_STATUS_META = {
@@ -43,7 +54,7 @@ export function timeAgo(s) {
 }
 
 export function StatusBadge({ status }) {
-  const m = STATUS_META[status];
+  const m = STATUS_META[status] || DEFAULT_STATUS_META;
   return (
     <span className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full border ${m.bg} ${m.text}`}>
       <span className={`w-1.5 h-1.5 rounded-full ${m.dot}`} />
