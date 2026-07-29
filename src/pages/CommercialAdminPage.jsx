@@ -7,6 +7,8 @@ import {
   ExternalLink, Image, Loader,
 } from 'lucide-react';
 import { supabase } from '../utils/supabaseClient';
+import CommercialQuoteIntelligence from '../components/CommercialQuoteIntelligence';
+import { useCommercialQuoteAnalysis } from '../hooks/useCommercialQuoteAnalysis';
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -100,14 +102,42 @@ function JobCard({ job, selected, onClick }) {
 // ── Quote Panel ───────────────────────────────────────────────────────────
 
 function QuotePanel({ job, onRefresh }) {
-  const [estimate, setEstimate] = useState(job.estimate ? String(job.estimate) : '');
+  const analysis = useCommercialQuoteAnalysis(job);
+  const { estimate, getPriceFlags, blockerOverrides } = analysis;
+
+  const [quotePrice, setQuotePrice] = useState(
+    job.estimate ? String(job.estimate) : '',
+  );
+  const [overrideReason, setOverrideReason] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState(null);
   const [sent, setSent] = useState(false);
+  const [prefilled, setPrefilled] = useState(!!job.estimate);
+
+  useEffect(() => {
+    if (!prefilled && estimate?.recommendedPrice && !quotePrice) {
+      setQuotePrice(String(estimate.recommendedPrice));
+      setPrefilled(true);
+    }
+  }, [estimate?.recommendedPrice, prefilled, quotePrice]);
+
+  const priceFlags = quotePrice ? getPriceFlags(quotePrice) : [];
+  const activeBlockers = [...analysis.riskFlags, ...priceFlags].filter(
+    (f) => f.severity === 'blocker' && !blockerOverrides[f.flag],
+  );
 
   const handleSend = async () => {
-    const val = parseFloat(estimate);
+    const val = parseFloat(quotePrice);
     if (!val || val <= 0) { setError('Enter a valid estimate amount'); return; }
+    if (activeBlockers.length > 0) {
+      setError('Resolve or override all blockers before sending the quote.');
+      return;
+    }
+    if (estimate && val !== estimate.recommendedPrice && !overrideReason.trim()) {
+      setError('Add a reason when quoting below or above the recommended price.');
+      return;
+    }
+
     setSending(true);
     setError(null);
     try {
@@ -132,46 +162,75 @@ function QuotePanel({ job, onRefresh }) {
   }
 
   return (
-    <div className="bg-white/4 border border-white/8 rounded-xl p-5 space-y-4">
-      <h3 className="font-bold text-white text-sm flex items-center gap-2">
-        <DollarSign className="w-4 h-4 text-[#22c55e]" />
-        {job.status === 'quote_sent' ? 'Resend Quote' : 'Send Quote to Client'}
-      </h3>
-      {job.status === 'quote_sent' && (
-        <p className="text-xs text-white/40">
-          Last sent: {fmtDateTime(job.quoteSentAt)}. You can update the estimate and resend.
-        </p>
-      )}
-      <div>
-        <label className="block text-xs text-white/50 mb-1.5">Total Estimate ($)</label>
-        <input
-          type="number"
-          min="0"
-          step="0.01"
-          value={estimate}
-          onChange={e => setEstimate(e.target.value)}
-          placeholder="e.g. 350.00"
-          className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-[#22c55e]/50"
-        />
-        {estimate && parseFloat(estimate) > 0 && (
-          <p className="text-xs text-white/40 mt-1">
-            Deposit (50%): ${(parseFloat(estimate) / 2).toFixed(2)} — Balance: ${(parseFloat(estimate) / 2).toFixed(2)}
+    <div className="space-y-4">
+      <CommercialQuoteIntelligence
+        analysis={analysis}
+        quotePrice={quotePrice}
+        priceFlags={priceFlags}
+      />
+
+      <div className="bg-white/4 border border-white/8 rounded-xl p-5 space-y-4">
+        <h3 className="font-bold text-white text-sm flex items-center gap-2">
+          <DollarSign className="w-4 h-4 text-[#22c55e]" />
+          {job.status === 'quote_sent' ? 'Resend Quote' : 'Send Quote to Client'}
+        </h3>
+        {job.status === 'quote_sent' && (
+          <p className="text-xs text-white/40">
+            Last sent: {fmtDateTime(job.quoteSentAt)}. You can update the estimate and resend.
           </p>
         )}
+        <div>
+          <label className="block text-xs text-white/50 mb-1.5">Total Estimate ($)</label>
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            value={quotePrice}
+            onChange={(e) => setQuotePrice(e.target.value)}
+            placeholder={estimate ? String(estimate.recommendedPrice) : 'e.g. 350.00'}
+            className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-[#22c55e]/50"
+          />
+          {estimate && quotePrice && Number(quotePrice) !== estimate.recommendedPrice && (
+            <p className="text-xs text-amber-400 mt-1">
+              Recommended: ${estimate.recommendedPrice} (difference:{' '}
+              {Number(quotePrice) > estimate.recommendedPrice ? '+' : ''}
+              ${Number(quotePrice) - estimate.recommendedPrice})
+            </p>
+          )}
+          {quotePrice && parseFloat(quotePrice) > 0 && (
+            <p className="text-xs text-white/40 mt-1">
+              Deposit (50%): ${(parseFloat(quotePrice) / 2).toFixed(2)} — Balance: ${(parseFloat(quotePrice) / 2).toFixed(2)}
+            </p>
+          )}
+        </div>
+
+        {estimate && quotePrice && Number(quotePrice) !== estimate.recommendedPrice && (
+          <div>
+            <label className="block text-xs text-white/50 mb-1.5">Reason for price adjustment</label>
+            <input
+              type="text"
+              value={overrideReason}
+              onChange={(e) => setOverrideReason(e.target.value)}
+              placeholder="e.g. Repeat client, competitive bid, bundled property rate…"
+              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-[#22c55e]/50"
+            />
+          </div>
+        )}
+
+        {error && (
+          <p className="text-xs text-red-400 flex items-center gap-1">
+            <AlertTriangle className="w-3.5 h-3.5" /> {error}
+          </p>
+        )}
+        <button
+          onClick={handleSend}
+          disabled={sending}
+          className="w-full bg-[#22c55e] hover:bg-[#16a34a] disabled:opacity-50 text-black font-bold text-sm py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2"
+        >
+          <Send className="w-4 h-4" />
+          {sending ? 'Sending…' : 'Send Quote Email'}
+        </button>
       </div>
-      {error && (
-        <p className="text-xs text-red-400 flex items-center gap-1">
-          <AlertTriangle className="w-3.5 h-3.5" /> {error}
-        </p>
-      )}
-      <button
-        onClick={handleSend}
-        disabled={sending}
-        className="w-full bg-[#22c55e] hover:bg-[#16a34a] disabled:opacity-50 text-black font-bold text-sm py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2"
-      >
-        <Send className="w-4 h-4" />
-        {sending ? 'Sending…' : 'Send Quote Email'}
-      </button>
     </div>
   );
 }
