@@ -737,6 +737,7 @@ export default function CommercialAdminPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [search, setSearch] = useState('');
   const [total, setTotal] = useState(0);
+  const [loadError, setLoadError] = useState(null);
 
   // Auth check
   useEffect(() => {
@@ -745,17 +746,18 @@ export default function CommercialAdminPage() {
       if (!data.session) { navigate('/admin'); return; }
       // Verify admin
       try {
-        await adminFetch('/api/healthcheck').catch(() => {});
+        await adminFetch('/api/get-admin-commercial-jobs?limit=1');
         setAuthed(true);
       } catch {
         navigate('/admin');
+        return;
       }
-      setAuthed(true);
     });
   }, [navigate]);
 
   const loadJobs = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const params = new URLSearchParams();
       if (statusFilter !== 'all') params.set('status', statusFilter);
@@ -765,6 +767,9 @@ export default function CommercialAdminPage() {
       setTotal(data.total || 0);
     } catch (e) {
       console.error('Failed to load jobs:', e);
+      setJobs([]);
+      setTotal(0);
+      setLoadError(e?.message || 'Failed to load commercial jobs.');
     } finally {
       setLoading(false);
     }
@@ -846,6 +851,11 @@ export default function CommercialAdminPage() {
           </div>
 
           <div className="flex-1 overflow-y-auto">
+            {loadError && (
+              <div className="m-3 bg-red-400/10 border border-red-400/20 rounded-lg p-3 text-xs text-red-300">
+                {loadError}
+              </div>
+            )}
             {loading ? (
               <div className="flex items-center justify-center py-12">
                 <div className="w-5 h-5 border-2 border-[#22c55e] border-t-transparent rounded-full animate-spin" />

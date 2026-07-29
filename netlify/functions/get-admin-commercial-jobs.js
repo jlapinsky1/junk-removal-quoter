@@ -3,10 +3,9 @@ import {
   jsonResponse, errorResponse,
 } from './_shared/supabase.js';
 
-const STATUS_ORDER = [
-  'pending_review', 'quote_sent', 'awaiting_payment',
-  'scheduled', 'in_progress', 'completed', 'cancelled',
-];
+function sanitizeSearchTerm(value) {
+  return String(value || '').trim().replace(/[%_,]/g, '');
+}
 
 export default async function handler(req) {
   if (req.method !== 'GET') return errorResponse('Method not allowed', 405);
@@ -17,7 +16,7 @@ export default async function handler(req) {
 
     const url = new URL(req.url);
     const status = url.searchParams.get('status') || '';
-    const search = url.searchParams.get('search') || '';
+    const search = sanitizeSearchTerm(url.searchParams.get('search') || '');
     const page = Math.max(1, parseInt(url.searchParams.get('page') || '1', 10));
     const limit = Math.min(50, Math.max(1, parseInt(url.searchParams.get('limit') || '25', 10)));
     const offset = (page - 1) * limit;
@@ -29,10 +28,8 @@ export default async function handler(req) {
       .select(`
         id, status, unit, description, preferred_date, created_at,
         estimate, deposit_confirmed_at, financially_completed_at,
-        quote_sent_at, scheduled_date,
-        properties!inner(id, name, address, client_id,
-          commercial_clients!inner(id, company_name, contact_name, phone)
-        )
+        quote_sent_at, scheduled_date, property_id,
+        properties(id, name, address, client_id)
       `, { count: 'exact' })
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
@@ -41,43 +38,78 @@ export default async function handler(req) {
       query = query.eq('status', status);
     }
     if (search) {
-      query = query.or(
-        `description.ilike.%${search}%,unit.ilike.%${search}%,properties.name.ilike.%${search}%`
-      );
+      query = query.or(`description.ilike.%${search}%,unit.ilike.%${search}%`);
     }
 
     const { data: jobs, error, count } = await query;
     if (error) {
-      console.error('get-admin-commercial-jobs error:', error);
+      console.error('get-admin-commercial-jobs error:', error.message || error);
       return errorResponse('Failed to load jobs', 500);
     }
 
-    const formatted = (jobs || []).map(j => ({
-      id: j.id,
-      status: j.status,
-      unit: j.unit,
-      description: j.description,
-      preferredDate: j.preferred_date,
-      createdAt: j.created_at,
-      estimate: j.estimate,
-      depositConfirmedAt: j.deposit_confirmed_at,
-      financiallyCompletedAt: j.financially_completed_at,
-      quoteSentAt: j.quote_sent_at,
-      scheduledDate: j.scheduled_date,
-      property: {
-        id: j.properties.id,
-        name: j.properties.name,
-        address: j.properties.address,
-      },
-      client: {
-        id: j.properties.commercial_clients.id,
-        companyName: j.properties.commercial_clients.company_name,
-        contactName: j.properties.commercial_clients.contact_name,
-        phone: j.properties.commercial_clients.phone,
-      },
-    }));
+    const clientIds = [...new Set((jobs || []).map((j) => j.properties?.client_id).filter(Boolean))];
+    let clientMap = {};
 
-    return jsonResponse({ jobs: formatted, total: count ?? 0, page, limit });
+    if (clientIds.length > 0) {
+      const { data: clients, error: clientErr } = await supabase
+        .from('commercial_clients')
+        .select('id, company_name, contact_name, phone')
+        .in('id', clientIds);
+
+      if (clientErr) {
+        console.error('get-admin-commercial-jobs clients error:', clientErr.message || clientErr);
+      } else {
+        clientMap = Object.fromEntries((clients || []).map((c) => [c.id, c]));
+      }
+    }
+
+    let formatted = (jobs || []).map((j) => {
+      const property = j.properties || {};
+      const client = clientMap[property.client_id] || {};
+
+      return {
+        id: j.id,
+        status: j.status,
+        unit: j.unit,
+        description: j.description,
+        preferredDate: j.preferred_date,
+        createdAt: j.created_at,
+        estimate: j.estimate,
+        depositConfirmedAt: j.deposit_confirmed_at,
+        financiallyCompletedAt: j.financially_completed_at,
+        quoteSentAt: j.quote_sent_at,
+        scheduledDate: j.scheduled_date,
+        property: {
+          id: property.id,
+          name: property.name,
+          address: property.address,
+        },
+        client: {
+          id: client.id || null,
+          companyName: client.company_name || null,
+          contactName: client.contact_name || null,
+          phone: client.phone || null,
+        },
+      };
+    });
+
+    if (search) {
+      const term = search.toLowerCase();
+      formatted = formatted.filter((j) =>
+        j.description?.toLowerCase().includes(term) ||
+        j.unit?.toLowerCase().includes(term) ||
+        j.property.name?.toLowerCase().includes(term) ||
+        j.client.companyName?.toLowerCase().includes(term) ||
+        j.client.contactName?.toLowerCase().includes(term)
+      );
+    }
+
+    return jsonResponse({
+      jobs: formatted,
+      total: search ? formatted.length : (count ?? formatted.length),
+      page,
+      limit,
+    });
   } catch (e) {
     console.error('get-admin-commercial-jobs error:', e);
     return errorResponse('Server error', 500);
