@@ -66,6 +66,7 @@ const SERVICES = [
   { label: "Eviction Cleanup", to: "/commercial/eviction-cleanup" },
   { label: "Unit Turnover Cleanout", to: "/commercial/unit-turnover-cleanout" },
   { label: "Bulk Trash Removal", to: "/commercial/bulk-trash-removal" },
+  { label: "Illegal Dumping Removal", to: "/commercial/illegal-dumping-removal" },
   { label: "Property Management Cleanup", to: "/commercial/property-management-cleanup" },
 ];
 

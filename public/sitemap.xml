@@ -36,6 +36,11 @@
     <changefreq>monthly</changefreq>
   </url>
   <url>
+    <loc>https://gosquatterz.com/commercial/illegal-dumping-removal</loc>
+    <priority>0.8</priority>
+    <changefreq>monthly</changefreq>
+  </url>
+  <url>
     <loc>https://gosquatterz.com/commercial/client-portal</loc>
     <priority>0.7</priority>
     <changefreq>monthly</changefreq>

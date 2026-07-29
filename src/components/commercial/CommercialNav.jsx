@@ -24,6 +24,7 @@ export default function CommercialNav() {
 
         <nav className="hidden md:flex items-center gap-8">
           <Link to="/commercial#services" className="text-sm text-white/60 hover:text-white transition-colors">Services</Link>
+          <Link to="/commercial/illegal-dumping-removal" className="text-sm text-white/60 hover:text-white transition-colors">Illegal Dumping</Link>
           <Link to="/commercial#portal" className="text-sm text-white/60 hover:text-white transition-colors">Client Portal</Link>
           <Link to="/commercial#faq" className="text-sm text-white/60 hover:text-white transition-colors">FAQ</Link>
         </nav>

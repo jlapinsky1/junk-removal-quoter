@@ -15,6 +15,7 @@ import ApartmentCleanouts from './pages/commercial/ApartmentCleanouts';
 import EvictionCleanup from './pages/commercial/EvictionCleanup';
 import UnitTurnoverCleanout from './pages/commercial/UnitTurnoverCleanout';
 import BulkTrashRemoval from './pages/commercial/BulkTrashRemoval';
+import IllegalDumpingRemoval from './pages/commercial/IllegalDumpingRemoval';
 import ClientPortalPage from './pages/commercial/ClientPortalPage';
 import ServiceArea from './pages/commercial/ServiceArea';
 import PortalStart from './pages/PortalStart';
@@ -125,6 +126,7 @@ export default function App() {
       <Route path="/commercial/eviction-cleanup" element={<EvictionCleanup />} />
       <Route path="/commercial/unit-turnover-cleanout" element={<UnitTurnoverCleanout />} />
       <Route path="/commercial/bulk-trash-removal" element={<BulkTrashRemoval />} />
+      <Route path="/commercial/illegal-dumping-removal" element={<IllegalDumpingRemoval />} />
       <Route path="/commercial/client-portal" element={<ClientPortalPage />} />
       <Route path="/commercial/service-area" element={<ServiceArea />} />
       <Route path="/portal/start" element={<PortalStart />} />

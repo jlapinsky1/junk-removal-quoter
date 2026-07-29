@@ -43,6 +43,7 @@ export default function CommercialFooter() {
                 { label: "Eviction Cleanup", to: "/commercial/eviction-cleanup" },
                 { label: "Unit Turnover Cleanout", to: "/commercial/unit-turnover-cleanout" },
                 { label: "Bulk Trash Removal", to: "/commercial/bulk-trash-removal" },
+                { label: "Illegal Dumping Removal", to: "/commercial/illegal-dumping-removal" },
                 { label: "Recurring Property Cleanup", to: "/commercial/property-management-cleanup" },
                 { label: "Client Portal", to: "/commercial/client-portal" },
               ].map(({ label, to }) => (

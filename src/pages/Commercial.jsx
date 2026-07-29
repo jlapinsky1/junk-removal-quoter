@@ -88,7 +88,7 @@ const SERVICES = [
     icon: Package,
     title: "Illegal Dumping Removal",
     desc: "Dumped furniture and trash removed from lots, alleys, and common areas, photo-documented.",
-    to: "/commercial/bulk-trash-removal",
+    to: "/commercial/illegal-dumping-removal",
   },
   {
     icon: CalendarClock,

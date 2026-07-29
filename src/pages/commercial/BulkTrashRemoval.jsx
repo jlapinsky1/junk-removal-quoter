@@ -51,6 +51,7 @@ const SCENARIOS = [
     icon: AlertTriangle,
     title: "Illegal Dumping on Lots",
     desc: "Outside parties dump on your property without permission. We remove it, document what was there, and clear the area so it's less of a target.",
+    to: "/commercial/illegal-dumping-removal",
   },
   {
     icon: RefreshCw,
@@ -152,13 +153,21 @@ export default function BulkTrashRemoval() {
             Bulk trash shows up in different ways at different properties. We handle all of them.
           </p>
           <div className="grid md:grid-cols-2 gap-5">
-            {SCENARIOS.map(({ icon: Icon, title, desc }) => (
+            {SCENARIOS.map(({ icon: Icon, title, desc, to }) => (
               <div key={title} className="bg-white/[0.03] border border-white/8 rounded-xl p-6">
                 <div className="w-10 h-10 rounded-full bg-[#22c55e]/10 flex items-center justify-center mb-4">
                   <Icon className="w-5 h-5 text-[#22c55e]" />
                 </div>
                 <h3 className="font-bold text-white mb-2">{title}</h3>
                 <p className="text-white/50 text-sm leading-relaxed">{desc}</p>
+                {to && (
+                  <Link
+                    to={to}
+                    className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-[#22c55e] hover:text-white transition-colors"
+                  >
+                    Learn more <ArrowRight className="w-3.5 h-3.5" />
+                  </Link>
+                )}
               </div>
             ))}
           </div>
@@ -183,6 +192,13 @@ export default function BulkTrashRemoval() {
 
         {/* FAQ */}
         <section className="max-w-4xl mx-auto px-5 mb-16">
+          <p className="text-sm text-white/45 mb-6">
+            Need help with items dumped by outside parties? See our{" "}
+            <Link to="/commercial/illegal-dumping-removal" className="text-[#22c55e] hover:text-white font-medium transition-colors">
+              illegal dumping removal page
+            </Link>
+            .
+          </p>
           <h2 className="text-2xl font-black mb-6">Common Questions</h2>
           <div className="space-y-4">
             {FAQ.map(({ q, a }) => (
