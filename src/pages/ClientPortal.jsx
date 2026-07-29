@@ -7,6 +7,8 @@ import {
   User, Trash2, Download, ChevronRight, Menu, X, AlertTriangle, LogOut,
 } from "lucide-react";
 import { supabase } from "../utils/supabaseClient";
+import { loadDraft, isSubmittableDraft } from "../utils/commercialRequestDraft";
+import { trySubmitSavedDraft } from "../utils/submitCommercialDraft";
 import {
   STATUS_META, INVOICE_STATUS_META, StatusBadge, InvoiceBadge,
   Card, SectionHeader, EmptyState, Spinner, ErrorState,
@@ -177,6 +179,10 @@ function Dashboard({ go }) {
   const [recent, setRecent] = useState([]);
   const [outstandingTotal, setOutstandingTotal] = useState(0);
   const [pendingQuotes, setPendingQuotes] = useState([]);
+  const [savedDraft, setSavedDraft] = useState(null);
+  const [draftSubmitting, setDraftSubmitting] = useState(false);
+  const [draftError, setDraftError] = useState(null);
+  const [draftSuccess, setDraftSuccess] = useState(false);
 
   const loadData = async () => {
     setLoading(true);
@@ -211,6 +217,26 @@ function Dashboard({ go }) {
       }
   };
 
+  useEffect(() => {
+    const draft = loadDraft();
+    if (isSubmittableDraft(draft)) setSavedDraft(draft);
+  }, []);
+
+  async function submitSavedDraft() {
+    setDraftSubmitting(true);
+    setDraftError(null);
+    try {
+      await trySubmitSavedDraft(supabase);
+      setSavedDraft(null);
+      setDraftSuccess(true);
+      await loadData();
+    } catch (e) {
+      setDraftError(e?.message || "Failed to submit saved request.");
+    } finally {
+      setDraftSubmitting(false);
+    }
+  }
+
   useEffect(() => { loadData(); }, []);
 
   if (loading) return <Spinner />;
@@ -229,6 +255,45 @@ function Dashboard({ go }) {
         <h1 className="text-2xl md:text-3xl font-black text-white tracking-tight">Dashboard</h1>
         <p className="mt-1.5 text-sm text-white/45">Your portfolio at a glance.</p>
       </div>
+
+      {draftSuccess && (
+        <div className="bg-[#22c55e]/10 border border-[#22c55e]/25 rounded-2xl p-5 text-sm text-white/80">
+          Your saved estimate request was submitted. It should appear below shortly.
+        </div>
+      )}
+
+      {savedDraft && (
+        <div className="bg-amber-400/10 border border-amber-400/25 rounded-2xl p-5">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-amber-300 shrink-0 mt-0.5" />
+            <div className="flex-1 space-y-3">
+              <div>
+                <p className="font-bold text-white text-sm">You have an unfinished estimate request</p>
+                <p className="text-xs text-white/50 mt-1">
+                  {savedDraft.propName} — {savedDraft.jobService}. Submit it now to add it to your portal.
+                </p>
+              </div>
+              {draftError && <p className="text-xs text-red-300">{draftError}</p>}
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={submitSavedDraft}
+                  disabled={draftSubmitting}
+                  className="bg-[#22c55e] hover:bg-[#16a34a] disabled:opacity-50 text-black font-bold text-sm px-4 py-2.5 rounded-xl transition-colors"
+                >
+                  {draftSubmitting ? "Submitting…" : "Submit Saved Request"}
+                </button>
+                <a
+                  href="/portal/start"
+                  className="text-sm text-white/50 hover:text-white/70 px-4 py-2.5"
+                >
+                  Review in form
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {pendingQuotes.length > 0 && (
         <div className="bg-[#22c55e]/10 border border-[#22c55e]/25 rounded-2xl p-5">

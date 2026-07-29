@@ -2,8 +2,8 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Trash2, Mail, Lock, User, AlertTriangle, ArrowLeft } from "lucide-react";
 import { supabase } from "../utils/supabaseClient";
-import { loadDraft } from "../utils/commercialRequestDraft";
-import { submitAuthenticatedDraft } from "../utils/submitCommercialDraft";
+import { loadDraft, isSubmittableDraft } from "../utils/commercialRequestDraft";
+import { trySubmitSavedDraft } from "../utils/submitCommercialDraft";
 
 export default function ClientLogin() {
   const navigate = useNavigate();
@@ -25,15 +25,16 @@ export default function ClientLogin() {
   }, [resumeRequest]);
 
   async function finishLoginRedirect() {
-    const draft = loadDraft();
-    if (resumeRequest && draft?.pendingLogin && supabase) {
+    if (supabase) {
       try {
-        await submitAuthenticatedDraft(supabase, draft);
-        navigate("/portal");
-        return;
+        const submitted = await trySubmitSavedDraft(supabase);
+        if (submitted) {
+          navigate("/portal");
+          return;
+        }
       } catch (err) {
-        setError(err?.message || "Logged in, but failed to submit your saved request. Try again from the portal.");
-        navigate("/portal/start");
+        setError(err?.message || "Logged in, but failed to submit your saved request.");
+        navigate("/portal");
         return;
       }
     }

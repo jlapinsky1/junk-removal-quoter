@@ -4,6 +4,8 @@ import {
   buildJobDescriptionText,
   buildAccessNotesText,
   clearDraft,
+  loadDraft,
+  isSubmittableDraft,
 } from './commercialRequestDraft';
 
 /**
@@ -85,4 +87,21 @@ export async function submitAuthenticatedDraft(supabase, draft) {
 
   clearDraft();
   return { jobId: data.jobId, propertyId: prop.id, clientId: client.id };
+}
+
+/**
+ * If sessionStorage holds a complete draft for the logged-in user, submit it.
+ */
+export async function trySubmitSavedDraft(supabase) {
+  const draft = loadDraft();
+  if (!isSubmittableDraft(draft)) return null;
+
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user?.email) return null;
+
+  const draftEmail = draft.email.trim().toLowerCase();
+  const sessionEmail = session.user.email.trim().toLowerCase();
+  if (draftEmail !== sessionEmail) return null;
+
+  return submitAuthenticatedDraft(supabase, draft);
 }

@@ -89,3 +89,20 @@ export function buildPropertyNotesText(draft) {
     draft.propNotes || null,
   ].filter(Boolean).join('\n') || null;
 }
+
+export function isSubmittableDraft(draft) {
+  if (!draft) return false;
+  return Boolean(
+    draft.propName &&
+    draft.propStreet &&
+    draft.propCity &&
+    draft.propZip &&
+    draft.propType &&
+    draft.jobService &&
+    draft.jobDescription?.trim() &&
+    draft.name &&
+    draft.email &&
+    draft.phone &&
+    draft.company
+  );
+}
