@@ -55,7 +55,7 @@ const PROBLEM_CARDS = [
   {
     icon: Package,
     title: "Illegal dumping on the lot",
-    desc: "Third-party debris in lots, alleys, and behind dumpsters — removed and documented.",
+    desc: "Third-party debris in lots, alleys, and behind dumpsters, removed and documented.",
   },
 ];
 
@@ -69,7 +69,7 @@ const SERVICES = [
   {
     icon: AlertTriangle,
     title: "Eviction and Abandoned-Property Cleanup",
-    desc: "Fast clearance when tenants leave belongings behind — with the records your file needs.",
+    desc: "Fast clearance when tenants leave belongings behind, with the records your file needs.",
     to: "/commercial/eviction-cleanup",
   },
   {
@@ -87,13 +87,13 @@ const SERVICES = [
   {
     icon: Package,
     title: "Illegal Dumping Removal",
-    desc: "Dumped furniture and trash removed from lots, alleys, and common areas — photo-documented.",
+    desc: "Dumped furniture and trash removed from lots, alleys, and common areas, photo-documented.",
     to: "/commercial/bulk-trash-removal",
   },
   {
     icon: CalendarClock,
     title: "Recurring Multi-Property Cleanup",
-    desc: "Scheduled pickups across your portfolio — one portal, one crew, every property tracked.",
+    desc: "Scheduled pickups across your portfolio: one portal, one crew, every property tracked.",
     to: "/commercial/property-management-cleanup",
   },
 ];
@@ -114,7 +114,7 @@ const DOC_ITEMS = [
 
 const SCENARIO_STEPS = [
   { num: "1", title: "Request submitted", desc: "The coordinator opens the portal, attaches a photo from the dumpster area, and sets a deadline before the HOA walkthrough." },
-  { num: "2", title: "Estimate reviewed", desc: "Squatterz reviews the scope and sends a line-item estimate. The coordinator approves from their phone — no phone tag." },
+  { num: "2", title: "Estimate reviewed", desc: "Squatterz reviews the scope and sends a line-item estimate. The coordinator approves from their phone. No phone tag." },
   { num: "3", title: "Cleanup completed", desc: "Crew clears the mattresses using the gate code. No one needs to stay on-site." },
   { num: "4", title: "Documentation delivered", desc: "Before-and-after photos, completion notes, and a labeled invoice land in the portal the same day." },
 ];
@@ -148,7 +148,7 @@ const FAQS = [
   },
   {
     q: "How does the client portal help multi-property teams?",
-    a: "One account covers your whole portfolio — submit work orders, track open jobs, and pull completion records and invoices without emailing back and forth.",
+    a: "One account covers your whole portfolio: submit work orders, track open jobs, and pull completion records and invoices without emailing back and forth.",
   },
   {
     q: "Do you offer recurring service?",
@@ -156,7 +156,7 @@ const FAQS = [
   },
   {
     q: "Do you handle small pickups, or only full cleanouts?",
-    a: "Both. One mattress beside a dumpster, a couch in a breezeway, or a full unit-turn cleanout — same portal, same documentation. No minimum project size.",
+    a: "Both. One mattress beside a dumpster, a couch in a breezeway, or a full unit-turn cleanout. Same portal, same documentation. No minimum project size.",
   },
   {
     q: "What if the load is larger than estimated?",
@@ -274,7 +274,7 @@ export default function Commercial() {
                   <span className="text-[#22c55e]">Every Cleanup Documented.</span>
                 </h1>
                 <p className="mt-5 text-lg md:text-xl text-white/70 leading-relaxed max-w-xl">
-                  From a single mattress or trash pickup to full unit cleanouts and recurring portfolio work — request apartment cleanouts, eviction cleanup, unit-turn debris removal, bulk pickups, and property cleanup across Northeast Georgia, then manage every property, estimate, open job, completion record, and invoice from one commercial portal.
+                  From a single mattress or trash pickup to full unit cleanouts and recurring portfolio work. Request apartment cleanouts, eviction cleanup, unit-turn debris removal, bulk pickups, and property cleanup across Northeast Georgia, then manage every property, estimate, open job, completion record, and invoice from one commercial portal.
                 </p>
               </div>
 
@@ -332,7 +332,7 @@ export default function Commercial() {
               A cleanup crew with a system behind it
             </h2>
             <p className="mt-3 text-sm md:text-base text-white/50 leading-relaxed">
-              Squatterz combines real-world property cleanup with a client portal built for recurring property operations. Need someone to grab one item before an inspection? Planning a full turnover or recurring pickups across a portfolio? Every request — small or large — stays connected to the right property, estimate, completion record, and invoice.
+              Squatterz combines real-world property cleanup with a client portal built for recurring property operations. Need someone to grab one item before an inspection? Planning a full turnover or recurring pickups across a portfolio? Every request, small or large, stays connected to the right property, estimate, completion record, and invoice.
             </p>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4 md:gap-6">
@@ -376,7 +376,7 @@ export default function Commercial() {
             <p className="text-[#22c55e] text-sm font-semibold uppercase tracking-widest mb-2">Services</p>
             <h2 className="text-2xl md:text-3xl font-black text-white">Commercial cleanup for property operations</h2>
             <p className="mt-3 text-white/45 text-sm md:text-base">
-              Six core categories — not a menu of fifty options. Mattresses, appliances, furniture, renovation debris, patio items, storage areas, and office cleanouts fit inside these.
+              Six core categories, not a menu of fifty options. Mattresses, appliances, furniture, renovation debris, patio items, storage areas, and office cleanouts fit inside these.
             </p>
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -410,7 +410,7 @@ export default function Commercial() {
                 Free portal + completion packet on every job
               </h2>
               <p className="text-white/50 text-base leading-relaxed">
-                Most haulers show up and leave. Squatterz ties every cleanup to your property account — with estimates, status updates, photo documentation, and invoices you can pull without chasing anyone.
+                Most haulers show up and leave. Squatterz ties every cleanup to your property account, with estimates, status updates, photo documentation, and invoices you can pull without chasing anyone.
               </p>
               <ul className="space-y-3">
                 {PORTAL_POINTS.map((item) => (
@@ -462,7 +462,7 @@ export default function Commercial() {
                   </div>
                 </div>
                 <div className="bg-[#0d1410] border border-white/8 rounded-xl p-3.5 text-sm text-white/60 leading-relaxed">
-                  2 mattresses, sofa, patio debris removed. Water stain noted near bathroom — maintenance follow-up recommended.
+                  2 mattresses, sofa, patio debris removed. Water stain noted near bathroom. Maintenance follow-up recommended.
                 </div>
                 <div className="flex items-center justify-between text-xs text-white/40">
                   <span className="flex items-center gap-1.5"><Receipt className="w-3.5 h-3.5 text-[#22c55e]" /> Invoice attached</span>
@@ -481,7 +481,7 @@ export default function Commercial() {
             <p className="text-[#22c55e] text-sm font-semibold uppercase tracking-widest mb-2">In practice</p>
             <h2 className="text-2xl md:text-3xl font-black text-white">What this looks like on a real property</h2>
             <p className="mt-3 text-white/45 text-base leading-relaxed">
-              A maintenance coordinator for a 48-unit community finds two mattresses beside the dumpster before a Friday HOA inspection — and handles the whole thing from the portal before lunch.
+              A maintenance coordinator for a 48-unit community finds two mattresses beside the dumpster before a Friday HOA inspection and handles the whole thing from the portal before lunch.
             </p>
           </div>
           <div className="grid sm:grid-cols-2 gap-4">
