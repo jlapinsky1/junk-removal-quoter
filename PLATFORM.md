@@ -988,6 +988,74 @@ booking_photos (new column)
 | `012_support_notes.sql` | `support_notes` table with `is_admin()` RLS policy. Powers the admin support note panel in the Completed booking view. |
 | `013_dispatch.sql` | Dispatch authentication (`dispatch_tokens`) and event log (`dispatch_events`). Required for the Squatterz Dispatch crew interface. |
 | `014_distance_fields.sql` | Adds `distance_miles` and `travel_minutes_one_way` to `bookings`. Populated by the `geocode-booking` Netlify function via Nominatim geocoding. |
+| `015_commercial_workflow.sql` | Extends the `jobs` table (originally created in migration 006) for a full quote→deposit→completion workflow. Expands the `status` CHECK constraint to include `pending_review`, `quote_sent`, and `awaiting_payment`; migrates any existing `'open'` rows to `'pending_review'`; adds Stripe payment columns (`stripe_customer_id`, `stripe_invoice_id`, `stripe_deposit_payment_intent_id`, `deposit_confirmed_at`, `financially_completed_at`); adds quote lifecycle columns (`quote_token_hash`, `quote_expires_at`, `quote_sent_at`, `quoted_at`); adds `admin_notes`; adds `submission` kind to the `job_photos.kind` CHECK constraint. |
+
+---
+
+## Commercial Workflow
+
+The commercial portal (migration 006) originally provided a basic CRUD experience for property managers. Migration 015 extends it with a full end-to-end workflow mirroring the residential booking flow.
+
+### Status Flow
+
+```
+pending_review → quote_sent → awaiting_payment → scheduled → in_progress → completed
+                                                                          ↘ cancelled
+```
+
+### How the flow works
+
+| Step | Who | Action |
+|---|---|---|
+| 1 | Client | Submits work order via portal (optional photos, drag-and-drop) |
+| 2 | Server | `create-commercial-job` creates job row, links photos, emails admin (`ADMIN_EMAIL`) and client confirmation |
+| 3 | Admin | Reviews job at `/admin/commercial`, sets estimate, clicks "Send Quote" |
+| 4 | Server | `send-commercial-quote` creates Stripe Customer + Invoice, sets `quote_token_hash`, emails client with link to `/commercial/quote/:token` |
+| 5 | Client | Opens email link or portal dashboard; accepts quote (no login required via email link) |
+| 6 | Server | `accept-commercial-quote` sets status → `awaiting_payment` |
+| 7 | Client | Pays 50% deposit via Stripe PaymentElement on quote page or portal |
+| 8 | Server | `create-commercial-deposit` creates PaymentIntent, attaches to invoice |
+| 9 | Stripe | `invoice_payment.paid` webhook fires; `handleCommercialInvoicePaymentPaid` sets status → `scheduled`, `deposit_confirmed_at`; emails admin |
+| 10 | Admin | Sets scheduled date via `/admin/commercial`; marks `in_progress` when crew arrives |
+| 11 | Admin | Uploads before/after photos (direct Supabase Storage), enters completion notes, clicks "Complete & Send Packet" |
+| 12 | Server | `complete-commercial-job` creates `job_photos` records, sets status → `completed`, emails client completion packet + Stripe hosted invoice URL for final balance |
+| 13 | Client | Pays remaining 50% via Stripe hosted invoice URL |
+| 14 | Stripe | `invoice.paid` fires; `handleCommercialInvoicePaid` sets `financially_completed_at` |
+
+### Auth model
+
+- **Client portal CRUD**: Supabase client with anon key + RLS (`commercial_clients.user_id = auth.uid()`)
+- **Job submission / quote acceptance**: Netlify Functions verify client JWT via `verifyCommercialClient()` in `_shared/supabase.js`; ownership checked server-side (property must belong to client's `client_id`)
+- **Quote acceptance via email link**: Token-based (no login required); 7-day expiry; raw token never stored — only SHA-256 hash stored in `jobs.quote_token_hash`
+- **Admin actions**: Netlify Functions verify admin JWT via `verifyAdmin()` + `admin_users` table check
+
+### Key files added
+
+| File | Purpose |
+|---|---|
+| `netlify/functions/create-commercial-job.js` | Authenticated job submission with photo linking and dual email |
+| `netlify/functions/get-admin-commercial-jobs.js` | Paginated, filterable admin job list |
+| `netlify/functions/get-admin-commercial-job-detail.js` | Full job detail with Stripe payment summary |
+| `netlify/functions/send-commercial-quote.js` | Sets estimate, creates Stripe invoice, sends quote email |
+| `netlify/functions/get-commercial-quote.js` | Public token-based quote view DTO |
+| `netlify/functions/accept-commercial-quote.js` | Accepts quote via token or client JWT |
+| `netlify/functions/create-commercial-deposit.js` | Creates Stripe deposit PaymentIntent |
+| `netlify/functions/update-commercial-job.js` | Admin: update status, scheduled date, admin notes |
+| `netlify/functions/complete-commercial-job.js` | Marks complete, links photos, sends completion packet email |
+| `src/pages/CommercialAdminPage.jsx` | Standalone admin page at `/admin/commercial` (two-panel: list + detail) |
+| `src/pages/CommercialQuotePage.jsx` | Public quote page at `/commercial/quote/:token` (no login required) |
+
+### Stripe integration
+
+Commercial jobs use Stripe Invoices (same as residential):
+- Invoice metadata: `{ job_id, environment }` (distinguishes from residential `booking_id`)
+- Deposit PaymentIntent metadata: `{ job_id, payment_stage: 'commercial_deposit' }`
+- `stripe-webhook.js` routes by metadata key: `booking_id` → residential handlers; `job_id` → commercial handlers
+- Idempotency keys prefixed with `comm-` to prevent collision with residential keys
+
+### Completion PDF
+
+The commercial completion packet is currently delivered by email (before/after photos via public Storage URLs + Stripe hosted invoice URL for final payment). Photos are visible in the portal at `/portal`. A dedicated PDF endpoint can be added in a future migration following the same pattern as `residential-completion-pdf.js`.
 
 ### Completion PDF
 
@@ -1018,16 +1086,19 @@ These bugs were discovered and fixed during end-to-end sandbox testing:
 
 | File | Purpose |
 |---|---|
-| `netlify/functions/_shared/stripe.js` | Stripe client, `toCents`, `calculateDepositCents`, idempotency key helpers |
-| `netlify/functions/approve-quote.js` | Creates Stripe customer + invoice; voids old invoice on re-approval |
-| `netlify/functions/create-deposit-payment.js` | Reserves slot, creates deposit PI, attaches to invoice |
-| `netlify/functions/stripe-webhook.js` | Handles `invoice_payment.paid` (deposit), `invoice.paid` (financial completion) |
+| `netlify/functions/_shared/stripe.js` | Stripe client, `toCents`, `calculateDepositCents`, idempotency key helpers (`ikey.*`); residential + commercial customer/invoice helpers |
+| `netlify/functions/_shared/supabase.js` | `verifyAdmin()`, `verifyCommercialClient()`, `getServiceClient()`, `generateToken()`, `sha256()` |
+| `netlify/functions/approve-quote.js` | Creates Stripe customer + invoice; voids old invoice on re-approval (residential) |
+| `netlify/functions/create-deposit-payment.js` | Reserves slot, creates deposit PI, attaches to invoice (residential) |
+| `netlify/functions/stripe-webhook.js` | Handles `invoice_payment.paid` and `invoice.paid` for both residential (`booking_id` metadata) and commercial (`job_id` metadata) |
 | `netlify/functions/payment-summary.js` | Safe payment DTO; hides `hostedInvoiceUrl` until final PI created |
 | `netlify/functions/get-completion-photo-url.js` | Admin: signed upload URL for after-job photos |
-| `netlify/functions/complete-job.js` | Saves completion package + creates final PI + sends single customer email |
+| `netlify/functions/complete-job.js` | Saves completion package + creates final PI + sends single customer email (residential) |
 | `netlify/functions/get-final-job-page.js` | Customer final page: completion data, signed photo URLs, final PI secret |
 | `netlify/functions/residential-completion-pdf.js` | Completion PDF (pdfkit, clean text-only layout: header, job details, work summary, invoice breakdown) |
 | `netlify/functions/reconcile-stripe.js` | Admin: re-link Stripe → Supabase on partial failure |
 | `netlify/functions/admin-payment-action.js` | Admin: refresh, resend final link, reconcile |
-| `src/pages/ApprovedQuote.jsx` | Customer quote page with Stripe Payment Element (deposit) |
-| `src/pages/FinalPaymentPage.jsx` | Customer final page: completion package display + final payment |
+| `src/pages/ApprovedQuote.jsx` | Customer quote page with Stripe Payment Element (deposit) — residential |
+| `src/pages/FinalPaymentPage.jsx` | Customer final page: completion package display + final payment — residential |
+| `src/pages/CommercialAdminPage.jsx` | Standalone admin queue at `/admin/commercial` — two-panel: job list + detail with status-based action panels |
+| `src/pages/CommercialQuotePage.jsx` | Public quote acceptance page at `/commercial/quote/:token` — no login required; Stripe deposit payment |

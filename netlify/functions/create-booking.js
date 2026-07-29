@@ -172,7 +172,7 @@ export default async function handler(req) {
       const confirmationCode = `#${booking.id.slice(0, 8).toUpperCase()}`;
 
       if (resendKey) {
-        fetch('https://api.resend.com/emails', {
+        await fetch('https://api.resend.com/emails', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${resendKey}`,

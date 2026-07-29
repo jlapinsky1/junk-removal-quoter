@@ -1,5 +1,6 @@
 import { getServiceClient } from './_shared/supabase.js';
 import { getStripeClient, calculateDepositCents } from './_shared/stripe.js';
+// Note: calculateDepositCents is used for both residential and commercial deposit handling
 
 // Must NOT use jsonResponse helper — Stripe expects specific response shapes
 function respond(body, status = 200) {
@@ -106,13 +107,27 @@ export default async function handler(req) {
 
   try {
     switch (event.type) {
-      case 'invoice_payment.paid':
-        await handleInvoicePaymentPaid(stripe, supabase, event);
+      case 'invoice_payment.paid': {
+        // Route by metadata: booking_id = residential, job_id = commercial
+        const invPayment = event.data.object;
+        const inv = await stripe.invoices.retrieve(invPayment.invoice);
+        if (inv.metadata?.booking_id) {
+          await handleInvoicePaymentPaid(stripe, supabase, event);
+        } else if (inv.metadata?.job_id) {
+          await handleCommercialInvoicePaymentPaid(supabase, inv, invPayment);
+        }
         break;
+      }
 
-      case 'invoice.paid':
-        await handleInvoicePaid(stripe, supabase, event);
+      case 'invoice.paid': {
+        const inv = event.data.object;
+        if (inv.metadata?.booking_id) {
+          await handleInvoicePaid(stripe, supabase, event);
+        } else if (inv.metadata?.job_id) {
+          await handleCommercialInvoicePaid(supabase, inv);
+        }
         break;
+      }
 
       case 'payment_intent.payment_failed':
         await handlePaymentFailed(supabase, event);
@@ -437,6 +452,79 @@ async function sendFinalPaidReceiptEmail(supabase, booking) {
   } catch (e) {
     console.error('Failed to send final receipt email:', e.message);
   }
+}
+
+// ── Commercial: invoice_payment.paid ─────────────────────────────────────
+
+async function handleCommercialInvoicePaymentPaid(supabase, invoice, invoicePayment) {
+  const jobId = invoice.metadata?.job_id;
+  if (!jobId) return;
+
+  const { data: job, error } = await supabase
+    .from('jobs')
+    .select('id, status, stripe_invoice_id, stripe_deposit_payment_intent_id, deposit_confirmed_at')
+    .eq('id', jobId)
+    .single();
+
+  if (error || !job) throw new Error(`Commercial job not found: ${jobId}`);
+  if (job.stripe_invoice_id !== invoice.id) return; // Not our invoice
+
+  const piId = invoicePayment.payment?.payment_intent;
+  const amountPaid = invoicePayment.amount_paid;
+  const requiredDeposit = calculateDepositCents(invoice.amount_due);
+
+  const isDepositPI = piId === job.stripe_deposit_payment_intent_id;
+
+  if ((isDepositPI || !job.deposit_confirmed_at) && amountPaid >= requiredDeposit) {
+    // Confirm deposit → move to scheduled
+    if (!job.deposit_confirmed_at) {
+      await supabase
+        .from('jobs')
+        .update({
+          status: 'scheduled',
+          deposit_confirmed_at: new Date().toISOString(),
+          stripe_deposit_payment_intent_id: piId || job.stripe_deposit_payment_intent_id,
+        })
+        .eq('id', jobId);
+
+      // Notify admin
+      const adminEmail = process.env.ADMIN_EMAIL;
+      const resendKey = process.env.RESEND_API_KEY;
+      if (adminEmail && resendKey) {
+        await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${resendKey}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            from: `Squatterz <${process.env.RESEND_FROM_EMAIL || 'noreply@squatterz.com'}>`,
+            to: [adminEmail],
+            subject: `Commercial deposit received — job ${jobId.slice(0, 8).toUpperCase()}`,
+            html: `<p>Deposit confirmed for commercial job ${jobId}. Job is now scheduled.</p>
+                   <p><a href="${process.env.URL || ''}/admin/commercial">View in admin →</a></p>`,
+          }),
+        }).catch(e => console.error('Admin deposit notification failed:', e.message));
+      }
+    }
+  }
+}
+
+// ── Commercial: invoice.paid (final payment) ──────────────────────────────
+
+async function handleCommercialInvoicePaid(supabase, invoice) {
+  const jobId = invoice.metadata?.job_id;
+  if (!jobId || invoice.amount_remaining !== 0) return;
+
+  const { data: job } = await supabase
+    .from('jobs')
+    .select('id, stripe_invoice_id, financially_completed_at')
+    .eq('id', jobId)
+    .single();
+
+  if (!job || job.stripe_invoice_id !== invoice.id || job.financially_completed_at) return;
+
+  await supabase
+    .from('jobs')
+    .update({ financially_completed_at: new Date().toISOString() })
+    .eq('id', jobId);
 }
 
 export const config = {

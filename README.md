@@ -53,6 +53,7 @@ VITE_SUPABASE_ANON_KEY=
 VITE_STRIPE_PUBLISHABLE_KEY=pk_test_...
 SHOP_LAT=                    # shop/home-base latitude — enables real travel time
 SHOP_LNG=                    # shop/home-base longitude — enables real travel time
+ADMIN_EMAIL=                 # admin notification address for new commercial job requests
 VITE_GOOGLE_MAPS_API_KEY=   # optional
 TURNSTILE_SECRET_KEY=        # optional
 VITE_TURNSTILE_SITE_KEY=    # optional
@@ -220,6 +221,20 @@ Returns 404 (not 403) when disabled — does not reveal its existence. Secret co
 | `/api/dispatch-jobs-today` | GET | dispatch token | List today's jobs for dispatch |
 | `/api/test/lookup` | GET + DELETE | X-Test-Secret | Test-only record lookup (disabled in prod) |
 
+### Commercial portal endpoints
+
+| Endpoint | Method | Auth | Purpose |
+|---|---|---|---|
+| `/api/create-commercial-job` | POST | client JWT | Submit work order (creates job, links photos, sends admin + client emails) |
+| `/api/get-admin-commercial-jobs` | GET | admin JWT | Paginated, filterable commercial job list |
+| `/api/get-admin-commercial-job-detail` | GET | admin JWT | Full job detail: client, property, photos, Stripe payment summary |
+| `/api/send-commercial-quote` | POST | admin JWT | Set estimate, create Stripe invoice, send quote email with token link |
+| `/api/get-commercial-quote` | GET | quote token | Public quote view DTO (no PII beyond names, no internal costs) |
+| `/api/accept-commercial-quote` | POST | token or client JWT | Accept quote → status `awaiting_payment` |
+| `/api/create-commercial-deposit` | POST | token or client JWT | Create Stripe deposit PaymentIntent (50%) |
+| `/api/update-commercial-job` | POST | admin JWT | Update status, scheduled date, or admin notes |
+| `/api/complete-commercial-job` | POST | admin JWT | Mark complete, link before/after photos, send completion packet + final invoice email |
+
 ---
 
 ## Service Area Architecture
@@ -239,12 +254,42 @@ Service area config is stored in Netlify Blobs (not the database) so it survives
 
 ## Commercial Portal
 
-The commercial portal is a separate authenticated experience for recurring business clients:
+The commercial portal is a separate authenticated experience for recurring business clients (property managers, etc.) with a full end-to-end workflow mirroring the residential flow:
 
-- Clients authenticate via Supabase Auth
-- Properties and jobs (work orders) are accessed directly via Supabase REST with RLS
-- RLS scopes all rows to `commercial_clients.user_id = auth.uid()` — no cross-tenant data leakage
-- No Netlify Functions wrapper for portal CRUD — Supabase enforces access at the database level
+### Client-side routes
+| Route | Description |
+|---|---|
+| `/commercial` | Marketing/info page |
+| `/portal/login` | Portal sign-in / account setup |
+| `/portal` | Authenticated client dashboard (jobs, invoices, properties) |
+| `/commercial/quote/:token` | Public quote acceptance page (no login required — linked from quote email) |
+
+### Admin-side route
+| Route | Description |
+|---|---|
+| `/admin/commercial` | Separate commercial job queue (distinct from residential `/admin`) |
+
+### Commercial job status flow
+```
+pending_review → quote_sent → awaiting_payment → scheduled → in_progress → completed
+```
+
+### How it works
+1. Client submits work order via portal (with optional drag-and-drop photos)
+2. Admin reviews at `/admin/commercial`, sets estimate, clicks "Send Quote"
+3. Client receives email with quote amount + "Review & Accept" link → `/commercial/quote/:token`
+4. Client accepts quote and pays 50% deposit via Stripe (no login required on the quote page, or via portal)
+5. Stripe webhook confirms deposit → job moves to `scheduled`; admin receives email notification
+6. Admin updates scheduled date, marks `in_progress` when crew arrives
+7. Admin uploads before/after photos, adds completion notes, clicks "Complete & Send Packet"
+8. Client receives completion packet email (before/after photos + final invoice link)
+9. Client pays remaining 50% balance via Stripe hosted invoice page
+10. `invoice.paid` webhook → `financially_completed_at` set; completion packet visible in portal
+
+### Auth model
+- Clients authenticate via Supabase Auth; RLS scopes all rows to `commercial_clients.user_id = auth.uid()` — no cross-tenant data leakage
+- Quote acceptance via email token requires no login (token-based, 7-day expiry)
+- All write operations from Netlify Functions use the service role (bypasses RLS); ownership is verified server-side
 
 ---
 
@@ -272,6 +317,7 @@ The commercial portal is a separate authenticated experience for recurring busin
 | `012_support_notes.sql` | `support_notes` table for admin-only timestamped notes on completed bookings; RLS via `is_admin()` |
 | `013_dispatch.sql` | Dispatch interface tables and auth: `dispatch_tokens`, `dispatch_events`; status transitions for `in_progress` enforcement |
 | `014_distance_fields.sql` | Adds `distance_miles` and `travel_minutes_one_way` columns to `bookings`; populated by `geocode-booking` function |
+| `015_commercial_workflow.sql` | Extends `jobs` table for full quote→deposit→completion workflow: expands status enum (adds `pending_review`, `quote_sent`, `awaiting_payment`; migrates `open` → `pending_review`), adds Stripe/quote/payment columns, adds `submission` kind to `job_photos` |
 
 ---
 

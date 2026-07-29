@@ -12,6 +12,8 @@ import ApprovedQuote from './pages/ApprovedQuote';
 import FinalPaymentPage from './pages/FinalPaymentPage';
 import AdminLogin from './pages/AdminLogin';
 import Commercial from './pages/Commercial';
+import CommercialAdminPage from './pages/CommercialAdminPage';
+import CommercialQuotePage from './pages/CommercialQuotePage';
 import ServiceAreaAdmin from './pages/ServiceAreaAdmin';
 import ClientLogin from './pages/ClientLogin';
 import ClientPortal from './pages/ClientPortal';
@@ -111,6 +113,8 @@ export default function App() {
       <Route path="/portal/login" element={<ClientLogin />} />
       <Route path="/portal" element={<ClientPortal />} />
       <Route path="/admin" element={<AdminDashboard />} />
+      <Route path="/admin/commercial" element={<CommercialAdminPage />} />
+      <Route path="/commercial/quote/:token" element={<CommercialQuotePage />} />
       <Route path="/dispatch" element={<DispatchPage />} />
     </Routes>
   );

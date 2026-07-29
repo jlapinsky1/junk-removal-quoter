@@ -77,6 +77,10 @@ export const ikey = {
   invoice:   (bookingId, quoteVersion) => `invoice-v${quoteVersion}-${bookingId}`,
   depositPI: (bookingId, quoteVersion) => `deposit-pi-v${quoteVersion}-${bookingId}`,
   finalPI:   (bookingId)               => `final-pi-${bookingId}`,
+  // Commercial
+  commCustomer: (jobId) => `comm-customer-${jobId}`,
+  commInvoice:  (jobId) => `comm-invoice-${jobId}`,
+  commDepositPI:(jobId) => `comm-deposit-pi-${jobId}`,
 };
 
 /**
@@ -87,6 +91,26 @@ export const ikey = {
  * @param {{ id: string, customer_email: string|null, customer_name: string }} booking
  * @returns {Promise<string>} customerId
  */
+/**
+ * Get or create a Stripe Customer for a commercial job.
+ * @param {Stripe} stripe
+ * @param {{ id: string, email: string|null, contactName: string|null, companyName: string|null }} job
+ */
+export async function getOrCreateCommercialStripeCustomer(stripe, job) {
+  const customer = await stripe.customers.create(
+    {
+      email: job.email || undefined,
+      name: job.companyName || job.contactName || undefined,
+      metadata: {
+        job_id: job.id,
+        environment: process.env.NODE_ENV || 'production',
+      },
+    },
+    { idempotencyKey: ikey.commCustomer(job.id) }
+  );
+  return customer.id;
+}
+
 export async function getOrCreateStripeCustomer(stripe, booking) {
   const customer = await stripe.customers.create(
     {

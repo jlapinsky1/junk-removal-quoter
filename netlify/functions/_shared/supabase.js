@@ -114,6 +114,29 @@ export function generateToken() {
 }
 
 /**
+ * Verify a commercial portal client JWT.
+ * Returns { user, client } if valid, null otherwise.
+ */
+export async function verifyCommercialClient(req) {
+  const auth = req.headers.get('authorization');
+  if (!auth?.startsWith('Bearer ')) return null;
+  const token = auth.slice(7);
+
+  const supabase = getServiceClient();
+  const { data: { user }, error } = await supabase.auth.getUser(token);
+  if (error || !user) return null;
+
+  const { data: client } = await supabase
+    .from('commercial_clients')
+    .select('id, company_name, contact_name, phone, user_id')
+    .eq('user_id', user.id)
+    .single();
+
+  if (!client) return null;
+  return { user, client };
+}
+
+/**
  * JSON response helper.
  */
 export function jsonResponse(body, status = 200) {

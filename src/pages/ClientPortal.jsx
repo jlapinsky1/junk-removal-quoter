@@ -176,17 +176,19 @@ function Dashboard({ go }) {
   const [stats, setStats] = useState({ open: 0, scheduled: 0, completed: 0, outstanding: 0 });
   const [recent, setRecent] = useState([]);
   const [outstandingTotal, setOutstandingTotal] = useState(0);
+  const [pendingQuotes, setPendingQuotes] = useState([]);
 
   const loadData = async () => {
     setLoading(true);
     setError(null);
     try {
-      const [openR, scheduledR, completedR, invoicesR, recentR] = await Promise.all([
-        supabase.from("jobs").select("id", { count: "exact", head: true }).eq("status", "open"),
+      const [openR, scheduledR, completedR, invoicesR, recentR, quotesR] = await Promise.all([
+        supabase.from("jobs").select("id", { count: "exact", head: true }).in("status", ["pending_review", "open"]),
         supabase.from("jobs").select("id", { count: "exact", head: true }).eq("status", "scheduled"),
         supabase.from("jobs").select("id", { count: "exact", head: true }).eq("status", "completed"),
         supabase.from("invoices").select("amount").in("status", ["outstanding", "overdue"]),
         supabase.from("jobs").select("*, properties(*)").order("created_at", { ascending: false }).limit(6),
+        supabase.from("jobs").select("id, estimate, unit, properties(name)").eq("status", "quote_sent"),
       ]);
       const firstError = [openR, scheduledR, completedR, invoicesR, recentR].find(r => r.error)?.error;
       if (firstError) {
@@ -201,6 +203,7 @@ function Dashboard({ go }) {
         });
         setOutstandingTotal((invoicesR.data ?? []).reduce((s, i) => s + Number(i.amount), 0));
         setRecent(recentR.data ?? []);
+        setPendingQuotes(quotesR.data ?? []);
       } catch (e) {
         setError(e.message ?? "Something went wrong");
       } finally {
@@ -226,6 +229,33 @@ function Dashboard({ go }) {
         <h1 className="text-2xl md:text-3xl font-black text-white tracking-tight">Dashboard</h1>
         <p className="mt-1.5 text-sm text-white/45">Your portfolio at a glance.</p>
       </div>
+
+      {pendingQuotes.length > 0 && (
+        <div className="bg-[#22c55e]/10 border border-[#22c55e]/25 rounded-2xl p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <DollarSign className="w-4 h-4 text-[#22c55e]" />
+            <span className="font-bold text-white text-sm">
+              {pendingQuotes.length === 1 ? "You have an estimate ready" : `You have ${pendingQuotes.length} estimates ready`}
+            </span>
+          </div>
+          <div className="space-y-2">
+            {pendingQuotes.map(q => (
+              <div key={q.id} className="flex items-center justify-between bg-white/5 rounded-xl px-4 py-3">
+                <div>
+                  <p className="text-sm font-semibold text-white">{q.properties?.name || "Property"}{q.unit ? ` — Unit ${q.unit}` : ""}</p>
+                  {q.estimate && <p className="text-xs text-white/50">Estimate: ${Number(q.estimate).toFixed(2)}</p>}
+                </div>
+                <button
+                  onClick={() => go({ name: "jobs" })}
+                  className="bg-[#22c55e] hover:bg-[#16a34a] text-black font-bold text-xs px-4 py-2 rounded-full transition-colors"
+                >
+                  Review
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
         {cards.map(({ label, value, sub, icon: Icon, color, bg, onClick }) => (
@@ -898,6 +928,9 @@ function NewRequest({ go }) {
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState(null);
   const [form, setForm] = useState({ property_id: "", unit: "", description: "", preferred_date: "", access_notes: "" });
+  const [photos, setPhotos] = useState([]); // File[]
+  const [dragOver, setDragOver] = useState(false);
+  const fileInputRef = React.useRef();
 
   useEffect(() => {
     (async () => {
@@ -913,21 +946,51 @@ function NewRequest({ go }) {
     })();
   }, []);
 
+  const addPhotos = (files) => {
+    const valid = Array.from(files).filter(f => f.type.startsWith("image/")).slice(0, 10 - photos.length);
+    setPhotos(prev => [...prev, ...valid].slice(0, 10));
+  };
+
+  const removePhoto = (idx) => setPhotos(prev => prev.filter((_, i) => i !== idx));
+
   const submit = async (e) => {
     e.preventDefault();
     if (!form.property_id) return;
     setSubmitting(true);
     setError(null);
     try {
-      const { error } = await supabase.from("jobs").insert({
-        property_id: form.property_id,
-        unit: form.unit || null,
-        description: form.description || null,
-        preferred_date: form.preferred_date ? new Date(form.preferred_date).toISOString() : null,
-        access_notes: form.access_notes || null,
-        status: "open",
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Not authenticated");
+
+      // Upload photos directly to Supabase Storage (authenticated)
+      const photoPaths = [];
+      for (const file of photos) {
+        const path = `submissions/${session.user.id}/${Date.now()}-${file.name.replace(/[^a-z0-9.]/gi, "_")}`;
+        const { data: uploadData, error: uploadErr } = await supabase.storage
+          .from("job-photos")
+          .upload(path, file, { contentType: file.type });
+        if (uploadErr) throw new Error(`Photo upload failed: ${uploadErr.message}`);
+        photoPaths.push(uploadData.path);
+      }
+
+      // Submit job via Netlify function (sends emails, links photos)
+      const res = await fetch("/api/create-commercial-job", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          propertyId: form.property_id,
+          unit: form.unit || null,
+          description: form.description || null,
+          preferredDate: form.preferred_date || null,
+          accessNotes: form.access_notes || null,
+          photoPaths,
+        }),
       });
-      if (error) throw error;
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to submit request");
       setSubmitted(true);
     } catch (e) {
       setError(e.message ?? "Failed to submit request");
@@ -947,10 +1010,11 @@ function NewRequest({ go }) {
         <h2 className="text-2xl font-black text-white">Request received</h2>
         <p className="text-sm text-white/50 mt-2 max-w-sm mx-auto">
           Our account manager will review your request and send an estimate within one business day.
+          You'll receive a confirmation email shortly.
         </p>
         <div className="flex flex-col sm:flex-row gap-3 justify-center mt-6">
           <button
-            onClick={() => { setSubmitted(false); setForm({ property_id: "", unit: "", description: "", preferred_date: "", access_notes: "" }); }}
+            onClick={() => { setSubmitted(false); setForm({ property_id: "", unit: "", description: "", preferred_date: "", access_notes: "" }); setPhotos([]); }}
             className="bg-[#22c55e] hover:bg-[#16a34a] text-black font-bold text-sm px-6 py-3 rounded-full transition-colors"
           >
             Submit Another
@@ -1034,6 +1098,50 @@ function NewRequest({ go }) {
             className="w-full bg-transparent text-sm text-white placeholder:text-white/30 outline-none resize-none"
           />
         </FormField>
+
+        {/* Photo upload */}
+        <div>
+          <label className="block text-sm font-semibold text-white/70 mb-2">
+            Photos <span className="text-white/30 font-normal">(optional, up to 10)</span>
+          </label>
+          <div
+            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={(e) => { e.preventDefault(); setDragOver(false); addPhotos(e.dataTransfer.files); }}
+            onClick={() => fileInputRef.current?.click()}
+            className={`border-2 border-dashed rounded-xl p-5 text-center cursor-pointer transition-colors ${
+              dragOver ? "border-[#22c55e]/60 bg-[#22c55e]/5" : "border-white/10 hover:border-white/20"
+            }`}
+          >
+            <Camera className="w-6 h-6 text-white/30 mx-auto mb-2" />
+            <p className="text-sm text-white/40">Drag &amp; drop photos or <span className="text-[#22c55e]">browse</span></p>
+            <p className="text-xs text-white/25 mt-1">Help us assess the job before your estimate</p>
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => addPhotos(e.target.files)}
+            />
+          </div>
+          {photos.length > 0 && (
+            <div className="grid grid-cols-4 gap-2 mt-3">
+              {photos.map((file, i) => (
+                <div key={i} className="relative aspect-square rounded-lg overflow-hidden bg-white/5 border border-white/8 group">
+                  <img src={URL.createObjectURL(file)} alt="" className="w-full h-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); removePhoto(i); }}
+                    className="absolute top-1 right-1 w-5 h-5 bg-black/70 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <X className="w-3 h-3 text-white" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
         <button
           type="submit"

@@ -21,6 +21,12 @@ export default function Navigation({ activeTab, onTabChange, onSignOut }) {
           >
             Dispatch
           </a>
+          <a
+            href="/admin/commercial"
+            className="text-xs font-semibold bg-blue-700 hover:bg-blue-600 text-white px-3 py-1.5 rounded-lg transition-colors"
+          >
+            Commercial
+          </a>
           <h1 className="text-lg font-bold">Junk Removal Admin</h1>
           {onSignOut ? (
             <button onClick={onSignOut} className="text-xs text-gray-400 hover:text-white">

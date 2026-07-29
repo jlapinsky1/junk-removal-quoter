@@ -15,6 +15,7 @@
 | `STRIPE_WEBHOOK_SECRET` | `whsec_...` from `stripe listen` output |
 | `SHOP_LAT` | Latitude of shop / home base (enables real travel time via geocoding) |
 | `SHOP_LNG` | Longitude of shop / home base (enables real travel time via geocoding) |
+| `ADMIN_EMAIL` | Admin notification address — receives email when new commercial job is submitted and when commercial deposits are confirmed |
 | `TURNSTILE_SECRET_KEY` | Cloudflare Turnstile server secret (optional) |
 | `NODE_ENV` | Set to `test` only in test environments — never in production |
 | `ENABLE_TEST_ENDPOINTS` | Set to `true` only in test environments — never in production |
@@ -49,6 +50,7 @@ Run all migrations in `supabase/migrations/` in order against the production dat
 | `012_support_notes.sql` | `support_notes` table; RLS via `is_admin()` |
 | `013_dispatch.sql` | `dispatch_tokens`, `dispatch_events` tables for crew dispatch interface |
 | `014_distance_fields.sql` | `distance_miles`, `travel_minutes_one_way` columns on `bookings` |
+| `015_commercial_workflow.sql` | Extends `jobs`: expands status enum (adds `pending_review`, `quote_sent`, `awaiting_payment`; migrates `open` → `pending_review`); adds `quote_token_hash`, `stripe_*`, `deposit_confirmed_at`, `financially_completed_at`, `admin_notes`, `quoted_at`, `quote_sent_at`, `quote_expires_at` columns; adds `submission` kind to `job_photos` |
 
 Migration 001 creates:
 - 11 tables: `admin_users`, `rate_limits`, `upload_sessions`, `session_photos`, `bookings`, `booking_photos`, `quote_snapshots`, `quote_tokens`, `slot_reservations`, `quote_acceptances`, `audit_log`
@@ -226,11 +228,25 @@ The Python regression suite tests API contracts and database persistence. These 
 - [ ] Final payment → invoice.paid → financially_completed_at set
 - [ ] PDF download link works; PDF shows Squatterz branding, job details, work summary, and invoice breakdown (text-only, no embedded photos)
 
-**Commercial portal:**
+**Commercial portal (client-side):**
 - [ ] Portal login → dashboard renders correctly
-- [ ] New work order request form → submission confirmation
+- [ ] Dashboard shows "Pending Quotes" alert when a quote is in `quote_sent` status
+- [ ] New work order form → drag-and-drop photo upload works, submission sends confirmation email to client and notification to `ADMIN_EMAIL`
 - [ ] Completion packet PDF opens correctly in browser
 - [ ] Client cannot access another client's data (isolation)
+
+**Commercial admin (`/admin/commercial`):**
+- [ ] "Commercial" button in admin nav links to `/admin/commercial`
+- [ ] Job list loads with status filter tabs and search
+- [ ] Selecting a job shows detail: client info, property info, submission photos, action panels
+- [ ] Quote panel: enter estimate, "Send Quote Email" → client receives email with token link, job moves to `quote_sent`
+- [ ] Quote email link (`/commercial/quote/:token`) loads correctly, shows estimate + deposit split
+- [ ] Accept quote on quote page → status moves to `awaiting_payment`
+- [ ] Pay deposit on quote page (test card `4242 4242 4242 4242`) → deposit confirmed, job moves to `scheduled`, admin receives notification email
+- [ ] Schedule panel: set service date, "Mark In Progress"
+- [ ] Completion panel: upload before + after photos, enter notes, "Complete & Send Packet" → client receives completion email with photos + final invoice link
+- [ ] Final payment via Stripe hosted invoice link → `financially_completed_at` set
+- [ ] Admin notes save without affecting client-visible data
 
 **Error states:**
 - [ ] Expired quote URL shows "no longer available"
@@ -246,7 +262,7 @@ The Python regression suite tests API contracts and database persistence. These 
 Before running the Python regression suite against staging:
 
 1. Create a staging Supabase project (never use production)
-2. Run all migrations (001–014) against staging
+2. Run all migrations (001–015) against staging
 3. Create test admin and client users in Supabase Auth
 4. Insert admin user into `admin_users` table
 5. Ensure admin user has a `commercial_clients` row for portal tests
