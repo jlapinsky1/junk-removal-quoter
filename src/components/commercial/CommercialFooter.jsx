@@ -39,11 +39,12 @@ export default function CommercialFooter() {
             </p>
             <ul className="space-y-2.5">
               {[
-                { label: "Property Management Cleanup", to: "/commercial/property-management-cleanup" },
-                { label: "Apartment Cleanouts", to: "/commercial/apartment-cleanouts" },
+                { label: "Apartment & Unit Cleanouts", to: "/commercial/apartment-cleanouts" },
                 { label: "Eviction Cleanup", to: "/commercial/eviction-cleanup" },
                 { label: "Unit Turnover Cleanout", to: "/commercial/unit-turnover-cleanout" },
                 { label: "Bulk Trash Removal", to: "/commercial/bulk-trash-removal" },
+                { label: "Recurring Property Cleanup", to: "/commercial/property-management-cleanup" },
+                { label: "Client Portal", to: "/commercial/client-portal" },
               ].map(({ label, to }) => (
                 <li key={to}>
                   <Link to={to} className="text-xs text-white/45 hover:text-white/80 transition-colors">
