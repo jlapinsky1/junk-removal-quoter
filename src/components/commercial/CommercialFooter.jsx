@@ -88,7 +88,7 @@ export default function CommercialFooter() {
                   }}
                   className="text-xs text-white/45 hover:text-white/80 transition-colors"
                 >
-                  Start an Account
+                  Request an Estimate
                 </button>
               </li>
             </ul>

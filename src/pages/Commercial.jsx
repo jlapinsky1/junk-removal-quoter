@@ -302,19 +302,19 @@ export default function Commercial() {
                   }}
                   className="bg-[#22c55e] hover:bg-[#16a34a] active:scale-[0.98] text-black font-bold text-base px-8 py-4 rounded-full flex items-center justify-center gap-2 transition-all"
                 >
-                  Start a Cleanup Request <ArrowRight className="w-4 h-4" />
+                  Request an Estimate <ArrowRight className="w-4 h-4" />
                 </button>
                 <Link
                   to="/commercial/client-portal"
                   onClick={() => trackEvent("portal_demo_click", { location: "hero" })}
                   className="border border-white/15 hover:border-white/30 text-white font-semibold text-base px-8 py-4 rounded-full flex items-center justify-center gap-2 transition-colors"
                 >
-                  See How the Portal Works
+                  See the Client Portal
                 </Link>
               </div>
 
               <p className="text-sm text-white/35 leading-relaxed">
-                Create your commercial account, add the property, and submit your first work order. Future requests take only a few clicks.
+                Tell us about the cleanup first. When you submit, you'll create secure portal access so the property and request are ready for next time.
               </p>
 
               <div className="flex flex-wrap gap-x-6 gap-y-2 pt-2">
@@ -744,7 +744,7 @@ export default function Commercial() {
                 }}
                 className="border border-white/15 hover:border-white/30 text-white font-semibold px-7 py-3.5 rounded-full text-sm transition-colors flex items-center justify-center gap-2"
               >
-                Start an Account <ArrowRight className="w-4 h-4" />
+                Request an Estimate <ArrowRight className="w-4 h-4" />
               </button>
             </div>
           </div>
@@ -771,7 +771,7 @@ export default function Commercial() {
               }}
               className="bg-[#22c55e] hover:bg-[#16a34a] text-black font-bold text-base px-8 py-4 rounded-full flex items-center justify-center gap-2 transition-all"
             >
-              Start a Cleanup Request <ArrowRight className="w-4 h-4" />
+              Request an Estimate <ArrowRight className="w-4 h-4" />
             </button>
             <a
               href="tel:7706282877"

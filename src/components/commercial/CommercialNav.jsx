@@ -51,7 +51,7 @@ export default function CommercialNav() {
             }}
             className="bg-[#22c55e] hover:bg-[#16a34a] text-black font-bold text-sm px-5 py-2.5 rounded-full transition-colors"
           >
-            Start a Cleanup Request
+            Request an Estimate
           </button>
         </div>
 
@@ -69,7 +69,7 @@ export default function CommercialNav() {
             }}
             className="bg-[#22c55e] text-black font-bold text-xs px-4 py-2 rounded-full"
           >
-            Get Started
+            Request an Estimate
           </button>
         </div>
       </div>

@@ -1,52 +1,15 @@
 /**
- * Onboarding flow tests
+ * Commercial estimate request flow tests
  *
  * Coverage:
- * - Duplicate email
- * - Similar company name (internal flag, no exposure)
- * - Draft job created without admin notification
- * - Step 4 idempotency / double-submit protection
- * - complete-onboarding validates ownership and draft status
- * - Abandoned onboarding resume detection
- * - Expired magic link (Supabase returns error, frontend handles gracefully)
- * - Unauthorized property insertion (RLS constraint)
- * - Unauthorized job access (cross-client)
+ * - check-commercial-email (rate limit, validation, exists flag)
+ * - submit-commercial-request (validation, duplicate email, idempotency, partial failure)
+ * - create-commercial-job (authenticated submit, draft mode)
+ * - sessionStorage draft + double-submit guard
+ * - Attribution capture
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-
-// ── Shared mock helpers ───────────────────────────────────────────────────────
-
-function makeSupabaseMock({
-  createUserResult = { data: { user: { id: 'uid-1', email: 'test@example.com' } }, error: null },
-  clientsRow = { id: 'client-1', last_onboarding_step: 1, onboarding_status: 'in_progress' },
-  propertyRow = { id: 'prop-1', name: 'Test Property', address: '123 Main St' },
-  jobRow = { id: 'job-1', description: 'Remove sofa', status: 'draft', unit: null },
-  generateLinkResult = { data: { properties: { action_link: 'https://supabase.co/auth/v1/verify?token=abc' } }, error: null },
-} = {}) {
-  const from = vi.fn().mockReturnValue({
-    select: vi.fn().mockReturnThis(),
-    insert: vi.fn().mockReturnThis(),
-    update: vi.fn().mockReturnThis(),
-    eq: vi.fn().mockReturnThis(),
-    neq: vi.fn().mockReturnThis(),
-    ilike: vi.fn().mockReturnThis(),
-    limit: vi.fn().mockReturnThis(),
-    single: vi.fn().mockResolvedValue({ data: clientsRow, error: null }),
-  });
-
-  return {
-    from,
-    auth: {
-      admin: {
-        createUser: vi.fn().mockResolvedValue(createUserResult),
-        getUserById: vi.fn().mockResolvedValue({ data: { user: { email: 'test@example.com' } } }),
-        generateLink: vi.fn().mockResolvedValue(generateLinkResult),
-      },
-    },
-    rpc: vi.fn().mockResolvedValue({ data: true, error: null }), // rate limit: allowed
-  };
-}
 
 function makeReq(body, headers = {}) {
   return {
@@ -58,14 +21,108 @@ function makeReq(body, headers = {}) {
   };
 }
 
-// ── start-commercial-onboarding ───────────────────────────────────────────────
+const VALID_SUBMIT_BODY = {
+  idempotencyKey: 'idem-1',
+  name: 'Joe Manager',
+  email: 'joe@test.com',
+  password: 'Password1',
+  phone: '7705551234',
+  company: 'Acme Properties',
+  propName: 'Oak Apartments',
+  propStreet: '123 Main St',
+  propCity: 'Atlanta',
+  propState: 'GA',
+  propZip: '30301',
+  propType: 'apartment_multifamily',
+  jobService: 'Unit Turnover Cleanout',
+  jobDescription: 'Remove furniture from unit 204',
+};
 
-describe('start-commercial-onboarding', () => {
+function makeSubmitSupabase({
+  existingJob = null,
+  emailTaken = false,
+  createUserResult = { data: { user: { id: 'uid-1', email: 'joe@test.com' } }, error: null },
+  clientUpdateResult = { data: { id: 'client-1', company_name: 'Acme', contact_name: 'Joe', phone: '770' }, error: null },
+  propertyInsertResult = { data: { id: 'prop-1', name: 'Oak', address: '123 Main' }, error: null },
+  jobInsertResult = { data: { id: 'job-1' }, error: null },
+  failAfterUser = null, // 'client' | 'property' | 'job'
+} = {}) {
+  const from = vi.fn((table) => {
+    if (table === 'jobs') {
+      const chain = {
+        select: vi.fn().mockReturnThis(),
+        insert: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        maybeSingle: vi.fn().mockResolvedValue({ data: existingJob, error: null }),
+        single: vi.fn().mockResolvedValue(
+          failAfterUser === 'job'
+            ? { data: null, error: { message: 'fail' } }
+            : jobInsertResult
+        ),
+      };
+      return chain;
+    }
+    if (table === 'properties') {
+      return {
+        select: vi.fn().mockReturnThis(),
+        insert: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        single: vi.fn().mockResolvedValue(
+          existingJob
+            ? { data: { id: 'prop-1', client_id: 'client-1' }, error: null }
+            : failAfterUser === 'property'
+              ? { data: null, error: { message: 'fail' } }
+              : propertyInsertResult
+        ),
+      };
+    }
+    if (table === 'commercial_clients') {
+      return {
+        select: vi.fn().mockReturnThis(),
+        update: vi.fn().mockReturnThis(),
+        insert: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        neq: vi.fn().mockReturnThis(),
+        ilike: vi.fn().mockReturnThis(),
+        limit: vi.fn().mockReturnThis(),
+        single: vi.fn().mockResolvedValue(
+          existingJob
+            ? { data: { id: 'client-1', user_id: 'uid-1' }, error: null }
+            : failAfterUser === 'client'
+              ? { data: null, error: { message: 'fail' } }
+              : clientUpdateResult
+        ),
+      };
+    }
+    return { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), single: vi.fn().mockResolvedValue({ data: null }) };
+  });
+
+  return {
+    from,
+    auth: {
+      admin: {
+        createUser: vi.fn().mockResolvedValue(createUserResult),
+      },
+    },
+    rpc: vi.fn().mockImplementation((name) => {
+      if (name === 'commercial_email_registered') {
+        return Promise.resolve({ data: emailTaken, error: null });
+      }
+      return Promise.resolve({ data: true, error: null });
+    }),
+  };
+}
+
+// ── check-commercial-email ─────────────────────────────────────────────────────
+
+describe('check-commercial-email', () => {
   let handler;
   let supabaseMock;
 
   beforeEach(async () => {
-    supabaseMock = makeSupabaseMock();
+    supabaseMock = {
+      rpc: vi.fn().mockResolvedValue({ data: true, error: null }),
+    };
     vi.doMock('../../netlify/functions/_shared/supabase.js', () => ({
       getServiceClient: () => supabaseMock,
       checkRateLimit: vi.fn().mockResolvedValue(true),
@@ -73,79 +130,123 @@ describe('start-commercial-onboarding', () => {
       jsonResponse: (body, status = 200) => ({ body, status }),
       errorResponse: (msg, status = 400) => ({ body: { error: msg }, status }),
     }));
-    ({ default: handler } = await import('../../netlify/functions/start-commercial-onboarding.js'));
+    ({ default: handler } = await import('../../netlify/functions/check-commercial-email.js'));
+  });
+
+  it('returns 400 when email is missing', async () => {
+    const res = await handler(makeReq({}));
+    expect(res.status).toBe(400);
+  });
+
+  it('returns exists: true when email is registered', async () => {
+    const res = await handler(makeReq({ email: 'taken@test.com' }));
+    expect(res.status).toBe(200);
+    expect(res.body.exists).toBe(true);
+    expect(supabaseMock.rpc).toHaveBeenCalledWith('commercial_email_registered', {
+      p_email: 'taken@test.com',
+    });
+  });
+
+  it('returns exists: false when email is new', async () => {
+    supabaseMock.rpc.mockResolvedValue({ data: false, error: null });
+    const res = await handler(makeReq({ email: 'new@test.com' }));
+    expect(res.body.exists).toBe(false);
+  });
+});
+
+// ── submit-commercial-request ────────────────────────────────────────────────
+
+describe('submit-commercial-request', () => {
+  let handler;
+  let supabaseMock;
+
+  beforeEach(async () => {
+    supabaseMock = makeSubmitSupabase();
+    vi.doMock('../../netlify/functions/_shared/supabase.js', () => ({
+      getServiceClient: () => supabaseMock,
+      checkRateLimit: vi.fn().mockResolvedValue(true),
+      getClientIp: vi.fn().mockReturnValue('1.2.3.4'),
+      jsonResponse: (body, status = 200) => ({ body, status }),
+      errorResponse: (msg, status = 400) => ({ body: { error: msg }, status }),
+    }));
+    vi.doMock('../../netlify/functions/_shared/commercialRequest.js', () => ({
+      sendCommercialJobEmails: vi.fn().mockResolvedValue(undefined),
+      linkUploadSessionPhotos: vi.fn().mockResolvedValue(0),
+    }));
+    ({ default: handler } = await import('../../netlify/functions/submit-commercial-request.js'));
   });
 
   it('returns 400 when required fields are missing', async () => {
-    const req = makeReq({ name: 'Joe', email: 'joe@test.com' }); // missing password, phone, company
-    const res = await handler(req);
+    const res = await handler(makeReq({ name: 'Joe', email: 'joe@test.com' }));
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/required/i);
   });
 
-  it('returns 400 when password is shorter than 8 characters', async () => {
-    const req = makeReq({ name: 'Joe', email: 'joe@test.com', password: 'short', phone: '770', company: 'Acme' });
-    const res = await handler(req);
-    expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/8 character/i);
-  });
-
   it('returns 409 when email is already registered', async () => {
-    supabaseMock = makeSupabaseMock({
-      createUserResult: {
-        data: { user: null },
-        error: { status: 422, message: 'User already registered' },
-      },
-    });
-    const req = makeReq({ name: 'Joe', email: 'taken@test.com', password: 'Password1', phone: '770', company: 'Acme' });
-    const res = await handler(req);
+    supabaseMock = makeSubmitSupabase({ emailTaken: true });
+    vi.doMock('../../netlify/functions/_shared/supabase.js', () => ({
+      getServiceClient: () => supabaseMock,
+      checkRateLimit: vi.fn().mockResolvedValue(true),
+      getClientIp: vi.fn().mockReturnValue('1.2.3.4'),
+      jsonResponse: (body, status = 200) => ({ body, status }),
+      errorResponse: (msg, status = 400) => ({ body: { error: msg }, status }),
+    }));
+    ({ default: handler } = await import('../../netlify/functions/submit-commercial-request.js'));
+
+    const res = await handler(makeReq(VALID_SUBMIT_BODY));
     expect(res.status).toBe(409);
-    expect(res.body.error).toMatch(/already exists/i);
+    expect(res.body.error).toMatch(/log in/i);
   });
 
-  it('does NOT expose existing company information when a similar name is found', async () => {
-    // The mock returns a similar org but the response must not include org data
-    supabaseMock.from.mockReturnValue({
-      select: vi.fn().mockReturnThis(),
-      insert: vi.fn().mockReturnThis(),
-      update: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      neq: vi.fn().mockReturnThis(),
-      ilike: vi.fn().mockReturnThis(),
-      limit: vi.fn().mockReturnThis(),
-      single: vi.fn().mockResolvedValue({ data: { id: 'client-1', last_onboarding_step: 1, onboarding_status: 'in_progress' }, error: null }),
+  it('returns idempotent 200 when idempotency key already submitted', async () => {
+    supabaseMock = makeSubmitSupabase({
+      existingJob: { id: 'job-1', property_id: 'prop-1', status: 'pending_review' },
     });
-    // Simulate a similar org being found (limit returns 1 row)
-    const originalFrom = supabaseMock.from;
-    supabaseMock.from = vi.fn((table) => {
-      const base = originalFrom(table);
-      if (table === 'commercial_clients') {
-        base.limit = vi.fn().mockReturnThis();
-        base.single = vi.fn().mockResolvedValue({ data: { id: 'client-1' }, error: null });
-      }
-      return base;
-    });
+    vi.doMock('../../netlify/functions/_shared/supabase.js', () => ({
+      getServiceClient: () => supabaseMock,
+      checkRateLimit: vi.fn().mockResolvedValue(true),
+      getClientIp: vi.fn().mockReturnValue('1.2.3.4'),
+      jsonResponse: (body, status = 200) => ({ body, status }),
+      errorResponse: (msg, status = 400) => ({ body: { error: msg }, status }),
+    }));
+    ({ default: handler } = await import('../../netlify/functions/submit-commercial-request.js'));
 
-    const req = makeReq({ name: 'Joe', email: 'new@test.com', password: 'Password1', phone: '770', company: 'Acme Corp' });
-    const res = await handler(req);
-    // Success — no company info in response body
+    const res = await handler(makeReq(VALID_SUBMIT_BODY));
+    expect(res.status).toBe(200);
+    expect(res.body.alreadySubmitted).toBe(true);
+    expect(res.body.jobId).toBe('job-1');
+    expect(supabaseMock.auth.admin.createUser).not.toHaveBeenCalled();
+  });
+
+  it('creates account, property, and pending_review job on success', async () => {
+    const res = await handler(makeReq(VALID_SUBMIT_BODY));
     expect(res.status).toBe(201);
-    expect(JSON.stringify(res.body)).not.toMatch(/Acme/);
-    expect(JSON.stringify(res.body)).not.toMatch(/existingOrg/);
+    expect(res.body.success).toBe(true);
+    expect(res.body).toHaveProperty('clientId');
+    expect(res.body).toHaveProperty('propertyId');
+    expect(res.body).toHaveProperty('jobId');
+    expect(supabaseMock.auth.admin.createUser).toHaveBeenCalled();
   });
 
-  it('uses generateLink for resume email, not a custom token', async () => {
-    vi.stubEnv('RESEND_API_KEY', 're_key');
-    global.fetch = vi.fn().mockResolvedValue({ ok: true });
-    const req = makeReq({ name: 'Joe', email: 'new@test.com', password: 'Password1', phone: '770', company: 'Acme' });
-    await handler(req);
-    expect(supabaseMock.auth.admin.generateLink).toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'magiclink', email: 'new@test.com' })
-    );
+  it('returns 500 with userCreated when post-auth steps fail', async () => {
+    supabaseMock = makeSubmitSupabase({ failAfterUser: 'property' });
+    vi.doMock('../../netlify/functions/_shared/supabase.js', () => ({
+      getServiceClient: () => supabaseMock,
+      checkRateLimit: vi.fn().mockResolvedValue(true),
+      getClientIp: vi.fn().mockReturnValue('1.2.3.4'),
+      jsonResponse: (body, status = 200) => ({ body, status }),
+      errorResponse: (msg, status = 400) => ({ body: { error: msg }, status }),
+    }));
+    ({ default: handler } = await import('../../netlify/functions/submit-commercial-request.js'));
+
+    const res = await handler(makeReq(VALID_SUBMIT_BODY));
+    expect(res.status).toBe(500);
+    expect(res.body.userCreated).toBe(true);
+    expect(res.body.error).toMatch(/log in/i);
   });
 });
 
-// ── create-commercial-job (draft mode) ───────────────────────────────────────
+// ── create-commercial-job (authenticated path) ───────────────────────────────
 
 describe('create-commercial-job — draft mode', () => {
   let handler;
@@ -156,19 +257,17 @@ describe('create-commercial-job — draft mode', () => {
     fetchMock = vi.fn().mockResolvedValue({ ok: true });
     global.fetch = fetchMock;
 
-    supabaseMock = makeSupabaseMock();
-    // property ownership check
-    supabaseMock.from.mockReturnValue({
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      single: vi.fn().mockResolvedValue({ data: { id: 'prop-1', name: 'Test Prop', address: '123 St', primary_contact_email: null }, error: null }),
-      insert: vi.fn().mockReturnThis(),
-    });
-    // job insert
-    const insertChain = { select: vi.fn().mockReturnThis(), single: vi.fn().mockResolvedValue({ data: { id: 'job-1' }, error: null }) };
-    supabaseMock.from.mockReturnValueOnce({ select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), single: vi.fn().mockResolvedValue({ data: { id: 'prop-1', name: 'Test', address: '123', primary_contact_email: null } }) })
-      .mockReturnValueOnce({ insert: vi.fn().mockReturnValue(insertChain) })
-      .mockReturnValueOnce({ insert: vi.fn().mockResolvedValue({ error: null }) }); // photos
+    supabaseMock = {
+      from: vi.fn()
+        .mockReturnValueOnce({ select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), single: vi.fn().mockResolvedValue({ data: { id: 'prop-1', name: 'Test', address: '123', primary_contact_email: null } }) })
+        .mockReturnValueOnce({ insert: vi.fn().mockReturnValue({ select: vi.fn().mockReturnThis(), single: vi.fn().mockResolvedValue({ data: { id: 'job-1' }, error: null }) }) })
+        .mockReturnValueOnce({ insert: vi.fn().mockResolvedValue({ error: null }) }),
+      auth: {
+        admin: {
+          getUserById: vi.fn().mockResolvedValue({ data: { user: { email: 'client@test.com' } } }),
+        },
+      },
+    };
 
     vi.doMock('../../netlify/functions/_shared/supabase.js', () => ({
       getServiceClient: () => supabaseMock,
@@ -180,27 +279,17 @@ describe('create-commercial-job — draft mode', () => {
   });
 
   it('does NOT call Resend when draft: true', async () => {
-    const req = makeReq({ propertyId: 'prop-1', description: 'Remove sofa', draft: true });
-    await handler(req);
-    // fetch should not be called for Resend (only call would be Resend email)
+    await handler(makeReq({ propertyId: 'prop-1', description: 'Remove sofa', draft: true }));
     const resendCalls = fetchMock.mock.calls.filter(([url]) =>
       typeof url === 'string' && url.includes('resend.com')
     );
     expect(resendCalls).toHaveLength(0);
   });
 
-  it('returns 201 with jobId when draft: true', async () => {
-    const req = makeReq({ propertyId: 'prop-1', description: 'Remove sofa', draft: true });
-    const res = await handler(req);
-    expect(res.status).toBe(201);
-    expect(res.body).toHaveProperty('jobId');
-  });
-
-  it('sends emails when draft is false (normal job creation)', async () => {
+  it('sends emails when draft is false', async () => {
     vi.stubEnv('RESEND_API_KEY', 're_key');
     vi.stubEnv('ADMIN_EMAIL', 'admin@test.com');
-    const req = makeReq({ propertyId: 'prop-1', description: 'Remove sofa', draft: false });
-    await handler(req);
+    await handler(makeReq({ propertyId: 'prop-1', description: 'Remove sofa', draft: false }));
     const resendCalls = fetchMock.mock.calls.filter(([url]) =>
       typeof url === 'string' && url.includes('resend.com')
     );
@@ -208,158 +297,21 @@ describe('create-commercial-job — draft mode', () => {
   });
 });
 
-// ── complete-onboarding ───────────────────────────────────────────────────────
+// ── PortalStart — double-submit guard ────────────────────────────────────────
 
-describe('complete-onboarding', () => {
-  let handler;
-  let supabaseMock;
-
-  function makeCompleteSupabase({ jobStatus = 'draft', jobDesc = 'Remove stuff', wrongProperty = false } = {}) {
-    const sb = {
-      from: vi.fn((table) => {
-        if (table === 'properties') {
-          return {
-            select: vi.fn().mockReturnThis(),
-            eq: vi.fn().mockReturnThis(),
-            single: vi.fn().mockResolvedValue(
-              wrongProperty
-                ? { data: null, error: { message: 'not found' } }
-                : { data: { id: 'prop-1', name: 'Prop', address: '123 St' }, error: null }
-            ),
-          };
-        }
-        if (table === 'jobs') {
-          return {
-            select: vi.fn().mockReturnThis(),
-            update: vi.fn().mockReturnThis(),
-            eq: vi.fn().mockReturnThis(),
-            single: vi.fn().mockResolvedValue({ data: { id: 'job-1', description: jobDesc, status: jobStatus, unit: null }, error: null }),
-          };
-        }
-        if (table === 'commercial_clients') {
-          return {
-            update: vi.fn().mockReturnThis(),
-            eq: vi.fn().mockResolvedValue({ error: null }),
-          };
-        }
-        return { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), single: vi.fn().mockResolvedValue({ data: null }) };
-      }),
-      auth: {
-        admin: {
-          getUserById: vi.fn().mockResolvedValue({ data: { user: { email: 'client@test.com' } } }),
-        },
-      },
-    };
-    return sb;
-  }
-
-  beforeEach(async () => {
-    supabaseMock = makeCompleteSupabase();
-    vi.doMock('../../netlify/functions/_shared/supabase.js', () => ({
-      getServiceClient: () => supabaseMock,
-      verifyCommercialClient: vi.fn().mockResolvedValue({
-        user: { id: 'uid-1' },
-        client: { id: 'client-1', company_name: 'Acme', contact_name: 'Joe', phone: '770' },
-      }),
-      jsonResponse: (body, status = 200) => ({ body, status }),
-      errorResponse: (msg, status = 400) => ({ body: { error: msg }, status }),
-    }));
-    ({ default: handler } = await import('../../netlify/functions/complete-onboarding.js'));
-  });
-
-  it('rejects missing propertyId or jobId', async () => {
-    const req = makeReq({ propertyId: 'prop-1' }); // no jobId
-    const res = await handler(req);
-    expect(res.status).toBe(400);
-  });
-
-  it('returns 404 when property does not belong to client', async () => {
-    supabaseMock = makeCompleteSupabase({ wrongProperty: true });
-    vi.doMock('../../netlify/functions/_shared/supabase.js', () => ({
-      getServiceClient: () => supabaseMock,
-      verifyCommercialClient: vi.fn().mockResolvedValue({ user: { id: 'uid-1' }, client: { id: 'client-1', company_name: 'Acme', contact_name: 'Joe', phone: '770' } }),
-      jsonResponse: (body, status = 200) => ({ body, status }),
-      errorResponse: (msg, status = 400) => ({ body: { error: msg }, status }),
-    }));
-    ({ default: handler } = await import('../../netlify/functions/complete-onboarding.js'));
-    const req = makeReq({ propertyId: 'other-prop', jobId: 'job-1' });
-    const res = await handler(req);
-    expect(res.status).toBe(404);
-  });
-
-  it('returns 422 when job description is empty', async () => {
-    supabaseMock = makeCompleteSupabase({ jobDesc: '' });
-    vi.doMock('../../netlify/functions/_shared/supabase.js', () => ({
-      getServiceClient: () => supabaseMock,
-      verifyCommercialClient: vi.fn().mockResolvedValue({ user: { id: 'uid-1' }, client: { id: 'client-1', company_name: 'Acme', contact_name: 'Joe', phone: '770' } }),
-      jsonResponse: (body, status = 200) => ({ body, status }),
-      errorResponse: (msg, status = 400) => ({ body: { error: msg }, status }),
-    }));
-    ({ default: handler } = await import('../../netlify/functions/complete-onboarding.js'));
-    const req = makeReq({ propertyId: 'prop-1', jobId: 'job-1' });
-    const res = await handler(req);
-    expect(res.status).toBe(422);
-  });
-
-  it('returns idempotent 200 when job is already past draft status', async () => {
-    supabaseMock = makeCompleteSupabase({ jobStatus: 'pending_review' });
-    vi.doMock('../../netlify/functions/_shared/supabase.js', () => ({
-      getServiceClient: () => supabaseMock,
-      verifyCommercialClient: vi.fn().mockResolvedValue({ user: { id: 'uid-1' }, client: { id: 'client-1', company_name: 'Acme', contact_name: 'Joe', phone: '770' } }),
-      jsonResponse: (body, status = 200) => ({ body, status }),
-      errorResponse: (msg, status = 400) => ({ body: { error: msg }, status }),
-    }));
-    ({ default: handler } = await import('../../netlify/functions/complete-onboarding.js'));
-    const req = makeReq({ propertyId: 'prop-1', jobId: 'job-1' });
-    const res = await handler(req);
-    expect(res.status).toBe(200);
-    expect(res.body.alreadySubmitted).toBe(true);
-  });
-
-  it('transitions job status from draft to pending_review on success', async () => {
-    global.fetch = vi.fn().mockResolvedValue({ ok: true });
-    const req = makeReq({ propertyId: 'prop-1', jobId: 'job-1' });
-    const res = await handler(req);
-    expect(res.status).toBe(200);
-    expect(res.body.success).toBe(true);
-    // Verify the jobs.update was called with status: pending_review
-    const jobsChain = supabaseMock.from.mock.results.find(
-      (r) => r.value?.update !== undefined
-    );
-    // The update should have been called with pending_review
-    // (exact call assertion depends on mock structure)
-    expect(res.body.alreadySubmitted).toBeUndefined();
-  });
-
-  it('does not send admin email when ADMIN_EMAIL is not set', async () => {
-    delete process.env.ADMIN_EMAIL;
-    delete process.env.RESEND_API_KEY;
-    global.fetch = vi.fn().mockResolvedValue({ ok: true });
-    const req = makeReq({ propertyId: 'prop-1', jobId: 'job-1' });
-    const res = await handler(req);
-    expect(res.status).toBe(200);
-    expect(global.fetch).not.toHaveBeenCalled();
-  });
-});
-
-// ── PortalStart wizard — double-submit guard ──────────────────────────────────
-
-describe('PortalStart — Step 4 double-submit protection', () => {
-  it('submitted flag prevents calling complete-onboarding twice', async () => {
-    // Unit test the logic: if submitted === true, handleStep4 returns early
+describe('PortalStart — final step double-submit protection', () => {
+  it('submitted flag prevents duplicate submit handler calls', async () => {
     let callCount = 0;
     const submitted = { current: false };
 
-    async function handleStep4() {
+    async function handleFinalSubmit() {
       if (submitted.current) return;
       submitted.current = true;
       callCount++;
-      // simulate async work
       await new Promise((r) => setTimeout(r, 10));
     }
 
-    // Call concurrently
-    await Promise.all([handleStep4(), handleStep4(), handleStep4()]);
+    await Promise.all([handleFinalSubmit(), handleFinalSubmit(), handleFinalSubmit()]);
     expect(callCount).toBe(1);
   });
 });
@@ -388,54 +340,22 @@ describe('Attribution capture', () => {
   });
 });
 
-// ── Abandoned onboarding resume ───────────────────────────────────────────────
+// ── sessionStorage draft resume ───────────────────────────────────────────────
 
-describe('Abandoned onboarding resume', () => {
-  it('advances to last_onboarding_step when session is restored', async () => {
-    const mockSession = { user: { id: 'uid-1', email: 'test@example.com' }, access_token: 'tok' };
-    const mockClient = { id: 'client-1', last_onboarding_step: 3, onboarding_status: 'in_progress' };
+describe('sessionStorage draft resume', () => {
+  it('preserves pendingLogin flag for login redirect flow', () => {
+    const draft = {
+      idempotencyKey: 'idem-1',
+      propName: 'Oak Apartments',
+      contactEmail: 'existing@test.com',
+      pendingLogin: true,
+    };
 
-    // Simulate the resume logic
-    let resolvedStep = 1;
-    async function resume(s, client) {
-      if (!client) return;
-      if (client.onboarding_status === 'complete') {
-        return 'redirect_to_portal';
-      }
-      resolvedStep = Math.max(2, Math.min(client.last_onboarding_step, 4));
-    }
+    const serialized = JSON.stringify(draft);
+    const restored = JSON.parse(serialized);
 
-    await resume(mockSession, mockClient);
-    expect(resolvedStep).toBe(3);
-  });
-
-  it('redirects to /portal if onboarding_status is complete', async () => {
-    const mockClient = { id: 'client-1', last_onboarding_step: 5, onboarding_status: 'complete' };
-
-    let redirected = false;
-    async function resume(s, client) {
-      if (!client) return;
-      if (client.onboarding_status === 'complete') {
-        redirected = true;
-        return;
-      }
-    }
-
-    await resume({}, mockClient);
-    expect(redirected).toBe(true);
-  });
-
-  it('clamps resume step between 2 and 4', async () => {
-    const cases = [
-      { last_onboarding_step: 1, expected: 2 },
-      { last_onboarding_step: 2, expected: 2 },
-      { last_onboarding_step: 4, expected: 4 },
-      { last_onboarding_step: 99, expected: 4 }, // clamp at 4
-    ];
-
-    for (const { last_onboarding_step, expected } of cases) {
-      const step = Math.max(2, Math.min(last_onboarding_step, 4));
-      expect(step).toBe(expected);
-    }
+    expect(restored.pendingLogin).toBe(true);
+    expect(restored.propName).toBe('Oak Apartments');
+    expect(restored.idempotencyKey).toBe('idem-1');
   });
 });

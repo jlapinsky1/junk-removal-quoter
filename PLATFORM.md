@@ -749,7 +749,7 @@ The admin navigation has tabs for:
 | `serviceArea.test.js` | 17 | `isValidZip` format validation, `reasonToUiState` mapping |
 | `dateLogic.test.js` | 9 | `getAvailableBookingDates` unit tests |
 | `integration.test.js` | ~40 | Netlify Function handler integration (mocked Blobs) |
-| `src/tests/onboarding.test.js` | 19 | Commercial onboarding: duplicate email, draft jobs, complete-onboarding idempotency, attribution, resume step clamping |
+| `src/tests/onboarding.test.js` | Commercial estimate request: email check, submit-commercial-request idempotency, authenticated job submit, draft storage |
 | **Total JS suite** | **~345** | Vitest (`npm test`) |
 
 ### Python Regression Tests (pytest)
@@ -993,7 +993,8 @@ booking_photos (new column)
 | `014_distance_fields.sql` | Adds `distance_miles` and `travel_minutes_one_way` to `bookings`. Populated by the `geocode-booking` Netlify function via Nominatim geocoding. |
 | `015_commercial_workflow.sql` | Extends the `jobs` table (originally created in migration 006) for a full quote→deposit→completion workflow. Expands the `status` CHECK constraint to include `pending_review`, `quote_sent`, and `awaiting_payment`; migrates any existing `'open'` rows to `'pending_review'`; adds Stripe payment columns (`stripe_customer_id`, `stripe_invoice_id`, `stripe_deposit_payment_intent_id`, `deposit_confirmed_at`, `financially_completed_at`); adds quote lifecycle columns (`quote_token_hash`, `quote_expires_at`, `quote_sent_at`, `quoted_at`); adds `admin_notes`; adds `submission` kind to the `job_photos.kind` CHECK constraint. |
 | `016_commercial_onboarding.sql` | Adds onboarding tracking columns to `commercial_clients`: `job_title`, `onboarding_status` (`in_progress` \| `complete`), `last_onboarding_step`, `attribution` JSONB (UTMs, referrer, landing page). Temporary continuation-token columns were included here and removed in 017. |
-| `017_draft_jobs_rls.sql` | Adds `draft` to the `jobs.status` CHECK constraint (onboarding step 3 saves without admin email). Drops `continuation_token_hash` / `continuation_token_expires_at` in favor of Supabase magic-link resume. Enables RLS on `commercial_clients`, `properties`, and `jobs` so authenticated clients only access their own rows and may insert jobs with `status = 'draft'` only. |
+| `017_draft_jobs_rls.sql` | Adds `draft` to the `jobs.status` CHECK constraint. Drops continuation-token columns. Enables RLS on `commercial_clients`, `properties`, and `jobs` so authenticated clients only access their own rows. |
+| `018_request_idempotency.sql` | Adds `jobs.idempotency_key` (unique) for idempotent estimate submission; adds `commercial_email_registered(p_email)` RPC for step-2 email lookup. |
 
 ---
 
@@ -1045,25 +1046,24 @@ draft → pending_review → quote_sent → awaiting_payment → scheduled → i
                                                                               ↘ cancelled
 ```
 
-`draft` exists only for onboarding (step 3). Existing portal work orders and admin flows still create jobs as `pending_review` directly.
+`draft` remains in the schema for legacy rows. New estimate requests from `/portal/start` create jobs as `pending_review` directly (no draft step).
 
-### Onboarding (`/portal/start`)
+### Estimate request (`/portal/start`)
 
 | Step | Who | Action |
 |---|---|---|
-| 1 | Visitor | Account form → `start-commercial-onboarding` creates auth user (`email_confirm: true`), updates `commercial_clients`, emails magic-link resume. Duplicate email → 409 (no pre-check enumeration). Similar company names are logged server-side only — never returned to the client. |
-| 2 | Client | Inserts first property under RLS |
-| 3 | Client | `create-commercial-job` with `draft: true` — no Resend emails |
-| 4 | Client | `complete-onboarding` validates draft ownership + description, sets status → `pending_review`, marks `onboarding_status = complete`, emails client + `ADMIN_EMAIL`. Idempotent if already past draft. |
-| 5 | Client | Success UI → redirect `/portal` |
+| 1 | Visitor | Cleanup details (property, service, photos via upload session). Draft persisted in `sessionStorage`. |
+| 2 | Visitor | Contact details → `check-commercial-email`. If email exists: save draft with `pendingLogin`, redirect to `/portal/login?resume=request`. |
+| 3 | Visitor (new email) | Review + password → `submit-commercial-request` creates auth user, client, property, `pending_review` job, links photos, sends emails. Idempotent via `idempotencyKey`. |
+| — | Existing user | After login, `submitAuthenticatedDraft()` creates property + job via authenticated APIs. |
 
-Resume: existing session or magic-link `SIGNED_IN` restores `last_onboarding_step` (clamped 2–4). Step 4 has a client-side double-submit guard.
+Partial failure: if auth user is created but property/job insert fails, `onboarding_status` stays `in_progress`; user logs in to finish. No admin notification until the work order exists. Step 3 has a client-side double-submit guard.
 
 ### Quote → deposit → completion
 
 | Step | Who | Action |
 |---|---|---|
-| 1 | Client | Submits work order via portal (optional photos) **or** finishes onboarding (draft → `pending_review`) |
+| 1 | Client | Submits work order via portal (optional photos) **or** completes `/portal/start` (new or existing account) |
 | 2 | Server | Non-draft `create-commercial-job` links photos and emails admin (`ADMIN_EMAIL`) + client confirmation |
 | 3 | Admin | Reviews job at `/admin/commercial`, sets estimate, clicks "Send Quote" |
 | 4 | Server | `send-commercial-quote` creates Stripe Customer + Invoice, sets `quote_token_hash`, emails client with link to `/commercial/quote/:token` |
@@ -1081,7 +1081,8 @@ Resume: existing session or magic-link `SIGNED_IN` restores `last_onboarding_ste
 ### Auth model
 
 - **Client portal CRUD**: Supabase client with anon key + RLS (`commercial_clients.user_id = auth.uid()`; properties/jobs scoped via `client_id`)
-- **Onboarding account creation**: `start-commercial-onboarding` uses service role; rate-limited by IP
+- **New account + first request**: `submit-commercial-request` uses service role; rate-limited by IP; idempotent via `idempotencyKey`
+- **Existing account resume**: authenticated `create-commercial-job` after login with saved sessionStorage draft
 - **Job submission / quote acceptance**: Netlify Functions verify client JWT via `verifyCommercialClient()` in `_shared/supabase.js`; ownership checked server-side (property must belong to client's `client_id`)
 - **Quote acceptance via email link**: Token-based (no login required); 7-day expiry; raw token never stored — only SHA-256 hash stored in `jobs.quote_token_hash`
 - **Admin actions**: Netlify Functions verify admin JWT via `verifyAdmin()` + `admin_users` table check
@@ -1090,9 +1091,10 @@ Resume: existing session or magic-link `SIGNED_IN` restores `last_onboarding_ste
 
 | File | Purpose |
 |---|---|
-| `netlify/functions/start-commercial-onboarding.js` | Wizard step 1: create user, update profile, magic-link resume email |
-| `netlify/functions/create-commercial-job.js` | Authenticated job submission; `draft: true` skips notifications |
-| `netlify/functions/complete-onboarding.js` | Draft → `pending_review`, onboarding complete, dual email |
+| `netlify/functions/check-commercial-email.js` | Step 2: returns whether email is already registered |
+| `netlify/functions/submit-commercial-request.js` | Final submit for new users: auth user + client + property + job + emails (idempotent) |
+| `netlify/functions/_shared/commercialRequest.js` | Shared photo linking + confirmation/admin email helpers |
+| `netlify/functions/create-commercial-job.js` | Authenticated job submission (existing users, portal repeat orders) |
 | `netlify/functions/get-admin-commercial-jobs.js` | Paginated, filterable admin job list |
 | `netlify/functions/get-admin-commercial-job-detail.js` | Full job detail with Stripe payment summary |
 | `netlify/functions/send-commercial-quote.js` | Sets estimate, creates Stripe invoice, sends quote email |
@@ -1101,7 +1103,9 @@ Resume: existing session or magic-link `SIGNED_IN` restores `last_onboarding_ste
 | `netlify/functions/create-commercial-deposit.js` | Creates Stripe deposit PaymentIntent |
 | `netlify/functions/update-commercial-job.js` | Admin: update status, scheduled date, admin notes |
 | `netlify/functions/complete-commercial-job.js` | Marks complete, links photos, sends completion packet email |
-| `src/pages/PortalStart.jsx` | 5-step onboarding wizard at `/portal/start` |
+| `src/pages/PortalStart.jsx` | 3-step estimate request wizard at `/portal/start` |
+| `src/utils/commercialRequestDraft.js` | sessionStorage draft load/save/clear |
+| `src/utils/submitCommercialDraft.js` | Submit saved draft for authenticated existing users |
 | `src/pages/CommercialAdminPage.jsx` | Standalone admin page at `/admin/commercial` (two-panel: list + detail) |
 | `src/pages/CommercialQuotePage.jsx` | Public quote page at `/commercial/quote/:token` (no login required) |
 | `src/tests/onboarding.test.js` | Vitest coverage for onboarding handlers, draft mode, resume/idempotency logic |
@@ -1163,6 +1167,6 @@ These bugs were discovered and fixed during end-to-end sandbox testing:
 | `src/pages/FinalPaymentPage.jsx` | Customer final page: completion package display + final payment — residential |
 | `src/pages/CommercialAdminPage.jsx` | Standalone admin queue at `/admin/commercial` — two-panel: job list + detail with status-based action panels |
 | `src/pages/CommercialQuotePage.jsx` | Public quote acceptance page at `/commercial/quote/:token` — no login required; Stripe deposit payment |
-| `src/pages/PortalStart.jsx` | Commercial onboarding wizard at `/portal/start` |
+| `src/pages/PortalStart.jsx` | Commercial estimate request wizard at `/portal/start` |
 | `src/pages/commercial/*.jsx` | SEO marketing pages (prerendered) |
 | `src/utils/seo.js` / `analytics.js` | Canonical/title helpers and GA4 `trackEvent` wrapper |

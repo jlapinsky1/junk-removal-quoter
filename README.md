@@ -13,7 +13,7 @@ A full-stack platform for a junk removal business: residential booking flow, adm
 | Database | Supabase (Postgres + RLS) |
 | Blob storage | Netlify Blobs (service area config) |
 | File storage | Supabase Storage (booking photos, private bucket) |
-| Auth | Supabase Auth (JWT + magic links for onboarding resume) |
+| Auth | Supabase Auth (JWT) |
 | Payments | Stripe (deposit + final balance via invoice) |
 | Photo analysis | Anthropic Claude API |
 | Email | Resend |
@@ -228,9 +228,9 @@ Returns 404 (not 403) when disabled — does not reveal its existence. Secret co
 
 | Endpoint | Method | Auth | Purpose |
 |---|---|---|---|
-| `/api/start-commercial-onboarding` | POST | none (rate-limited) | Create auth user + commercial profile (step 1 of `/portal/start`); emails magic-link resume |
-| `/api/create-commercial-job` | POST | client JWT | Submit work order; pass `draft: true` during onboarding (no emails); otherwise creates `pending_review` and emails admin + client |
-| `/api/complete-onboarding` | POST | client JWT | Transition draft job → `pending_review`, mark onboarding complete, send confirmation + admin emails |
+| `/api/check-commercial-email` | POST | none (rate-limited) | Step 2 email lookup — returns `{ exists: boolean }` (no enumeration beyond this check) |
+| `/api/submit-commercial-request` | POST | none (rate-limited) | New-user final submit: create auth user → client → property → `pending_review` job + photos + emails; idempotent via `idempotencyKey` |
+| `/api/create-commercial-job` | POST | client JWT | Submit work order for authenticated clients (existing users resuming a saved draft after login); creates `pending_review` and emails admin + client |
 | `/api/get-admin-commercial-jobs` | GET | admin JWT | Paginated, filterable commercial job list |
 | `/api/get-admin-commercial-job-detail` | GET | admin JWT | Full job detail: client, property, photos, Stripe payment summary |
 | `/api/send-commercial-quote` | POST | admin JWT | Set estimate, create Stripe invoice, send quote email with token link |
@@ -283,8 +283,8 @@ Authenticated experience for recurring business clients (property managers, etc.
 ### Client-side routes
 | Route | Description |
 |---|---|
-| `/portal/start` | 5-step onboarding wizard (account → property → draft work order → review → done) |
-| `/portal/login` | Portal sign-in ("Create an account" → `/portal/start`) |
+| `/portal/start` | 3-step estimate request wizard (cleanup details → contact → review + create account) |
+| `/portal/login` | Portal sign-in; `?resume=request` submits a sessionStorage draft after login |
 | `/portal` | Authenticated client dashboard (jobs, invoices, properties) |
 | `/commercial/quote/:token` | Public quote acceptance page (no login required — linked from quote email) |
 
@@ -298,16 +298,14 @@ Authenticated experience for recurring business clients (property managers, etc.
 draft → pending_review → quote_sent → awaiting_payment → scheduled → in_progress → completed
                                                                               ↘ cancelled
 ```
-`draft` is used only during onboarding so step 3 can save progress without notifying admins. `complete-onboarding` moves the job to `pending_review` and sends emails.
+`draft` remains in the schema for legacy rows; new estimate requests create jobs as `pending_review` directly.
 
-### Onboarding wizard (`/portal/start`)
-1. Create account → `start-commercial-onboarding` (no email enumeration; duplicate email → 409; magic-link resume email via Resend)
-2. Add first property (RLS-scoped insert)
-3. Create draft work order (`create-commercial-job` with `draft: true` — no emails)
-4. Review & submit → `complete-onboarding` (idempotent if already submitted)
-5. Success → redirect to `/portal`
+### Estimate request wizard (`/portal/start`)
+1. **Cleanup details** — property, service, description, photos (upload session), timing, access notes. Draft saved in `sessionStorage`.
+2. **Contact details** — name, company, email, phone, optional job title. `check-commercial-email` detects existing accounts → save draft, prompt login at `/portal/login?resume=request`.
+3. **Save and submit** — review summary, password + agreement → `submit-commercial-request` (idempotent). Existing users submit via authenticated `create-commercial-job` after login.
 
-Abandoned setup resumes via magic link (Supabase `generateLink`) or an existing session; step is restored from `commercial_clients.last_onboarding_step`. Attribution (UTMs, referrer, landing page) is stored on the client row.
+If auth user creation succeeds but a later step fails, `onboarding_status` stays `in_progress` so the user can log in and finish without creating a duplicate account. Attribution (UTMs, referrer, landing page) is stored on the client row.
 
 ### Ongoing work orders
 1. Client submits work order via portal (optional photos) → `pending_review` + emails
@@ -351,7 +349,8 @@ Abandoned setup resumes via magic link (Supabase `generateLink`) or an existing 
 | `014_distance_fields.sql` | Adds `distance_miles` and `travel_minutes_one_way` columns to `bookings`; populated by `geocode-booking` function |
 | `015_commercial_workflow.sql` | Extends `jobs` table for full quote→deposit→completion workflow: expands status enum (adds `pending_review`, `quote_sent`, `awaiting_payment`; migrates `open` → `pending_review`), adds Stripe/quote/payment columns, adds `submission` kind to `job_photos` |
 | `016_commercial_onboarding.sql` | Onboarding columns on `commercial_clients`: `job_title`, `onboarding_status`, `last_onboarding_step`, `attribution` (plus temporary continuation-token columns later dropped by 017) |
-| `017_draft_jobs_rls.sql` | Adds `draft` job status; drops custom continuation-token columns (magic-link resume instead); enables RLS policies so clients only access their own rows and can insert jobs as `draft` only |
+| `017_draft_jobs_rls.sql` | Adds `draft` job status; drops custom continuation-token columns; enables RLS policies so clients only access their own rows |
+| `018_request_idempotency.sql` | `jobs.idempotency_key` unique index; `commercial_email_registered()` RPC for email checks |
 
 ---
 
@@ -381,6 +380,6 @@ npm run preview   # local preview of prod build
 
 `vite.config.js` targets `es2015` so react-snap’s bundled Chromium can execute the bundle. Stripe payment pages (`ApprovedQuote`, `FinalPaymentPage`, `CommercialQuotePage`) are lazy-loaded so prerender does not pull Stripe.js onto marketing routes. `reactSnap.include` in `package.json` lists the 9 public routes that get static HTML (home + commercial SEO pages).
 
-Deploy via Netlify: connect the GitHub repo, set build command `npm run build`, publish directory `dist`, and configure all required environment variables (including optional `VITE_GA4_MEASUREMENT_ID`). Apply migrations `016` and `017` on production Supabase before relying on onboarding.
+Deploy via Netlify: connect the GitHub repo, set build command `npm run build`, publish directory `dist`, and configure all required environment variables (including optional `VITE_GA4_MEASUREMENT_ID`). Apply migrations `016`, `017`, and `018` on production Supabase before relying on the commercial estimate request flow.
 
 See `LAUNCH_CHECKLIST.md` for the full pre-production checklist.

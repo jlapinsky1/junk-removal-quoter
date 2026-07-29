@@ -1,11 +1,20 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import {
   Trash2, Mail, Lock, User, Phone, Building2, Briefcase,
-  MapPin, AlertTriangle, CheckCircle, ArrowLeft, ArrowRight, ClipboardList,
+  MapPin, AlertTriangle, CheckCircle, ArrowLeft, ArrowRight,
+  ClipboardList, Camera, X,
 } from "lucide-react";
 import { supabase } from "../utils/supabaseClient";
 import { trackEvent } from "../utils/analytics";
+import { getRepo } from "../utils/repository";
+import {
+  emptyDraft,
+  loadDraft,
+  saveDraft,
+  clearDraft,
+  buildPropertyAddress,
+} from "../utils/commercialRequestDraft";
 
 const PROPERTY_TYPES = [
   { value: "apartment_multifamily", label: "Apartment / Multifamily" },
@@ -38,7 +47,7 @@ const US_STATES = [
 function ProgressBar({ step }) {
   return (
     <div className="flex items-center justify-center gap-2 mb-10">
-      {[1, 2, 3, 4, 5].map((n) => (
+      {[1, 2, 3].map((n) => (
         <React.Fragment key={n}>
           <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
             n < step
@@ -49,8 +58,8 @@ function ProgressBar({ step }) {
           }`}>
             {n < step ? <CheckCircle className="w-4 h-4" /> : n}
           </div>
-          {n < 5 && (
-            <div className={`h-px flex-1 max-w-8 transition-colors ${n < step ? "bg-[#22c55e]" : "bg-white/10"}`} />
+          {n < 3 && (
+            <div className={`h-px flex-1 max-w-12 transition-colors ${n < step ? "bg-[#22c55e]" : "bg-white/10"}`} />
           )}
         </React.Fragment>
       ))}
@@ -81,32 +90,46 @@ function InputRow({ icon: Icon, children }) {
 const inputCls = "w-full bg-transparent text-sm text-white placeholder:text-white/25 outline-none";
 const selectCls = "w-full bg-transparent text-sm text-white outline-none [&>option]:bg-[#111a14]";
 
-async function loadClientRecord(supabaseClient, userId) {
-  const { data } = await supabaseClient
-    .from("commercial_clients")
-    .select("id, last_onboarding_step, onboarding_status")
-    .eq("user_id", userId)
-    .single();
-  return data;
+function resizeImagePreview(file, maxWidth) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        let { width, height } = img;
+        if (width > maxWidth) {
+          height = (height * maxWidth) / width;
+          width = maxWidth;
+        }
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", 0.8));
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
 }
 
 export default function PortalStart() {
   const navigate = useNavigate();
-
   const [step, setStep] = useState(1);
-  const [session, setSession] = useState(null);
-  const [clientId, setClientId] = useState(null);
-  const [propertyId, setPropertyId] = useState(null);
-  const [jobId, setJobId] = useState(null);
+  const [draft, setDraft] = useState(null);
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [agreed, setAgreed] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [submitted, setSubmitted] = useState(false); // idempotency guard for Step 4
+  const [submitted, setSubmitted] = useState(false);
+  const [uploadingPhotos, setUploadingPhotos] = useState(false);
+  const [existingEmailPrompt, setExistingEmailPrompt] = useState(false);
 
-  // Capture attribution once on mount — landing_page is the wizard URL itself,
-  // referrer is where the user came from.
-  const [attribution] = useState(() => {
+  // Initialize draft from sessionStorage
+  useEffect(() => {
     const p = new URLSearchParams(window.location.search);
-    return {
+    const attribution = {
       utm_source: p.get("utm_source") || "",
       utm_medium: p.get("utm_medium") || "",
       utm_campaign: p.get("utm_campaign") || "",
@@ -115,116 +138,117 @@ export default function PortalStart() {
       referrer: document.referrer || "",
       landing_page: window.location.href,
     };
-  });
 
-  // Step 1 fields
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [phone, setPhone] = useState("");
-  const [company, setCompany] = useState("");
-  const [jobTitle, setJobTitle] = useState("");
+    const saved = loadDraft();
+    setDraft(saved ? { ...emptyDraft(attribution), ...saved, attribution: saved.attribution || attribution } : emptyDraft(attribution));
+  }, []);
 
-  // Step 2 fields
-  const [propName, setPropName] = useState("");
-  const [propStreet, setPropStreet] = useState("");
-  const [propCity, setPropCity] = useState("");
-  const [propState, setPropState] = useState("GA");
-  const [propZip, setPropZip] = useState("");
-  const [propType, setPropType] = useState("");
-  const [propUnits, setPropUnits] = useState("");
-  const [propContactName, setPropContactName] = useState("");
-  const [propContactPhone, setPropContactPhone] = useState("");
-  const [propNotes, setPropNotes] = useState("");
-
-  // Step 3 fields
-  const [jobUnit, setJobUnit] = useState("");
-  const [jobService, setJobService] = useState("");
-  const [jobDescription, setJobDescription] = useState("");
-  const [jobDate, setJobDate] = useState("");
-  const [jobAccessNotes, setJobAccessNotes] = useState("");
-  const [jobPoRef, setJobPoRef] = useState("");
-
-  // ── Auth: detect existing session or magic-link callback ─────────────────
+  // Persist draft on change
   useEffect(() => {
-    if (!supabase) return;
+    if (draft) saveDraft(draft);
+  }, [draft]);
 
-    async function resume(s) {
-      setSession(s);
-      if (s.user?.email) setEmail(s.user.email);
-      const client = await loadClientRecord(supabase, s.user.id);
-      if (!client) return;
-      setClientId(client.id);
-      if (client.onboarding_status === "complete") {
-        navigate("/portal");
-        return;
-      }
-      const resumeStep = Math.max(2, Math.min(client.last_onboarding_step, 4));
-      setStep(resumeStep);
-    }
-
-    // Check for an existing session first (page refresh, returning user)
-    supabase.auth.getSession().then(({ data: { session: s } }) => {
-      if (s) resume(s);
-    });
-
-    // Listen for magic-link authentication callback
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, s) => {
-      if ((event === "SIGNED_IN" || event === "TOKEN_REFRESHED") && s) {
-        resume(s);
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const updateDraft = useCallback((patch) => {
+    setDraft((prev) => ({ ...prev, ...patch }));
+  }, []);
 
   function clearError() {
     setError("");
+    setExistingEmailPrompt(false);
   }
 
-  // ── Step 1: Create account ────────────────────────────────────────────────
-  async function handleStep1(e) {
+  async function ensureUploadSession(currentDraft) {
+    if (currentDraft.uploadSessionId) return currentDraft.uploadSessionId;
+    const repo = await getRepo();
+    const session = await repo.createUploadSession(null);
+    updateDraft({ uploadSessionId: session.sessionId });
+    return session.sessionId;
+  }
+
+  async function handlePhotoUpload(e) {
+    const files = Array.from(e.target.files || []);
+    if (!files.length || !draft) return;
+
+    const remaining = 10 - (draft.photoPreviews?.length || 0);
+    const toProcess = files.slice(0, remaining);
+    if (!toProcess.length) return;
+
+    setUploadingPhotos(true);
+    clearError();
+
+    try {
+      const sid = await ensureUploadSession(draft);
+      const repo = await getRepo();
+      const newPreviews = [...(draft.photoPreviews || [])];
+
+      for (const file of toProcess) {
+        const preview = await resizeImagePreview(file, 1200);
+        await repo.getUploadUrl(sid, file.name, file.type || "image/jpeg");
+        newPreviews.push(preview);
+      }
+
+      updateDraft({ photoPreviews: newPreviews, uploadSessionId: sid });
+    } catch {
+      setError("Photo upload failed. You can continue without photos or try again.");
+    } finally {
+      setUploadingPhotos(false);
+      e.target.value = "";
+    }
+  }
+
+  function removePhoto(index) {
+    updateDraft({
+      photoPreviews: draft.photoPreviews.filter((_, i) => i !== index),
+    });
+  }
+
+  // ── Step 1: Cleanup details ─────────────────────────────────────────────
+  function handleStep1(e) {
     e.preventDefault();
-    if (!supabase) { setError("Supabase is not configured."); return; }
+    if (!draft.propName || !draft.propStreet || !draft.propCity || !draft.propZip || !draft.propType) {
+      setError("Property name, address, and type are required.");
+      return;
+    }
+    if (!draft.jobService || !draft.jobDescription?.trim()) {
+      setError("Service type and description are required.");
+      return;
+    }
+    clearError();
+    trackEvent("commercial_request_details_entered");
+    setStep(2);
+  }
+
+  // ── Step 2: Contact details + email check ───────────────────────────────
+  async function handleStep2(e) {
+    e.preventDefault();
+    if (!draft.name || !draft.email || !draft.phone || !draft.company) {
+      setError("Name, work email, phone, and company are required.");
+      return;
+    }
     setLoading(true);
     clearError();
 
     try {
-      const res = await fetch("/.netlify/functions/start-commercial-onboarding", {
+      const res = await fetch("/.netlify/functions/check-commercial-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password, phone, company, jobTitle, attribution }),
+        body: JSON.stringify({ email: draft.email.trim() }),
       });
       const data = await res.json();
-
       if (!res.ok) {
-        if (res.status === 409) {
-          setError("An account with this email already exists.");
-        } else {
-          setError(data.error || "Something went wrong. Please try again.");
-        }
+        setError(data.error || "Unable to verify email.");
         return;
       }
 
-      // Sign in with the credentials the user just entered
-      const { data: authData, error: signInErr } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-      if (signInErr) {
-        setError("Account created but sign-in failed. Please log in.");
+      if (data.exists) {
+        updateDraft({ pendingLogin: true });
+        setExistingEmailPrompt(true);
+        setError("An account with this email already exists. Log in to submit your request.");
         return;
       }
 
-      setSession(authData.session);
-      trackEvent("commercial_profile_created");
-
-      // Fetch client record (trigger may need a moment)
-      await new Promise((r) => setTimeout(r, 600));
-      const client = await loadClientRecord(supabase, authData.session.user.id);
-      if (client) setClientId(client.id);
-
-      setStep(2);
+      trackEvent("commercial_contact_entered");
+      setStep(3);
     } catch {
       setError("Something went wrong. Please try again.");
     } finally {
@@ -232,140 +256,125 @@ export default function PortalStart() {
     }
   }
 
-  // ── Step 2: Add property ──────────────────────────────────────────────────
-  async function handleStep2(e) {
-    e.preventDefault();
-    if (!supabase || !session || !clientId) { setError("Session expired. Please refresh."); return; }
-    setLoading(true);
-    clearError();
-
-    try {
-      const address = `${propStreet}, ${propCity}, ${propState} ${propZip}`;
-      const { data: prop, error: propErr } = await supabase
-        .from("properties")
-        .insert({
-          client_id: clientId,
-          name: propName,
-          address,
-          primary_contact_name: propContactName || null,
-          primary_contact_phone: propContactPhone || null,
-          notes: [
-            propType ? `Type: ${propType}` : null,
-            propUnits ? `Units: ${propUnits}` : null,
-            propNotes || null,
-          ].filter(Boolean).join("\n") || null,
-        })
-        .select("id")
-        .single();
-
-      if (propErr) {
-        setError("Failed to save property. Please try again.");
-        return;
-      }
-      setPropertyId(prop.id);
-
-      await supabase
-        .from("commercial_clients")
-        .update({ last_onboarding_step: 3 })
-        .eq("id", clientId);
-
-      trackEvent("commercial_property_added");
-      setStep(3);
-    } catch {
-      setError("Failed to save property. Please try again.");
-    } finally {
-      setLoading(false);
-    }
+  function goToLoginWithDraft() {
+    saveDraft({ ...draft, pendingLogin: true });
+    navigate("/portal/login?resume=request");
   }
 
-  // ── Step 3: Create draft work order ───────────────────────────────────────
+  // ── Step 3: Review + create account + submit ────────────────────────────
   async function handleStep3(e) {
     e.preventDefault();
-    if (!session || !propertyId) { setError("Session expired. Please refresh."); return; }
-    setLoading(true);
-    clearError();
-
-    try {
-      const desc = [jobService, jobDescription].filter(Boolean).join(" — ");
-      const res = await fetch("/.netlify/functions/create-commercial-job", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({
-          propertyId,
-          unit: jobUnit || null,
-          description: desc,
-          preferredDate: jobDate || null,
-          accessNotes: [jobAccessNotes, jobPoRef ? `PO/Ref: ${jobPoRef}` : null].filter(Boolean).join("\n") || null,
-          photoPaths: [],
-          draft: true, // saves progress without notifying admins
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || "Failed to create work order.");
-        return;
-      }
-      setJobId(data.jobId);
-
-      await supabase
-        .from("commercial_clients")
-        .update({ last_onboarding_step: 4 })
-        .eq("id", clientId);
-
-      trackEvent("commercial_work_order_draft_created");
-      setStep(4);
-    } catch {
-      setError("Failed to create work order. Please try again.");
-    } finally {
-      setLoading(false);
+    if (submitted) return;
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters.");
+      return;
     }
-  }
+    if (password !== confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
+    if (!agreed) {
+      setError("Please agree to continue.");
+      return;
+    }
 
-  // ── Step 4: Review & final submit ─────────────────────────────────────────
-  async function handleStep4() {
-    if (submitted) return; // prevent double-submit
-    if (!session || !propertyId || !jobId) { setError("Session expired. Please refresh."); return; }
     setLoading(true);
     setSubmitted(true);
     clearError();
 
     try {
-      const res = await fetch("/.netlify/functions/complete-onboarding", {
+      const res = await fetch("/.netlify/functions/submit-commercial-request", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({ propertyId, jobId }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          idempotencyKey: draft.idempotencyKey,
+          name: draft.name,
+          email: draft.email.trim(),
+          password,
+          phone: draft.phone,
+          company: draft.company,
+          jobTitle: draft.jobTitle || null,
+          propName: draft.propName,
+          propStreet: draft.propStreet,
+          propCity: draft.propCity,
+          propState: draft.propState,
+          propZip: draft.propZip,
+          propType: draft.propType,
+          propUnits: draft.propUnits || null,
+          propContactName: draft.propContactName || null,
+          propContactPhone: draft.propContactPhone || null,
+          propNotes: draft.propNotes || null,
+          jobUnit: draft.jobUnit || null,
+          jobService: draft.jobService,
+          jobDescription: draft.jobDescription,
+          jobDate: draft.jobDate || null,
+          jobAccessNotes: draft.jobAccessNotes || null,
+          jobPoRef: draft.jobPoRef || null,
+          uploadSessionId: draft.uploadSessionId || null,
+          attribution: draft.attribution,
+        }),
       });
+
       const data = await res.json();
+
+      if (res.status === 409) {
+        setSubmitted(false);
+        updateDraft({ pendingLogin: true });
+        setExistingEmailPrompt(true);
+        setError(data.error || "This email already has an account. Please log in.");
+        return;
+      }
+
+      if (data.userCreated && !data.success) {
+        setSubmitted(false);
+        setError(data.error || "Account created but submission failed. Please log in to finish.");
+        return;
+      }
+
       if (!res.ok) {
         setSubmitted(false);
         setError(data.error || "Failed to submit. Please try again.");
         return;
       }
 
+      // Sign in with the credentials just created
+      if (supabase) {
+        const { error: signInErr } = await supabase.auth.signInWithPassword({
+          email: draft.email.trim(),
+          password,
+        });
+        if (signInErr) {
+          // Non-fatal — account and job exist
+          console.error("Post-submit sign-in failed");
+        }
+      }
+
+      clearDraft();
+      trackEvent("commercial_profile_created");
       trackEvent("commercial_work_order_submitted");
       trackEvent("commercial_onboarding_completed");
-      setStep(5);
+      setStep(4);
       setTimeout(() => navigate("/portal"), 2500);
     } catch {
       setSubmitted(false);
-      setError("Failed to submit. Please try again.");
+      setError("Something went wrong. Please try again.");
     } finally {
       setLoading(false);
     }
   }
 
-  const propAddress = [propStreet, propCity, propState, propZip].filter(Boolean).join(", ");
-  const jobDesc = [jobService, jobDescription].filter(Boolean).join(" — ");
+  if (!draft) {
+    return (
+      <div className="min-h-screen bg-[#0a0f0d] flex items-center justify-center">
+        <div className="animate-spin w-8 h-8 border-4 border-[#22c55e] border-t-transparent rounded-full" />
+      </div>
+    );
+  }
+
+  const propAddress = buildPropertyAddress(draft);
 
   return (
     <div className="min-h-screen bg-[#0a0f0d] text-white">
-      {/* Minimal nav — no main nav links to keep focus on the funnel */}
       <header className="fixed top-0 inset-x-0 z-50 border-b border-white/5 bg-[#0a0f0d]/90 backdrop-blur-md">
         <div className="max-w-lg mx-auto px-5 h-14 flex items-center justify-between">
           <Link to="/commercial" className="flex items-center gap-2.5">
@@ -377,9 +386,9 @@ export default function PortalStart() {
               <div className="text-[#22c55e] text-[8px] tracking-[0.2em] font-semibold uppercase mt-0.5">Commercial</div>
             </div>
           </Link>
-          {step < 5 && (
+          {step < 4 && (
             <Link to="/portal/login" className="text-xs text-white/40 hover:text-white/60 transition-colors">
-              Already have an account? Log in
+              Client Login
             </Link>
           )}
         </div>
@@ -387,114 +396,67 @@ export default function PortalStart() {
 
       <main className="pt-24 pb-16 px-5">
         <div className="max-w-lg mx-auto">
-          {step < 5 && (
+          {step < 4 && (
             <div className="text-center mb-8">
               <h1 className="text-2xl font-black mb-1">
-                {step === 1 && "Create Your Commercial Account"}
-                {step === 2 && "Add Your First Property"}
-                {step === 3 && "Create a Work Order"}
-                {step === 4 && "Review and Submit"}
+                {step === 1 && "Tell Us About the Cleanup"}
+                {step === 2 && "Your Contact Details"}
+                {step === 3 && "Save and Submit Your Request"}
               </h1>
               <p className="text-white/45 text-sm">
-                {step === 1 && "Takes about 2 minutes."}
-                {step === 2 && "You can add more properties at any time."}
-                {step === 3 && "Describe the cleanup needed."}
-                {step === 4 && "Confirm your details and submit for review."}
+                {step === 1 && "Property and cleanup details first — account setup comes at the end."}
+                {step === 2 && "We'll use this to follow up about your estimate."}
+                {step === 3 && "Create secure portal access to submit your request, review your estimate, approve work, track progress, and manage future cleanups."}
               </p>
             </div>
           )}
 
-          <ProgressBar step={step} />
+          {step < 4 && <ProgressBar step={step} />}
 
           {error && (
             <div className="bg-red-400/10 border border-red-400/20 rounded-xl p-4 mb-6 text-sm text-red-300 flex items-start gap-2">
               <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
               <div>
                 <span>{error}</span>
-                {error.includes("already exists") && (
+                {existingEmailPrompt && (
                   <div className="mt-2">
-                    <Link to="/portal/login" className="text-[#22c55e] font-semibold hover:underline">
-                      Log in instead →
-                    </Link>
+                    <button
+                      type="button"
+                      onClick={goToLoginWithDraft}
+                      className="text-[#22c55e] font-semibold hover:underline"
+                    >
+                      Log in to submit your request →
+                    </button>
                   </div>
                 )}
               </div>
             </div>
           )}
 
-          {/* ─── Step 1 ─── */}
+          {/* Step 1 — Cleanup details */}
           {step === 1 && (
             <form onSubmit={handleStep1} className="bg-white/[0.03] border border-white/8 rounded-2xl p-6 space-y-5">
-              <FieldWrap label="Full Name" required>
-                <InputRow icon={User}>
-                  <input required value={name} onChange={(e) => setName(e.target.value)} placeholder="Jordan Rivera" className={inputCls} />
-                </InputRow>
-              </FieldWrap>
-
-              <FieldWrap label="Work Email" required>
-                <InputRow icon={Mail}>
-                  <input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="jordan@propertyco.com" autoComplete="email" className={inputCls} />
-                </InputRow>
-              </FieldWrap>
-
-              <FieldWrap label="Password" required>
-                <InputRow icon={Lock}>
-                  <input required type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Min. 8 characters" minLength={8} autoComplete="new-password" className={inputCls} />
-                </InputRow>
-              </FieldWrap>
-
-              <FieldWrap label="Phone" required>
-                <InputRow icon={Phone}>
-                  <input required type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(770) 555-0100" className={inputCls} />
-                </InputRow>
-              </FieldWrap>
-
-              <FieldWrap label="Company / Organization" required>
-                <InputRow icon={Building2}>
-                  <input required value={company} onChange={(e) => setCompany(e.target.value)} placeholder="Apex Property Management" className={inputCls} />
-                </InputRow>
-              </FieldWrap>
-
-              <FieldWrap label="Job Title">
-                <InputRow icon={Briefcase}>
-                  <input value={jobTitle} onChange={(e) => setJobTitle(e.target.value)} placeholder="Property Manager (optional)" className={inputCls} />
-                </InputRow>
-              </FieldWrap>
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full bg-[#22c55e] hover:bg-[#16a34a] disabled:opacity-50 disabled:cursor-not-allowed text-black font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-colors"
-              >
-                {loading ? "Creating account…" : <>Create Account <ArrowRight className="w-4 h-4" /></>}
-              </button>
-            </form>
-          )}
-
-          {/* ─── Step 2 ─── */}
-          {step === 2 && (
-            <form onSubmit={handleStep2} className="bg-white/[0.03] border border-white/8 rounded-2xl p-6 space-y-5">
               <FieldWrap label="Property Name" required>
                 <InputRow icon={Building2}>
-                  <input required value={propName} onChange={(e) => setPropName(e.target.value)} placeholder="Oakwood Ridge Apartments" className={inputCls} />
+                  <input required value={draft.propName} onChange={(e) => updateDraft({ propName: e.target.value })} placeholder="Oakwood Ridge Apartments" className={inputCls} />
                 </InputRow>
               </FieldWrap>
 
               <FieldWrap label="Street Address" required>
                 <InputRow icon={MapPin}>
-                  <input required value={propStreet} onChange={(e) => setPropStreet(e.target.value)} placeholder="1240 Ridge Blvd" className={inputCls} />
+                  <input required value={draft.propStreet} onChange={(e) => updateDraft({ propStreet: e.target.value })} placeholder="1240 Ridge Blvd" className={inputCls} />
                 </InputRow>
               </FieldWrap>
 
               <div className="grid grid-cols-2 gap-4">
                 <FieldWrap label="City" required>
                   <InputRow>
-                    <input required value={propCity} onChange={(e) => setPropCity(e.target.value)} placeholder="Gainesville" className={inputCls} />
+                    <input required value={draft.propCity} onChange={(e) => updateDraft({ propCity: e.target.value })} placeholder="Gainesville" className={inputCls} />
                   </InputRow>
                 </FieldWrap>
                 <FieldWrap label="State" required>
                   <InputRow>
-                    <select value={propState} onChange={(e) => setPropState(e.target.value)} className={selectCls}>
+                    <select value={draft.propState} onChange={(e) => updateDraft({ propState: e.target.value })} className={selectCls}>
                       {US_STATES.map((s) => <option key={s} value={s}>{s}</option>)}
                     </select>
                   </InputRow>
@@ -503,74 +465,28 @@ export default function PortalStart() {
 
               <FieldWrap label="ZIP Code" required>
                 <InputRow>
-                  <input required value={propZip} onChange={(e) => setPropZip(e.target.value)} placeholder="30501" maxLength={10} className={inputCls} />
+                  <input required value={draft.propZip} onChange={(e) => updateDraft({ propZip: e.target.value })} placeholder="30501" maxLength={10} className={inputCls} />
                 </InputRow>
               </FieldWrap>
 
               <FieldWrap label="Property Type" required>
                 <InputRow>
-                  <select required value={propType} onChange={(e) => setPropType(e.target.value)} className={selectCls}>
+                  <select required value={draft.propType} onChange={(e) => updateDraft({ propType: e.target.value })} className={selectCls}>
                     <option value="" disabled>Select type…</option>
                     {PROPERTY_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
                   </select>
                 </InputRow>
               </FieldWrap>
 
-              <FieldWrap label="Approx. Unit Count">
-                <InputRow>
-                  <input type="number" min="1" value={propUnits} onChange={(e) => setPropUnits(e.target.value)} placeholder="48 (optional)" className={inputCls} />
-                </InputRow>
-              </FieldWrap>
-
-              <FieldWrap label="Onsite Contact Name">
-                <InputRow icon={User}>
-                  <input value={propContactName} onChange={(e) => setPropContactName(e.target.value)} placeholder="Alex Smith (optional)" className={inputCls} />
-                </InputRow>
-              </FieldWrap>
-
-              <FieldWrap label="Onsite Contact Phone">
-                <InputRow icon={Phone}>
-                  <input type="tel" value={propContactPhone} onChange={(e) => setPropContactPhone(e.target.value)} placeholder="(770) 555-0200 (optional)" className={inputCls} />
-                </InputRow>
-              </FieldWrap>
-
-              <FieldWrap label="Access Information / Notes">
-                <textarea
-                  value={propNotes}
-                  onChange={(e) => setPropNotes(e.target.value)}
-                  rows={3}
-                  placeholder="Gate code, lockbox location, parking notes… (optional)"
-                  className="w-full bg-[#111a14] border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-white/25 outline-none focus:border-[#22c55e]/40 transition-colors resize-none"
-                />
-              </FieldWrap>
-
-              <div className="flex gap-3">
-                <button type="button" onClick={() => { clearError(); setStep(1); }} className="flex items-center gap-1.5 text-sm text-white/40 hover:text-white/60 transition-colors">
-                  <ArrowLeft className="w-4 h-4" /> Back
-                </button>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="flex-1 bg-[#22c55e] hover:bg-[#16a34a] disabled:opacity-50 disabled:cursor-not-allowed text-black font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-colors"
-                >
-                  {loading ? "Saving property…" : <>Save Property <ArrowRight className="w-4 h-4" /></>}
-                </button>
-              </div>
-            </form>
-          )}
-
-          {/* ─── Step 3 ─── */}
-          {step === 3 && (
-            <form onSubmit={handleStep3} className="bg-white/[0.03] border border-white/8 rounded-2xl p-6 space-y-5">
               <FieldWrap label="Unit or Location">
                 <InputRow>
-                  <input value={jobUnit} onChange={(e) => setJobUnit(e.target.value)} placeholder="Unit 14B, Dumpster Area, Lot C… (optional)" className={inputCls} />
+                  <input value={draft.jobUnit} onChange={(e) => updateDraft({ jobUnit: e.target.value })} placeholder="Unit 14B, Dumpster Area… (optional)" className={inputCls} />
                 </InputRow>
               </FieldWrap>
 
               <FieldWrap label="Service Needed" required>
                 <InputRow icon={ClipboardList}>
-                  <select required value={jobService} onChange={(e) => setJobService(e.target.value)} className={selectCls}>
+                  <select required value={draft.jobService} onChange={(e) => updateDraft({ jobService: e.target.value })} className={selectCls}>
                     <option value="" disabled>Select service…</option>
                     {SERVICE_TYPES.map((s) => <option key={s} value={s}>{s}</option>)}
                   </select>
@@ -580,123 +496,181 @@ export default function PortalStart() {
               <FieldWrap label="Description" required>
                 <textarea
                   required
-                  value={jobDescription}
-                  onChange={(e) => setJobDescription(e.target.value)}
+                  value={draft.jobDescription}
+                  onChange={(e) => updateDraft({ jobDescription: e.target.value })}
                   rows={4}
-                  placeholder="Describe what needs to go. Include specific items, volumes, or conditions that might affect the job."
+                  placeholder="Describe what needs to go. Include specific items, volumes, or conditions."
                   className="w-full bg-[#111a14] border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-white/25 outline-none focus:border-[#22c55e]/40 transition-colors resize-none"
                 />
               </FieldWrap>
 
+              <FieldWrap label="Photos (optional)">
+                <div className="space-y-3">
+                  {draft.photoPreviews?.length > 0 && (
+                    <div className="grid grid-cols-3 gap-2">
+                      {draft.photoPreviews.map((src, i) => (
+                        <div key={i} className="relative aspect-square rounded-lg overflow-hidden border border-white/10">
+                          <img src={src} alt="" className="w-full h-full object-cover" />
+                          <button type="button" onClick={() => removePhoto(i)} className="absolute top-1 right-1 bg-black/60 rounded-full p-0.5">
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {draft.photoPreviews?.length < 10 && (
+                    <label className="flex items-center justify-center gap-2 border border-dashed border-white/15 rounded-xl py-4 cursor-pointer hover:border-[#22c55e]/40 transition-colors">
+                      <Camera className="w-4 h-4 text-[#22c55e]" />
+                      <span className="text-sm text-white/50">{uploadingPhotos ? "Uploading…" : "Add photos"}</span>
+                      <input type="file" accept="image/*" multiple className="hidden" onChange={handlePhotoUpload} disabled={uploadingPhotos} />
+                    </label>
+                  )}
+                </div>
+              </FieldWrap>
+
               <FieldWrap label="Preferred Date">
                 <InputRow>
-                  <input type="date" value={jobDate} onChange={(e) => setJobDate(e.target.value)} className={inputCls} min={new Date().toISOString().split("T")[0]} />
+                  <input type="date" value={draft.jobDate} onChange={(e) => updateDraft({ jobDate: e.target.value })} className={inputCls} min={new Date().toISOString().split("T")[0]} />
                 </InputRow>
               </FieldWrap>
 
               <FieldWrap label="Access Notes">
                 <textarea
-                  value={jobAccessNotes}
-                  onChange={(e) => setJobAccessNotes(e.target.value)}
+                  value={draft.jobAccessNotes}
+                  onChange={(e) => updateDraft({ jobAccessNotes: e.target.value })}
                   rows={2}
                   placeholder="Lockbox code, gate code, who to contact on arrival… (optional)"
                   className="w-full bg-[#111a14] border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-white/25 outline-none focus:border-[#22c55e]/40 transition-colors resize-none"
                 />
               </FieldWrap>
 
-              <FieldWrap label="PO / Internal Reference">
-                <InputRow>
-                  <input value={jobPoRef} onChange={(e) => setJobPoRef(e.target.value)} placeholder="PO-1042 or Work Order #8814 (optional)" className={inputCls} />
+              <button type="submit" className="w-full bg-[#22c55e] hover:bg-[#16a34a] text-black font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-colors">
+                Continue <ArrowRight className="w-4 h-4" />
+              </button>
+            </form>
+          )}
+
+          {/* Step 2 — Contact details */}
+          {step === 2 && (
+            <form onSubmit={handleStep2} className="bg-white/[0.03] border border-white/8 rounded-2xl p-6 space-y-5">
+              <FieldWrap label="Full Name" required>
+                <InputRow icon={User}>
+                  <input required value={draft.name} onChange={(e) => updateDraft({ name: e.target.value })} placeholder="Jordan Rivera" className={inputCls} />
+                </InputRow>
+              </FieldWrap>
+
+              <FieldWrap label="Company / Organization" required>
+                <InputRow icon={Building2}>
+                  <input required value={draft.company} onChange={(e) => updateDraft({ company: e.target.value })} placeholder="Apex Property Management" className={inputCls} />
+                </InputRow>
+              </FieldWrap>
+
+              <FieldWrap label="Work Email" required>
+                <InputRow icon={Mail}>
+                  <input required type="email" value={draft.email} onChange={(e) => updateDraft({ email: e.target.value })} placeholder="jordan@propertyco.com" autoComplete="email" className={inputCls} />
+                </InputRow>
+              </FieldWrap>
+
+              <FieldWrap label="Phone" required>
+                <InputRow icon={Phone}>
+                  <input required type="tel" value={draft.phone} onChange={(e) => updateDraft({ phone: e.target.value })} placeholder="(770) 555-0100" className={inputCls} />
+                </InputRow>
+              </FieldWrap>
+
+              <FieldWrap label="Job Title">
+                <InputRow icon={Briefcase}>
+                  <input value={draft.jobTitle} onChange={(e) => updateDraft({ jobTitle: e.target.value })} placeholder="Property Manager (optional)" className={inputCls} />
                 </InputRow>
               </FieldWrap>
 
               <div className="flex gap-3">
-                <button type="button" onClick={() => { clearError(); setStep(2); }} className="flex items-center gap-1.5 text-sm text-white/40 hover:text-white/60 transition-colors">
+                <button type="button" onClick={() => { clearError(); setStep(1); }} className="flex items-center gap-1.5 text-sm text-white/40 hover:text-white/60 transition-colors">
                   <ArrowLeft className="w-4 h-4" /> Back
                 </button>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="flex-1 bg-[#22c55e] hover:bg-[#16a34a] disabled:opacity-50 disabled:cursor-not-allowed text-black font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-colors"
-                >
-                  {loading ? "Saving…" : <>Continue <ArrowRight className="w-4 h-4" /></>}
+                <button type="submit" disabled={loading} className="flex-1 bg-[#22c55e] hover:bg-[#16a34a] disabled:opacity-50 text-black font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-colors">
+                  {loading ? "Checking…" : <>Continue <ArrowRight className="w-4 h-4" /></>}
                 </button>
               </div>
             </form>
           )}
 
-          {/* ─── Step 4 ─── */}
-          {step === 4 && (
-            <div className="space-y-5">
+          {/* Step 3 — Review + password */}
+          {step === 3 && (
+            <form onSubmit={handleStep3} className="space-y-5">
               <div className="bg-white/[0.03] border border-white/8 rounded-2xl p-6 space-y-3">
-                <h2 className="font-black text-lg mb-4">Review Your Submission</h2>
-
+                <h2 className="font-black text-lg mb-4">Review Your Request</h2>
                 {[
-                  ["Company", company || session?.user?.email],
-                  ["Contact", name],
-                  ["Email", email || session?.user?.email],
-                  ["Property", propName],
+                  ["Property", draft.propName],
                   propAddress && ["Address", propAddress],
-                  jobUnit && ["Unit / Location", jobUnit],
-                  ["Service", jobService],
+                  draft.jobUnit && ["Unit / Location", draft.jobUnit],
+                  ["Service", draft.jobService],
+                  ["Contact", draft.name],
+                  ["Company", draft.company],
+                  ["Email", draft.email],
+                  ["Phone", draft.phone],
                 ].filter(Boolean).map(([label, value]) => (
                   <div key={label} className="flex justify-between gap-4 py-2 border-b border-white/8 text-sm">
                     <span className="text-white/40">{label}</span>
                     <span className="text-white text-right">{value}</span>
                   </div>
                 ))}
-
-                {jobDescription && (
+                {draft.jobDescription && (
                   <div className="pt-2 text-sm">
                     <span className="text-white/40 block mb-1">Description</span>
-                    <span className="text-white leading-relaxed">{jobDescription}</span>
+                    <span className="text-white leading-relaxed">{draft.jobDescription}</span>
                   </div>
                 )}
               </div>
 
-              <div className="bg-white/[0.02] border border-white/5 rounded-xl p-4 text-xs text-white/35 leading-relaxed">
-                Submitting will send your work order for review. We'll reach out to confirm scheduling. A confirmation will be sent to <strong className="text-white/50">{email || session?.user?.email}</strong>.
+              <div className="bg-white/[0.02] border border-white/5 rounded-xl p-4 text-xs text-white/40 leading-relaxed">
+                Create secure portal access to submit this request. Your property and work order will be saved so future cleanup requests only take a few clicks.
+              </div>
+
+              <div className="bg-white/[0.03] border border-white/8 rounded-2xl p-6 space-y-5">
+                <FieldWrap label="Password" required>
+                  <InputRow icon={Lock}>
+                    <input required type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Min. 8 characters" minLength={8} autoComplete="new-password" className={inputCls} />
+                  </InputRow>
+                </FieldWrap>
+
+                <FieldWrap label="Confirm Password" required>
+                  <InputRow icon={Lock}>
+                    <input required type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Re-enter password" minLength={8} autoComplete="new-password" className={inputCls} />
+                  </InputRow>
+                </FieldWrap>
+
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} className="mt-1 accent-[#22c55e]" />
+                  <span className="text-xs text-white/45 leading-relaxed">
+                    I agree to create a Squatterz commercial portal account and submit this estimate request for review.
+                  </span>
+                </label>
               </div>
 
               <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={() => { clearError(); setStep(3); }}
-                  disabled={loading || submitted}
-                  className="flex items-center gap-1.5 text-sm text-white/40 hover:text-white/60 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                >
+                <button type="button" onClick={() => { clearError(); setStep(2); }} disabled={loading || submitted} className="flex items-center gap-1.5 text-sm text-white/40 hover:text-white/60 transition-colors disabled:opacity-30">
                   <ArrowLeft className="w-4 h-4" /> Back
                 </button>
-                <button
-                  onClick={handleStep4}
-                  disabled={loading || submitted}
-                  className="flex-1 bg-[#22c55e] hover:bg-[#16a34a] disabled:opacity-50 disabled:cursor-not-allowed text-black font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-colors"
-                >
-                  {loading ? "Submitting…" : "Submit Work Order for Review"}
+                <button type="submit" disabled={loading || submitted} className="flex-1 bg-[#22c55e] hover:bg-[#16a34a] disabled:opacity-50 text-black font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-colors">
+                  {loading ? "Submitting…" : "Create Account & Submit Request"}
                 </button>
               </div>
-            </div>
+            </form>
           )}
 
-          {/* ─── Step 5 ─── */}
-          {step === 5 && (
+          {/* Success */}
+          {step === 4 && (
             <div className="text-center space-y-6 py-8">
               <div className="w-16 h-16 rounded-full bg-[#22c55e]/15 border border-[#22c55e]/30 flex items-center justify-center mx-auto">
                 <CheckCircle className="w-8 h-8 text-[#22c55e]" />
               </div>
               <div>
-                <h2 className="text-2xl font-black mb-3">Work Order Submitted</h2>
+                <h2 className="text-2xl font-black mb-3">Request Submitted</h2>
                 <p className="text-white/55 text-sm leading-relaxed max-w-sm mx-auto">
-                  Your work order has been submitted for review. We'll reach out to confirm scheduling. Check your email for a confirmation.
+                  Your estimate request has been submitted for review. Check your email for confirmation. Redirecting you to the portal…
                 </p>
               </div>
-              <div className="text-sm text-white/35">
-                Redirecting you to the portal…
-              </div>
-              <button
-                onClick={() => navigate("/portal")}
-                className="text-sm text-[#22c55e] font-semibold hover:underline"
-              >
+              <button onClick={() => navigate("/portal")} className="text-sm text-[#22c55e] font-semibold hover:underline">
                 Go to portal now →
               </button>
             </div>

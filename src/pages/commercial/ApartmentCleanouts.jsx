@@ -159,7 +159,7 @@ export default function ApartmentCleanouts() {
               }}
               className="bg-[#22c55e] hover:bg-[#16a34a] text-black font-bold text-sm px-6 py-3 rounded-full transition-colors flex items-center gap-2"
             >
-              Start a Cleanup Request <ArrowRight className="w-4 h-4" />
+              Request an Estimate <ArrowRight className="w-4 h-4" />
             </button>
             <a
               href="tel:7706282877"
@@ -274,7 +274,7 @@ export default function ApartmentCleanouts() {
                 }}
                 className="bg-[#22c55e] hover:bg-[#16a34a] text-black font-bold text-sm px-8 py-3.5 rounded-full transition-colors"
               >
-                Start a Cleanup Request
+                Request an Estimate
               </button>
               <a
                 href="tel:7706282877"

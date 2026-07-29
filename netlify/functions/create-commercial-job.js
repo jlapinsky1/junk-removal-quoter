@@ -2,6 +2,7 @@ import {
   getServiceClient, verifyCommercialClient,
   jsonResponse, errorResponse,
 } from './_shared/supabase.js';
+import { linkUploadSessionPhotos } from './_shared/commercialRequest.js';
 
 export default async function handler(req) {
   if (req.method !== 'POST') return errorResponse('Method not allowed', 405);
@@ -13,7 +14,7 @@ export default async function handler(req) {
 
     const {
       propertyId, unit, description, preferredDate,
-      accessNotes, photoPaths, draft,
+      accessNotes, photoPaths, draft, uploadSessionId,
     } = await req.json();
 
     if (!propertyId) return errorResponse('propertyId is required');
@@ -50,10 +51,10 @@ export default async function handler(req) {
       return errorResponse('Failed to create job', 500);
     }
 
-    // Link submission photos
+    // Link submission photos (direct paths or upload session)
     const paths = Array.isArray(photoPaths) ? photoPaths : [];
     if (paths.length > 0) {
-      const photoRecords = paths.map((path, i) => ({
+      const photoRecords = paths.map((path) => ({
         job_id: job.id,
         kind: 'submission',
         storage_path: path,
@@ -64,6 +65,18 @@ export default async function handler(req) {
         .insert(photoRecords);
       if (photoErr) console.error('Photo link error:', photoErr);
     }
+
+    let sessionPhotoCount = 0;
+    if (uploadSessionId) {
+      sessionPhotoCount = await linkUploadSessionPhotos(
+        supabase,
+        uploadSessionId,
+        job.id,
+        user.id,
+      );
+    }
+
+    const totalPhotos = paths.length + sessionPhotoCount;
 
     // Draft jobs do not trigger any notifications.
     // complete-onboarding.js transitions them to pending_review and sends emails.
@@ -105,7 +118,7 @@ export default async function handler(req) {
                   ${unit ? `<p><strong>Unit:</strong> ${unit}</p>` : ''}
                   ${description ? `<p><strong>Description:</strong> ${description}</p>` : ''}
                   ${preferredDate ? `<p><strong>Preferred Date:</strong> ${new Date(preferredDate).toLocaleDateString()}</p>` : ''}
-                  ${paths.length > 0 ? `<p><strong>Photos:</strong> ${paths.length} submitted</p>` : ''}
+                  ${totalPhotos > 0 ? `<p><strong>Photos:</strong> ${totalPhotos} submitted</p>` : ''}
                   <p><a href="${siteUrl}/admin/commercial">Review in Admin →</a></p>
                 </div>
               `,

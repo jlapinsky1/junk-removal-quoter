@@ -1,10 +1,14 @@
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Trash2, Mail, Lock, User, AlertTriangle, ArrowLeft } from "lucide-react";
 import { supabase } from "../utils/supabaseClient";
+import { loadDraft } from "../utils/commercialRequestDraft";
+import { submitAuthenticatedDraft } from "../utils/submitCommercialDraft";
 
 export default function ClientLogin() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const resumeRequest = searchParams.get("resume") === "request";
   const [mode, setMode] = useState("login"); // login | signup | forgot
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -13,6 +17,28 @@ export default function ClientLogin() {
   const [error, setError] = useState(null);
   const [signupSuccess, setSignupSuccess] = useState(false);
   const [resetSent, setResetSent] = useState(false);
+
+  useEffect(() => {
+    if (resumeRequest && loadDraft()) {
+      setMode("login");
+    }
+  }, [resumeRequest]);
+
+  async function finishLoginRedirect() {
+    const draft = loadDraft();
+    if (resumeRequest && draft?.pendingLogin && supabase) {
+      try {
+        await submitAuthenticatedDraft(supabase, draft);
+        navigate("/portal");
+        return;
+      } catch (err) {
+        setError(err?.message || "Logged in, but failed to submit your saved request. Try again from the portal.");
+        navigate("/portal/start");
+        return;
+      }
+    }
+    navigate("/portal");
+  }
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -27,7 +53,7 @@ export default function ClientLogin() {
       if (mode === "login") {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-        navigate("/portal");
+        await finishLoginRedirect();
       } else if (mode === "forgot") {
         const res = await fetch("/.netlify/functions/reset-password", {
           method: "POST",
@@ -129,7 +155,9 @@ export default function ClientLogin() {
             {mode === "login" ? "Welcome back" : mode === "signup" ? "Create your account" : "Reset your password"}
           </h1>
           <p className="mt-2 text-sm text-white/45">
-            {mode === "login"
+            {resumeRequest
+              ? "Log in to submit your saved estimate request."
+              : mode === "login"
               ? "Log in to view jobs, invoices, and documentation."
               : mode === "signup"
               ? "Sign up to access your commercial account portal."
@@ -224,7 +252,7 @@ export default function ClientLogin() {
             <>
               New commercial customer?{" "}
               <a href="/portal/start" className="text-[#22c55e] font-semibold hover:underline">
-                Create an account
+                Request an estimate
               </a>
             </>
           ) : (
