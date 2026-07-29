@@ -26,6 +26,20 @@ export const INVOICE_STATUS_META = {
   draft:       { label: "Draft",       text: "text-white/40",  bg: "bg-white/5 border-white/10" },
 };
 
+const DEFAULT_INVOICE_STATUS_META = {
+  label: "Unknown",
+  text: "text-white/40",
+  bg: "bg-white/5 border-white/10",
+};
+
+export function statusLabel(status) {
+  return STATUS_META[status]?.label || DEFAULT_STATUS_META.label;
+}
+
+export function invoiceStatusLabel(status) {
+  return INVOICE_STATUS_META[status]?.label || DEFAULT_INVOICE_STATUS_META.label;
+}
+
 export function fmtMoney(n) {
   if (n == null) return "\u2014";
   return Number(n).toLocaleString("en-US", { style: "currency", currency: "USD" });
@@ -64,7 +78,7 @@ export function StatusBadge({ status }) {
 }
 
 export function InvoiceBadge({ status }) {
-  const m = INVOICE_STATUS_META[status];
+  const m = INVOICE_STATUS_META[status] || DEFAULT_INVOICE_STATUS_META;
   return (
     <span className={`inline-flex items-center text-[11px] font-semibold px-2.5 py-1 rounded-full border ${m.bg} ${m.text}`}>
       {m.label}

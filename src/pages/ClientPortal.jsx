@@ -11,6 +11,7 @@ import { loadDraft, isSubmittableDraft } from "../utils/commercialRequestDraft";
 import { trySubmitSavedDraft } from "../utils/submitCommercialDraft";
 import {
   STATUS_META, INVOICE_STATUS_META, StatusBadge, InvoiceBadge,
+  statusLabel, invoiceStatusLabel,
   Card, SectionHeader, EmptyState, Spinner, ErrorState,
   fmtMoney, fmtDate, fmtDateTime, timeAgo,
 } from "../utils/portalComponents";
@@ -663,7 +664,7 @@ function JobsView({ go }) {
               filter === f ? "bg-white text-black border-white" : "bg-white/5 text-white/50 border-white/10 hover:text-white"
             }`}
           >
-            {f === "all" ? "All" : STATUS_META[f].label}
+            {f === "all" ? "All" : statusLabel(f)}
           </button>
         ))}
       </div>
@@ -937,7 +938,7 @@ function InvoicesView({ go }) {
               filter === f ? "bg-white text-black border-white" : "bg-white/5 text-white/50 border-white/10 hover:text-white"
             }`}
           >
-            {f === "all" ? "All" : INVOICE_STATUS_META[f].label}
+            {f === "all" ? "All" : invoiceStatusLabel(f)}
           </button>
         ))}
       </div>
