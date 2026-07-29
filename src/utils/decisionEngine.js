@@ -194,7 +194,7 @@ function buildExplanation(recommendation, context, ruleResults, goalContribution
       parts.push("Today's profit target is already covered by booked work.");
     } else if (dt.openSlots > 0 && dt.suggestedPerSlot > 0) {
       const slotWord = dt.openSlots === 1 ? 'slot' : 'slots';
-      parts.push(`Today has ${dt.openSlots} remaining schedule ${slotWord} and your target contribution per remaining job is approximately $${Math.round(dt.suggestedPerSlot)}.`);
+      parts.push(`Today has ${dt.openSlots} remaining schedule ${slotWord} and you need roughly $${Math.round(dt.suggestedPerSlot)} profit per remaining job to hit today's target (this is not a suggested quote price).`);
 
       if (profit != null) {
         if (profit >= dt.suggestedPerSlot) {

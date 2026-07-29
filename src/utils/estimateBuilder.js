@@ -10,6 +10,7 @@ const ACCESS_MAP = {
 };
 
 const QUANTITY_TO_LOAD = {
+  'Single item': 'Single item curbside',
   'A few items (1-5)': 'Normal small job',
   'A room worth of stuff': 'Quarter truck/trailer',
   'Multiple rooms': 'Three-quarter truck/trailer',
@@ -17,6 +18,7 @@ const QUANTITY_TO_LOAD = {
 };
 
 const QUANTITY_TO_TRUCK = {
+  'Single item': { volumePct: 10, weightRisk: false },
   'A few items (1-5)': { volumePct: 15, weightRisk: false },
   'A room worth of stuff': { volumePct: 25, weightRisk: false },
   'Multiple rooms': { volumePct: 75, weightRisk: false },
@@ -24,6 +26,7 @@ const QUANTITY_TO_TRUCK = {
 };
 
 const QUANTITY_TO_DUMPS = {
+  'Single item': 1,
   'A few items (1-5)': 1,
   'A room worth of stuff': 1,
   'Multiple rooms': 2,
@@ -31,6 +34,7 @@ const QUANTITY_TO_DUMPS = {
 };
 
 const QUANTITY_TO_HOURS = {
+  'Single item': 0.25,
   'A few items (1-5)': 0.5,
   'A room worth of stuff': 1,
   'Multiple rooms': 2,
@@ -157,7 +161,7 @@ export function buildEstimate(booking, settingsOverride) {
   // We do NOT have actual distance data at estimate time.
   // Flag this explicitly rather than defaulting to zero.
 
-  const hasDistanceData = booking.travelMinutes != null;
+  const hasDistanceData = booking.travelMinutes != null || booking.distanceMiles != null;
   if (!hasDistanceData) {
     missingInputs.push({
       field: 'distance',
@@ -166,9 +170,19 @@ export function buildEstimate(booking, settingsOverride) {
     });
   }
 
-  // Use geocoded travel time if available; fall back to 30 min (conservative short-run default)
-  const estimatedTravelMinutes = hasDistanceData ? booking.travelMinutes : 30;
-  const estimatedFuelCost = Math.round((estimatedTravelMinutes / 60) * (settings.gasPrice || 3.50) / (settings.mpg || 15) * 40);
+  const oneWayMiles = booking.distanceMiles != null
+    ? Number(booking.distanceMiles)
+    : (booking.travelMinutes != null ? (booking.travelMinutes / 60) * 30 : null);
+
+  const estimatedTravelMinutes = booking.travelMinutes != null
+    ? booking.travelMinutes
+    : (oneWayMiles != null ? Math.max(5, Math.round((oneWayMiles / 30) * 60)) : 30);
+
+  const homeBaseToJob = oneWayMiles ?? 0;
+  const jobToLandfill = oneWayMiles != null ? Math.min(30, Math.max(8, oneWayMiles * 0.35)) : 0;
+  const estimatedFuelCost = oneWayMiles != null
+    ? Math.round(((oneWayMiles * 2) + jobToLandfill) / (settings.mpg || 15) * (settings.gasPrice || 3.50))
+    : Math.round((estimatedTravelMinutes / 60) * (settings.gasPrice || 3.50) / (settings.mpg || 15) * 40);
 
   // --- On-site duration ---
 
@@ -195,9 +209,9 @@ export function buildEstimate(booking, settingsOverride) {
     addOns,
     numberOfDumpLoads: numberOfDumpLoads || 1,
     priceSensitivity: 'balanced',
-    homeBaseToJob: 0,
-    jobToLandfill: 0,
-    landfillToHomeBase: 0,
+    homeBaseToJob,
+    jobToLandfill,
+    landfillToHomeBase: jobToLandfill,
     estimatedJobTime: estimatedOnSiteHours,
   }, settings);
 

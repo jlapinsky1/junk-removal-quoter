@@ -15,11 +15,41 @@ function countSubmissionPhotos(job) {
   return submission.length || photos.length;
 }
 
+const ITEM_KEYWORDS = [
+  { pattern: /mattress/, item: 'mattress' },
+  { pattern: /\b(couch|sofa)\b/, item: 'couch' },
+  { pattern: /\b(refrigerator|fridge)\b/, item: 'refrigerator' },
+  { pattern: /\b(washer|dryer)\b/, item: 'washer' },
+  { pattern: /\b(dresser|desk|table|chair)\b/, item: 'furniture' },
+  { pattern: /\b(treadmill|elliptical)\b/, item: 'treadmill' },
+];
+
+export function extractItemsFromText(text) {
+  const t = text.toLowerCase();
+  const items = [];
+  for (const { pattern, item } of ITEM_KEYWORDS) {
+    if (pattern.test(t)) items.push({ item, quantity: 1 });
+  }
+  return items;
+}
+
 /**
  * Infer residential-style quantity bucket from commercial job text.
  */
 export function inferQuantity(text, photoCount = 0) {
   const t = text.toLowerCase();
+
+  if (
+    /single item|one item|one mattress|mattress removal|mattress only|just a mattress|only a mattress|basic mattress|single mattress/.test(t)
+  ) {
+    return 'Single item';
+  }
+  if (/\bmattress\b/.test(t) && !/multiple|several|\d+\s*mattress/.test(t)) {
+    return 'Single item';
+  }
+  if (/\b(couch|sofa|refrigerator|fridge|washer|dryer)\b/.test(t) && !/multiple|several|and more|plus/.test(t)) {
+    return 'Single item';
+  }
 
   if (
     /whole (building|property|house|site)|full cleanout|major cleanout|multiple units|several units|bulk cleanout|construction debris|demo(lition)?|renovation/.test(t)
@@ -42,7 +72,7 @@ export function inferQuantity(text, photoCount = 0) {
   return 'A few items (1-5)';
 }
 
-export function inferAccess(text) {
+export function inferAccess(text, quantity) {
   const t = text.toLowerCase();
 
   if (/curbside|already outside|dumpster|loading dock|dock|roll[- ]?off/.test(t)) return 'curbside';
@@ -52,6 +82,8 @@ export function inferAccess(text) {
   }
   if (/basement|downstairs|lower level/.test(t)) return 'basement';
   if (/first floor|ground floor|inside|interior|unit/.test(t)) return 'first_floor';
+
+  if (quantity === 'Single item') return 'curbside';
 
   return 'first_floor';
 }
@@ -74,18 +106,20 @@ export function inferStairs(text) {
 export function commercialJobToBookingShape(job) {
   const text = combinedJobText(job);
   const photoCount = countSubmissionPhotos(job);
+  const quantity = inferQuantity(text, photoCount);
 
   return {
     id: job.id,
-    quantity: inferQuantity(text, photoCount),
-    accessType: inferAccess(text),
+    quantity,
+    accessType: inferAccess(text, quantity),
     stairs: inferStairs(text),
     description: text,
-    detectedItems: [],
+    detectedItems: extractItemsFromText(text),
     photoCount,
     fullAddress: job.property?.address || '',
     preferredDate: job.preferredDate,
     travelMinutes: job.travelMinutes ?? null,
+    distanceMiles: job.distanceMiles ?? null,
     geocodingStatus: job.travelMinutes != null ? 'success' : null,
   };
 }

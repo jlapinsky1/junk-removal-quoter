@@ -235,12 +235,61 @@ function RequestDetail({ booking, onBack }) {
           body: JSON.stringify({ bookingId: data.id }),
         });
         if (res.ok) {
-          const { travelMinutes, distanceMiles } = await res.json();
-          if (travelMinutes != null) {
-            setData(prev => ({ ...prev, travelMinutes, distanceMiles, geocodingStatus: 'success' }));
+          const body = await res.json();
+          if (body.skipped) {
+            throw new Error(body.reason || 'geocode skipped');
+          }
+          if (body.travelMinutes != null) {
+            setData(prev => ({
+              ...prev,
+              travelMinutes: body.travelMinutes,
+              distanceMiles: body.distanceMiles,
+              geocodingStatus: 'success',
+            }));
+            return;
           }
         }
-      } catch (e) {
+      } catch {
+        // Fall through to address-based geocode
+      }
+
+      const settings = getSettings();
+      const shopAddress = settings.homeBaseAddress?.trim();
+      const jobAddress = data.fullAddress;
+      if (!jobAddress) return;
+
+      try {
+        if (shopAddress) {
+          const { calculateDistance } = await import('../utils/distance');
+          const result = await calculateDistance(shopAddress, jobAddress);
+          if (result.success) {
+            setData(prev => ({
+              ...prev,
+              travelMinutes: result.durationMinutes ?? Math.max(5, Math.round((result.miles / 30) * 60)),
+              distanceMiles: result.miles,
+              geocodingStatus: 'success',
+            }));
+            return;
+          }
+        }
+
+        const res = await fetch('/api/geocode-address', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ address: jobAddress, shopAddress: shopAddress || undefined }),
+        });
+        if (res.ok) {
+          const body = await res.json();
+          if (body.travelMinutes != null) {
+            setData(prev => ({
+              ...prev,
+              travelMinutes: body.travelMinutes,
+              distanceMiles: body.distanceMiles,
+              geocodingStatus: 'success',
+            }));
+          }
+        }
+      } catch {
         // Non-fatal — estimate will show default
       }
     })();

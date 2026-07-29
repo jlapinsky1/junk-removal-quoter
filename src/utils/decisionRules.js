@@ -184,6 +184,9 @@ export const DECISION_RULES = [
     evaluate(ctx) {
       const travel = ctx.estimate?.estimatedTravelMinutes;
       if (travel == null) return { result: 'skip', message: 'No travel estimate' };
+      if (!ctx.estimate?.hasDistanceData) {
+        return { result: 'pass', message: 'Travel not verified — using placeholder estimate', data: { bonus: -0.08 } };
+      }
       if (travel <= 30) return { result: 'pass', message: 'Short travel — efficient', data: { bonus: 0.05 } };
       if (travel <= 60) return { result: 'pass', message: 'Normal travel time', data: { bonus: 0 } };
       if (travel <= 90) return { result: 'pass', message: 'Long travel time', data: { bonus: -0.05 } };
@@ -241,7 +244,7 @@ export const DECISION_RULES = [
       if (ratio >= 0.40) {
         return { result: 'pass', message: `Below slot target (${fmtC(profit)} vs ~${fmtC(suggested)}/slot)`, data: { bonus: -0.03 } };
       }
-      return { result: 'pass', message: `Well below slot target (${fmtC(profit)} vs ~${fmtC(suggested)}/slot)`, data: { bonus: -0.08 } };
+        return { result: 'pass', message: `Well below slot profit target (${fmtC(profit)} profit vs ~${fmtC(suggested)} needed/slot)`, data: { bonus: -0.08 } };
     },
   },
   {

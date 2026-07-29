@@ -35,8 +35,9 @@ export async function calculateDistance(origin, destination) {
     // Distance is in meters, convert to miles
     const miles = Math.round(element.distance.value / 1609.34 * 10) / 10;
     const duration = element.duration.text;
+    const durationMinutes = Math.max(1, Math.round((element.duration.value || 0) / 60));
 
-    return { success: true, miles, duration };
+    return { success: true, miles, duration, durationMinutes };
   } catch (e) {
     return { success: false, error: e.message };
   }

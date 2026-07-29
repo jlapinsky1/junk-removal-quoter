@@ -28,6 +28,7 @@ function getWeekDateRange() {
 
 export function useCommercialQuoteAnalysis(job) {
   const [travelMinutes, setTravelMinutes] = useState(job?.travelMinutes ?? null);
+  const [distanceMiles, setDistanceMiles] = useState(job?.distanceMiles ?? null);
   const [goal, setGoal] = useState(null);
   const [goalProgress, setGoalProgress] = useState(null);
   const [weekProgress, setWeekProgress] = useState(null);
@@ -38,8 +39,8 @@ export function useCommercialQuoteAnalysis(job) {
   const settings = getSettings();
 
   const jobWithTravel = useMemo(
-    () => (job ? { ...job, travelMinutes } : null),
-    [job, travelMinutes],
+    () => (job ? { ...job, travelMinutes, distanceMiles } : null),
+    [job, travelMinutes, distanceMiles],
   );
 
   const bookingShape = useMemo(
@@ -96,15 +97,41 @@ export function useCommercialQuoteAnalysis(job) {
     if (!job?.property?.address || travelMinutes != null) return;
 
     (async () => {
+      const settings = getSettings();
+      const shopAddress = settings.homeBaseAddress?.trim();
+      const jobAddress = job.property.address;
+
+      if (shopAddress) {
+        try {
+          const { calculateDistance } = await import('../utils/distance');
+          const result = await calculateDistance(shopAddress, jobAddress);
+          if (result.success) {
+            setDistanceMiles(result.miles);
+            setTravelMinutes(
+              result.durationMinutes ?? Math.max(5, Math.round((result.miles / 30) * 60)),
+            );
+            return;
+          }
+        } catch {
+          // Fall through to server geocode
+        }
+      }
+
       try {
         const res = await fetch('/api/geocode-address', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ address: job.property.address }),
+          body: JSON.stringify({
+            address: jobAddress,
+            shopAddress: shopAddress || undefined,
+          }),
         });
         if (res.ok) {
           const data = await res.json();
-          if (data.travelMinutes != null) setTravelMinutes(data.travelMinutes);
+          if (data.travelMinutes != null) {
+            setTravelMinutes(data.travelMinutes);
+            if (data.distanceMiles != null) setDistanceMiles(data.distanceMiles);
+          }
         }
       } catch {
         // Non-fatal — estimate uses default travel time

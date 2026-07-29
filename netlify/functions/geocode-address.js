@@ -15,40 +15,56 @@ function haversineDistance(lat1, lon1, lat2, lon2) {
   return 2 * R * Math.asin(Math.sqrt(a));
 }
 
+async function geocodeAddress(address) {
+  const nominatimUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address.trim())}&format=json&limit=1`;
+  const geoRes = await fetch(nominatimUrl, {
+    headers: {
+      'User-Agent': 'Squatterz/1.0 (hello@gosquatterz.com)',
+      'Accept-Language': 'en',
+    },
+  });
+
+  if (!geoRes.ok) throw new Error(`Geocoding service unavailable (${geoRes.status})`);
+
+  const results = await geoRes.json();
+  if (!results?.length) throw new Error('Address could not be geocoded');
+
+  return {
+    lat: Number(results[0].lat),
+    lng: Number(results[0].lon),
+  };
+}
+
 export default async function handler(req) {
   if (req.method !== 'POST') return errorResponse('Method not allowed', 405);
 
   try {
-    const { address } = await req.json();
+    const { address, shopAddress } = await req.json();
     if (!address?.trim()) return errorResponse('address required');
 
-    const shopLat = Number(process.env.SHOP_LAT);
-    const shopLng = Number(process.env.SHOP_LNG);
-    if (!shopLat || !shopLng) {
-      return jsonResponse({ skipped: true, reason: 'SHOP_LAT/SHOP_LNG not configured' });
+    let shopLat = Number(process.env.SHOP_LAT);
+    let shopLng = Number(process.env.SHOP_LNG);
+
+    if ((!shopLat || !shopLng) && shopAddress?.trim()) {
+      const shop = await geocodeAddress(shopAddress);
+      shopLat = shop.lat;
+      shopLng = shop.lng;
     }
 
-    const nominatimUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address.trim())}&format=json&limit=1`;
-    const geoRes = await fetch(nominatimUrl, {
-      headers: {
-        'User-Agent': 'Squatterz/1.0 (hello@gosquatterz.com)',
-        'Accept-Language': 'en',
-      },
-    });
+    if (!shopLat || !shopLng) {
+      return jsonResponse({
+        skipped: true,
+        reason: 'Shop location not configured — set SHOP_LAT/SHOP_LNG or pass shopAddress',
+      });
+    }
 
-    if (!geoRes.ok) return errorResponse('Geocoding service unavailable', 502);
-
-    const results = await geoRes.json();
-    if (!results?.length) return errorResponse('Address could not be geocoded', 422);
-
-    const custLat = Number(results[0].lat);
-    const custLng = Number(results[0].lon);
-    const straightLineMiles = haversineDistance(shopLat, shopLng, custLat, custLng);
+    const job = await geocodeAddress(address);
+    const straightLineMiles = haversineDistance(shopLat, shopLng, job.lat, job.lng);
     const roadMiles = straightLineMiles * 1.3;
     const travelMinutes = Math.max(5, Math.round((roadMiles / 30) * 60));
 
     return jsonResponse({
-      distanceMiles: Math.round(straightLineMiles * 10) / 10,
+      distanceMiles: Math.round(roadMiles * 10) / 10,
       travelMinutes,
     });
   } catch (e) {

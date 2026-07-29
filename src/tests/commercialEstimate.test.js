@@ -4,6 +4,7 @@ import {
   inferAccess,
   inferStairs,
   buildCommercialEstimate,
+  commercialJobToBookingShape,
 } from '../utils/commercialEstimateBuilder';
 
 describe('commercialEstimateBuilder', () => {
@@ -13,6 +14,40 @@ describe('commercialEstimateBuilder', () => {
 
   it('infers unit turnover as room-sized job', () => {
     expect(inferQuantity('Unit 204 turnover after tenant move-out')).toBe('A room worth of stuff');
+  });
+
+  it('prices a basic mattress removal as a single item, not a truck load', () => {
+    const job = {
+      id: 'fb0c7b4a',
+      description: 'Basic mattress removal',
+      accessNotes: '',
+      photos: [{ kind: 'submission' }],
+      property: { address: '305 Brookhaven Ave NE, Atlanta, GA 30319' },
+    };
+
+    const shape = commercialJobToBookingShape(job);
+    expect(shape.quantity).toBe('Single item');
+    expect(shape.accessType).toBe('curbside');
+
+    const estimate = buildCommercialEstimate(job);
+    expect(estimate.recommendedPrice).toBeLessThanOrEqual(225);
+    expect(estimate.loadSize).toBe('Single item curbside');
+  });
+
+  it('increases price and flags long travel when distance is known', () => {
+    const job = {
+      id: 'fb0c7b4a',
+      description: 'Basic mattress removal',
+      photos: [{ kind: 'submission' }],
+      property: { address: '305 Brookhaven Ave NE, Atlanta, GA 30319' },
+      travelMinutes: 90,
+      distanceMiles: 42,
+    };
+
+    const estimate = buildCommercialEstimate(job);
+    expect(estimate.hasDistanceData).toBe(true);
+    expect(estimate.estimatedTravelMinutes).toBe(90);
+    expect(estimate.recommendedPrice).toBeGreaterThan(200);
   });
 
   it('infers upstairs access from access notes', () => {
