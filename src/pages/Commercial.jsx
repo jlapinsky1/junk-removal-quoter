@@ -165,9 +165,7 @@ const FAQS = [
   },
 ];
 
-const BEFORE_AFTER = {
-  title: "Two-bedroom turnover cleanout",
-  desc: "Furniture, mattresses, household trash, and patio debris removed. Completion packet delivered to the property manager same day.",
+const COMPLETION_PACKET_IMAGES = {
   before: "https://images.pexels.com/photos/4108715/pexels-photo-4108715.jpeg?auto=compress&cs=tinysrgb&w=800&h=600&dpr=2",
   after: "https://images.pexels.com/photos/6585757/pexels-photo-6585757.jpeg?auto=compress&cs=tinysrgb&w=800&h=600&dpr=2",
 };
@@ -458,10 +456,10 @@ export default function Commercial() {
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <div className="aspect-[4/3] rounded-lg overflow-hidden bg-white/5 border border-white/8">
-                    <img src={BEFORE_AFTER.before} alt="Before property cleanout" className="w-full h-full object-cover" />
+                    <img src={COMPLETION_PACKET_IMAGES.before} alt="Before property cleanout" className="w-full h-full object-cover" />
                   </div>
                   <div className="aspect-[4/3] rounded-lg overflow-hidden bg-white/5 border border-white/8">
-                    <img src={BEFORE_AFTER.after} alt="After property cleanout" className="w-full h-full object-cover" />
+                    <img src={COMPLETION_PACKET_IMAGES.after} alt="After property cleanout" className="w-full h-full object-cover" />
                   </div>
                 </div>
                 <div className="bg-[#0d1410] border border-white/8 rounded-xl p-3.5 text-sm text-white/60 leading-relaxed">
@@ -548,34 +546,7 @@ export default function Commercial() {
         </div>
       </section>
 
-      {/* 9. Real job example */}
-      <section className="py-20 border-b border-white/5 bg-white/[0.02]">
-        <div className="max-w-5xl mx-auto px-5">
-          <div className="grid md:grid-cols-2 gap-8 items-center">
-            <div>
-              <p className="text-[#22c55e] text-sm font-semibold uppercase tracking-widest mb-2">Recent work</p>
-              <h2 className="text-2xl md:text-3xl font-black text-white">{BEFORE_AFTER.title}</h2>
-              <p className="mt-3 text-white/45 text-sm leading-relaxed">{BEFORE_AFTER.desc}</p>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <p className="text-[10px] uppercase tracking-widest text-white/35 mb-2">Before</p>
-                <div className="aspect-[4/3] rounded-xl overflow-hidden border border-white/8">
-                  <img src={BEFORE_AFTER.before} alt="Apartment unit before cleanout" className="w-full h-full object-cover" />
-                </div>
-              </div>
-              <div>
-                <p className="text-[10px] uppercase tracking-widest text-white/35 mb-2">After</p>
-                <div className="aspect-[4/3] rounded-xl overflow-hidden border border-white/8">
-                  <img src={BEFORE_AFTER.after} alt="Apartment unit after cleanout" className="w-full h-full object-cover" />
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 10. FAQ */}
+      {/* 9. FAQ */}
       <section id="faq" className="py-20 border-b border-white/5">
         <div className="max-w-3xl mx-auto px-5">
           <div className="mb-10 text-center">
@@ -590,7 +561,7 @@ export default function Commercial() {
         </div>
       </section>
 
-      {/* 11. Final CTA */}
+      {/* 10. Final CTA */}
       <section className="py-20">
         <div className="max-w-3xl mx-auto px-5 text-center">
           <h2 className="text-3xl md:text-4xl font-black text-white">Request a commercial estimate</h2>
