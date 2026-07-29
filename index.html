@@ -2,12 +2,30 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <link rel="icon" type="image/png" href="/icon-squatterz.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
-    <title>Squatterz - We Haul It All</title>
+    <title>Squatterz — Junk Removal &amp; Property Cleanup | Hoschton, GA</title>
+    <!-- Google Analytics — loaded only when VITE_GA4_MEASUREMENT_ID is set at build time -->
+    <script>
+      (function() {
+        var mid = '%VITE_GA4_MEASUREMENT_ID%';
+        // Vite replaces the token above; if the env var is unset the literal
+        // placeholder remains and we skip loading GA4 entirely.
+        if (!mid || mid.indexOf('%VITE_') === 0) return;
+        var s = document.createElement('script');
+        s.async = true;
+        s.src = 'https://www.googletagmanager.com/gtag/js?id=' + mid;
+        document.head.appendChild(s);
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){window.dataLayer.push(arguments);}
+        window.gtag = gtag;
+        gtag('js', new Date());
+        gtag('config', mid);
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

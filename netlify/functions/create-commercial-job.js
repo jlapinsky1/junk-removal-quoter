@@ -13,10 +13,11 @@ export default async function handler(req) {
 
     const {
       propertyId, unit, description, preferredDate,
-      accessNotes, photoPaths,
+      accessNotes, photoPaths, draft,
     } = await req.json();
 
     if (!propertyId) return errorResponse('propertyId is required');
+    const isDraft = draft === true;
 
     const supabase = getServiceClient();
 
@@ -39,7 +40,7 @@ export default async function handler(req) {
         description: description || null,
         preferred_date: preferredDate ? new Date(preferredDate).toISOString() : null,
         access_notes: accessNotes || null,
-        status: 'pending_review',
+        status: isDraft ? 'draft' : 'pending_review',
       })
       .select('id')
       .single();
@@ -62,6 +63,12 @@ export default async function handler(req) {
         .from('job_photos')
         .insert(photoRecords);
       if (photoErr) console.error('Photo link error:', photoErr);
+    }
+
+    // Draft jobs do not trigger any notifications.
+    // complete-onboarding.js transitions them to pending_review and sends emails.
+    if (isDraft) {
+      return jsonResponse({ jobId: job.id }, 201);
     }
 
     // --- Emails (both awaited so they complete before function exits) ---

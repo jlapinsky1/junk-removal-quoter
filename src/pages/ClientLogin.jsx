@@ -222,10 +222,10 @@ export default function ClientLogin() {
         <p className="text-center text-sm text-white/45">
           {mode === "login" ? (
             <>
-              Don&apos;t have an account?{" "}
-              <button onClick={() => { setMode("signup"); setError(null); }} className="text-[#22c55e] font-semibold hover:underline">
-                Sign up
-              </button>
+              New commercial customer?{" "}
+              <a href="/portal/start" className="text-[#22c55e] font-semibold hover:underline">
+                Create an account
+              </a>
             </>
           ) : (
             <>

@@ -6,3 +6,29 @@
   from = "/*"
   to = "/index.html"
   status = 200
+
+# Private routes — noindex so crawlers don't index authenticated content.
+# Do NOT add these to robots.txt — crawlers must be able to visit these
+# pages to read the noindex directive.
+[[headers]]
+  for = "/admin/*"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow"
+
+[[headers]]
+  for = "/portal/*"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow"
+
+[[headers]]
+  for = "/dispatch/*"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow"
+
+# Security headers for all routes
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "DENY"
+    Referrer-Policy = "strict-origin-when-cross-origin"

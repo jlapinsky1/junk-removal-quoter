@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 import {
   Phone,
   Star,
@@ -8,7 +9,6 @@ import {
   Zap,
   CheckCircle,
   ArrowRight,
-  ChevronRight,
   ChevronDown,
   MapPin,
   Building2,
@@ -28,10 +28,13 @@ import {
   Recycle,
   CalendarDays,
   Trash,
-  Mail,
-  User,
-  LogIn,
+  Briefcase,
+  Home,
 } from "lucide-react";
+import CommercialNav from "../components/commercial/CommercialNav";
+import CommercialFooter from "../components/commercial/CommercialFooter";
+import { makeCanonical, makeTitle, SITE_URL, DEFAULT_OG_IMAGE } from "../utils/seo";
+import { trackEvent } from "../utils/analytics";
 
 const TRUST_BAR = [
   { icon: Camera, label: "Before-and-after photos" },
@@ -93,16 +96,16 @@ const DOC_ITEMS = [
 ];
 
 const ACCOUNT_BENEFITS = [
-  { icon: User, title: "One point of contact", desc: "No wondering who to call for the next property. Your account manager knows your portfolio." },
-  { icon: Building2, title: "Portfolio support", desc: "Service for one building or multiple addresses — coordinated under one account." },
-  { icon: CalendarClock, title: "Flexible scheduling", desc: "On-call work, turnover scheduling, or recurring pickup days — whatever your operations need." },
-  { icon: Receipt, title: "Consistent invoicing", desc: "Invoices organized by property, unit, purchase order, or internal reference number." },
-  { icon: FileText, title: "Vendor onboarding", desc: "COI, W-9, and other required onboarding documents available on request." },
+  { icon: Building2, title: "Multi-property management", desc: "Submit and track cleanup requests across your entire portfolio — one account, every property." },
+  { icon: ClipboardList, title: "Work order submission", desc: "Create a request, attach photos, set a deadline, and submit. Future requests take only a few clicks." },
+  { icon: CalendarClock, title: "Portfolio-wide job visibility", desc: "See every open job across all properties with statuses: Requested, Under Review, Scheduled, In Progress, Completed." },
+  { icon: Receipt, title: "Invoice management", desc: "Invoices organized by property, unit, purchase order, or internal reference. Pay and download from the portal." },
+  { icon: FileText, title: "Completion documentation", desc: "Before-and-after photos, completion notes, and records available in the portal after every job." },
 ];
 
 const FAQS = [
   { q: "Can you work without a manager present?", a: "Yes. As long as access has been arranged — keys, gate codes, or lockbox — our crew can complete the removal and document everything without anyone on-site." },
-  { q: "How quickly can you complete a turnover?", a: "Most single-unit turnovers are completed same-day or next-day depending on volume. For urgent evictions or move-outs, we offer on-call dispatch." },
+  { q: "How quickly can you complete a turnover?", a: "Turnaround depends on volume, access, and scheduling availability. Contact us for timing on your specific request." },
   { q: "Do you provide before-and-after photos?", a: "Always. Every completion packet includes dated before-and-after photos plus written completion notes." },
   { q: "Can invoices include a property, unit, or purchase-order number?", a: "Yes. We label every invoice with the property name, unit number, and any internal reference or PO you provide." },
   { q: "Do you offer recurring pickups?", a: "We do. Set a weekly, biweekly, or monthly cadence and we'll show up on schedule — no need to call each time." },
@@ -121,13 +124,91 @@ const BEFORE_AFTERS = [
     before: "https://images.pexels.com/photos/4108715/pexels-photo-4108715.jpeg?auto=compress&cs=tinysrgb&w=800&h=600&dpr=2",
     after: "https://images.pexels.com/photos/6585757/pexels-photo-6585757.jpeg?auto=compress&cs=tinysrgb&w=800&h=600&dpr=2",
   },
-  {
-    title: "Eviction cleanout — 1 bedroom",
-    desc: "Abandoned belongings, appliances, and debris cleared within 24 hours of notice. Photos and completion notes sent same-day.",
-    before: "https://images.pexels.com/photos/4245826/pexels-photo-4245826.jpeg?auto=compress&cs=tinysrgb&w=800&h=600&dpr=2",
-    after: "https://images.pexels.com/photos/1571460/pexels-photo-1571460.jpeg?auto=compress&cs=tinysrgb&w=800&h=600&dpr=2",
-  },
 ];
+
+const PROBLEM_CARDS = [
+  { icon: Sofa, title: "Abandoned furniture after move-out", desc: "Mattresses, sofas, and appliances left behind delay the next turn and keep the unit off the market longer than it needs to be." },
+  { icon: AlertTriangle, title: "Eviction and abandoned-property debris", desc: "Time-sensitive removal with the documentation your team and ownership need — photos, completion notes, and an itemized invoice." },
+  { icon: Trash2, title: "Dumpster overflow and bulk trash", desc: "Overfilled enclosures become code violations and tenant complaints. Coordinated removal stops the problem before it escalates." },
+  { icon: Warehouse, title: "Illegal dumping on the lot", desc: "Third-party debris in parking lots, alleys, and behind dumpsters. We remove it, document it, and clear the area." },
+];
+
+const SCENARIO_STEPS = [
+  { num: "1", title: "Submit the work order", desc: "The maintenance coordinator opens the portal, creates a request for the property, attaches a photo from their phone, and sets the deadline — Friday morning before the HOA walkthrough." },
+  { num: "2", title: "Approve the estimate", desc: "Squatterz reviews the photos and sends a line-item estimate. The coordinator approves it from their phone — no back-and-forth calls needed." },
+  { num: "3", title: "Crew handles the removal", desc: "No one needs to be on-site. Access was arranged via gate code. The mattresses are cleared and the area is reset." },
+  { num: "4", title: "Completion packet delivered", desc: "Before-and-after photos, completion notes, and an invoice labeled with the property address are available in the portal by end of day." },
+];
+
+const WHO_TILES = [
+  { icon: Building2, label: "Apartment and multifamily operators", desc: "Ongoing unit turns, evictions, and common-area cleanup for communities of any size." },
+  { icon: Home, label: "Single-family rental portfolio owners", desc: "Move-out cleanouts and bulk removal across scattered-site rentals." },
+  { icon: Users, label: "HOA and community managers", desc: "Common-area cleanup, bulk trash, and dumpster enclosure reset for residential communities." },
+  { icon: Briefcase, label: "Commercial property managers", desc: "Office, retail, and mixed-use properties with furniture, renovation debris, and bulk removal needs." },
+  { icon: Warehouse, label: "Property maintenance companies", desc: "Subcontract cleanup work across your client portfolio without adding another vendor relationship." },
+  { icon: FileCheck, label: "Real estate investors and flippers", desc: "Estate cleanouts, distressed-property cleanup, and pre-sale debris removal." },
+];
+
+const SERVICE_CITIES = [
+  { city: "Hoschton", county: "Jackson County" },
+  { city: "Braselton", county: "Jackson County" },
+  { city: "Gainesville", county: "Hall County" },
+  { city: "Buford", county: "Gwinnett County" },
+  { city: "Sugar Hill", county: "Gwinnett County" },
+  { city: "Suwanee", county: "Gwinnett County" },
+  { city: "Winder", county: "Barrow County" },
+  { city: "Lawrenceville", county: "Gwinnett County" },
+  { city: "Jefferson", county: "Jackson County" },
+  { city: "Commerce", county: "Jackson County" },
+  { city: "Oakwood", county: "Hall County" },
+  { city: "Flowery Branch", county: "Hall County" },
+  { city: "Cumming", county: "Forsyth County" },
+  { city: "Dawsonville", county: "Dawson County" },
+];
+
+const COMMERCIAL_JSON_LD = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": ["LocalBusiness", "Organization"],
+      "@id": "https://gosquatterz.com/#organization",
+      "name": "Squatterz LLC",
+      "url": "https://gosquatterz.com",
+      "telephone": "+17706282877",
+      "address": {
+        "@type": "PostalAddress",
+        "addressLocality": "Hoschton",
+        "addressRegion": "GA",
+        "postalCode": "30548",
+        "addressCountry": "US",
+      },
+      "areaServed": [
+        "Hoschton, GA", "Braselton, GA", "Gainesville, GA", "Buford, GA",
+        "Sugar Hill, GA", "Suwanee, GA", "Winder, GA", "Lawrenceville, GA",
+        "Jefferson, GA", "Commerce, GA", "Oakwood, GA", "Flowery Branch, GA",
+        "Cumming, GA", "Dawsonville, GA",
+      ],
+      "description": "Commercial junk removal and property cleanup for property managers in Northeast Georgia.",
+      "logo": "https://gosquatterz.com/logo-squatterz.png",
+      "image": "https://gosquatterz.com/logo-squatterz.png",
+    },
+    {
+      "@type": "Service",
+      "serviceType": "Commercial Junk Removal",
+      "provider": { "@id": "https://gosquatterz.com/#organization" },
+      "areaServed": "Northeast Georgia",
+      "name": "Commercial Property Cleanup Services",
+      "url": "https://gosquatterz.com/commercial",
+    },
+    {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://gosquatterz.com/" },
+        { "@type": "ListItem", "position": 2, "name": "Commercial Services", "item": "https://gosquatterz.com/commercial" },
+      ],
+    },
+  ],
+};
 
 function StarRow({ count = 5 }) {
   return (
@@ -171,70 +252,20 @@ export default function Commercial() {
   const navigate = useNavigate();
   return (
     <div className="min-h-screen bg-[#0a0f0d] text-white font-sans antialiased">
-      {/* NAV */}
-      <header className="fixed top-0 inset-x-0 z-50 border-b border-white/5 bg-[#0a0f0d]/90 backdrop-blur-md">
-        <div className="max-w-7xl mx-auto px-5 h-16 flex items-center justify-between">
-          <a href="/" className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-full bg-white flex items-center justify-center">
-              <Trash2 className="w-5 h-5 text-[#0a0f0d]" />
-            </div>
-            <div className="leading-none">
-              <span className="text-white font-black tracking-widest text-sm uppercase">
-                Squatterz
-              </span>
-              <div className="text-[#22c55e] text-[9px] tracking-[0.2em] font-semibold uppercase mt-0.5">
-                Commercial
-              </div>
-            </div>
-          </a>
+      <Helmet>
+        <title>{makeTitle("Commercial Junk Removal for Property Managers")}</title>
+        <meta name="description" content="Squatterz handles tenant cleanouts, eviction debris, bulk trash, and recurring cleanup for property managers across Northeast Georgia. Documentation on every job." />
+        <link rel="canonical" href={makeCanonical("/commercial")} />
+        <meta property="og:title" content="Commercial Junk Removal for Property Managers | Squatterz" />
+        <meta property="og:description" content="One cleanup partner for every property you manage. Fast cleanouts, clear documentation, insured crew — Gainesville, Hoschton, Braselton, and Northeast GA." />
+        <meta property="og:url" content={makeCanonical("/commercial")} />
+        <meta property="og:type" content="website" />
+        <meta property="og:image" content={`${SITE_URL}${DEFAULT_OG_IMAGE}`} />
+        <meta name="twitter:card" content="summary_large_image" />
+        <script type="application/ld+json">{JSON.stringify(COMMERCIAL_JSON_LD)}</script>
+      </Helmet>
 
-          <nav className="hidden md:flex items-center gap-8">
-            <a href="#services" className="text-sm text-white/60 hover:text-white transition-colors">Services</a>
-            <a href="#process" className="text-sm text-white/60 hover:text-white transition-colors">How It Works</a>
-            <a href="#account" className="text-sm text-white/60 hover:text-white transition-colors">Commercial Account</a>
-            <a href="#faq" className="text-sm text-white/60 hover:text-white transition-colors">FAQ</a>
-          </nav>
-
-          <div className="hidden md:flex items-center gap-3">
-            <a
-              href="tel:7706282877"
-              className="flex items-center gap-2 text-sm text-white/70 hover:text-white transition-colors"
-            >
-              <Phone className="w-4 h-4 text-[#22c55e]" />
-              <span className="font-medium">(770) 628-2877</span>
-            </a>
-            <button
-              onClick={() => navigate("/portal/login")}
-              className="border border-white/15 hover:border-white/30 text-white font-bold text-sm px-5 py-2.5 rounded-full transition-colors flex items-center gap-2"
-            >
-              <LogIn className="w-4 h-4" />
-              Log In
-            </button>
-            <button
-              onClick={() => navigate("/portal/login")}
-              className="bg-[#22c55e] hover:bg-[#16a34a] text-black font-bold text-sm px-5 py-2.5 rounded-full transition-colors"
-            >
-              Set Up Account
-            </button>
-          </div>
-
-          <div className="md:hidden flex items-center gap-2">
-            <button
-              onClick={() => navigate("/portal/login")}
-              className="border border-white/15 text-white font-bold text-xs px-3 py-2 rounded-full flex items-center gap-1.5"
-            >
-              <LogIn className="w-3.5 h-3.5" />
-              Log In
-            </button>
-            <button
-              onClick={() => navigate("/portal/login")}
-              className="bg-[#22c55e] text-black font-bold text-xs px-4 py-2 rounded-full"
-            >
-              Set Up
-            </button>
-          </div>
-        </div>
-      </header>
+      <CommercialNav />
 
       {/* HERO */}
       <section className="relative pt-16 overflow-hidden">
@@ -247,44 +278,50 @@ export default function Commercial() {
             <div className="lg:w-1/2 space-y-8">
               <div className="inline-flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-4 py-2 text-sm">
                 <Building2 className="w-4 h-4 text-[#22c55e]" />
-                <span className="text-white/80 font-medium">For Property Managers & Commercial Accounts</span>
+                <span className="text-white/80 font-medium">For Property Managers &amp; Commercial Accounts</span>
               </div>
 
               <div>
                 <h1 className="text-4xl md:text-6xl font-black leading-[1.05] tracking-tight text-white">
-                  Junk Removal for
-                </h1>
-                <h1 className="text-4xl md:text-6xl font-black leading-[1.05] tracking-tight text-[#22c55e]">
-                  Property Managers
+                  One Cleanup Partner for{" "}
+                  <span className="text-[#22c55e]">Every Property You Manage</span>
                 </h1>
                 <p className="mt-6 text-xl md:text-2xl font-semibold text-white/80">
                   Fast cleanouts. Clear documentation. One reliable crew.
                 </p>
                 <p className="mt-4 text-base text-white/55 leading-relaxed max-w-2xl">
-                  Squatterz handles tenant move-outs, abandoned belongings, bulk-item pickups, property cleanups, and recurring removal services for apartments and rental properties.
+                  Squatterz handles tenant move-outs, abandoned belongings, bulk-item pickups, property cleanups, and recurring removal services for apartments and rental properties across Northeast Georgia.
                 </p>
               </div>
 
               <div className="flex flex-col sm:flex-row gap-3">
                 <button
-                  onClick={() => navigate("/portal/login")}
+                  onClick={() => {
+                    trackEvent("commercial_onboarding_start", { location: "hero" });
+                    navigate("/portal/start");
+                  }}
                   className="bg-[#22c55e] hover:bg-[#16a34a] active:scale-[0.98] text-black font-bold text-base px-8 py-4 rounded-full flex items-center justify-center gap-2 transition-all"
                 >
-                  Set Up a Commercial Account <ArrowRight className="w-4 h-4" />
+                  Start a Cleanup Request <ArrowRight className="w-4 h-4" />
                 </button>
-                <button
-                  onClick={() => navigate("/portal/login")}
+                <Link
+                  to="/commercial/client-portal"
+                  onClick={() => trackEvent("portal_demo_click", { location: "hero" })}
                   className="border border-white/15 hover:border-white/30 text-white font-semibold text-base px-8 py-4 rounded-full flex items-center justify-center gap-2 transition-colors"
                 >
-                  <LogIn className="w-4 h-4" /> Client Portal Log In
-                </button>
+                  See How the Portal Works
+                </Link>
               </div>
 
+              <p className="text-sm text-white/35 leading-relaxed">
+                Create your commercial account, add the property, and submit your first work order. Future requests take only a few clicks.
+              </p>
+
               <div className="flex flex-wrap gap-x-6 gap-y-2 pt-2">
-                {["Our crew — not independent haulers", "Insured & COI-ready", "Documentation on every job"].map((t) => (
+                {["Our crew — not independent haulers", "Insured &amp; COI-ready", "Documentation on every job"].map((t) => (
                   <div key={t} className="flex items-center gap-2 text-sm text-white/45">
                     <CheckCircle className="w-4 h-4 text-[#22c55e]" />
-                    {t}
+                    <span dangerouslySetInnerHTML={{ __html: t }} />
                   </div>
                 ))}
               </div>
@@ -293,13 +330,13 @@ export default function Commercial() {
             <div className="lg:w-1/2 mt-10 lg:mt-0 flex justify-center lg:justify-end">
               <img
                 src="/trailer-hero.png"
-                alt="Squatterz dump trailer ready for commercial cleanouts"
+                alt="Squatterz dump trailer ready for commercial property cleanouts in Northeast Georgia"
                 style={{
-                  display: 'block',
-                  width: 'min(90%, 600px)',
-                  height: 'auto',
-                  mixBlendMode: 'multiply',
-                  filter: 'drop-shadow(0 20px 40px rgba(34, 197, 94, 0.15))',
+                  display: "block",
+                  width: "min(90%, 600px)",
+                  height: "auto",
+                  mixBlendMode: "multiply",
+                  filter: "drop-shadow(0 20px 40px rgba(34, 197, 94, 0.15))",
                 }}
               />
             </div>
@@ -323,6 +360,37 @@ export default function Commercial() {
         </div>
       </section>
 
+      {/* AUDIENCE + PROBLEM */}
+      <section className="py-24 border-t border-white/5">
+        <div className="max-w-6xl mx-auto px-5">
+          <div className="mb-14 max-w-2xl">
+            <p className="text-[#22c55e] text-sm font-semibold uppercase tracking-widest mb-3">
+              Why property managers call us
+            </p>
+            <h2 className="text-3xl md:text-4xl font-black text-white">
+              Recurring problems. One reliable partner.
+            </h2>
+            <p className="mt-4 text-white/45 text-base">
+              These aren't one-off situations — they happen across every property, every month. Squatterz is built to handle them cleanly, quickly, and with the documentation your team needs.
+            </p>
+          </div>
+          <div className="grid sm:grid-cols-2 gap-4">
+            {PROBLEM_CARDS.map(({ icon: Icon, title, desc }) => (
+              <div
+                key={title}
+                className="bg-white/4 border border-white/8 rounded-2xl p-6 hover:border-[#22c55e]/40 hover:bg-white/6 transition-all"
+              >
+                <div className="w-11 h-11 rounded-xl bg-[#22c55e]/10 border border-[#22c55e]/20 flex items-center justify-center mb-4">
+                  <Icon className="w-5 h-5 text-[#22c55e]" />
+                </div>
+                <h3 className="font-bold text-white text-base">{title}</h3>
+                <p className="mt-1.5 text-sm text-white/45 leading-relaxed">{desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* SERVICES */}
       <section id="services" className="py-24 border-t border-white/5">
         <div className="max-w-6xl mx-auto px-5">
@@ -334,7 +402,7 @@ export default function Commercial() {
               Services made for the jobs you actually deal with
             </h2>
             <p className="mt-4 text-white/45 text-base">
-              Not generic "junk." These are the situations our crew handles every week for property managers across Gainesville, GA.
+              Not generic "junk." These are the situations our crew handles every week for property managers across Northeast Georgia — Gainesville, Hoschton, Braselton, and surrounding areas.
             </p>
           </div>
 
@@ -419,13 +487,13 @@ export default function Commercial() {
               </div>
 
               <div>
-                <p className="text-white/35 uppercase tracking-wider text-xs mb-2">Before & After</p>
+                <p className="text-white/35 uppercase tracking-wider text-xs mb-2">Before &amp; After</p>
                 <div className="grid grid-cols-2 gap-2">
                   <div className="aspect-[4/3] rounded-lg overflow-hidden bg-white/5 border border-white/8">
-                    <img src={BEFORE_AFTERS[0].before} alt="Before" className="w-full h-full object-cover" />
+                    <img src={BEFORE_AFTERS[0].before} alt="Unit before cleanout" className="w-full h-full object-cover" />
                   </div>
                   <div className="aspect-[4/3] rounded-lg overflow-hidden bg-white/5 border border-white/8">
-                    <img src={BEFORE_AFTERS[0].after} alt="After" className="w-full h-full object-cover" />
+                    <img src={BEFORE_AFTERS[0].after} alt="Unit after cleanout" className="w-full h-full object-cover" />
                   </div>
                 </div>
               </div>
@@ -456,18 +524,18 @@ export default function Commercial() {
         </div>
       </section>
 
-      {/* COMMERCIAL ACCOUNT BENEFITS */}
-      <section id="account" className="py-24 border-t border-white/5 bg-white/[0.02]">
+      {/* CLIENT PORTAL SHOWCASE */}
+      <section id="portal" className="py-24 border-t border-white/5 bg-white/[0.02]">
         <div className="max-w-6xl mx-auto px-5">
           <div className="mb-14 max-w-2xl">
             <p className="text-[#22c55e] text-sm font-semibold uppercase tracking-widest mb-3">
-              Commercial account
+              Client portal
             </p>
             <h2 className="text-3xl md:text-4xl font-black text-white">
-              One account. Your whole portfolio.
+              Property cleanup without the phone tag
             </h2>
             <p className="mt-4 text-white/45 text-base">
-              A commercial account with Squatterz means one reliable crew, one point of contact, and paperwork your accounting team can actually process.
+              The Squatterz client portal gives property managers a single dashboard for all active work orders, job statuses, completion documentation, and invoices across every property in your portfolio.
             </p>
           </div>
 
@@ -479,6 +547,48 @@ export default function Commercial() {
               >
                 <div className="w-11 h-11 rounded-xl bg-[#22c55e]/10 border border-[#22c55e]/20 flex items-center justify-center mb-4">
                   <Icon className="w-5 h-5 text-[#22c55e]" />
+                </div>
+                <h3 className="font-bold text-white text-base">{title}</h3>
+                <p className="mt-1.5 text-sm text-white/45 leading-relaxed">{desc}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-10 text-center">
+            <Link
+              to="/commercial/client-portal"
+              onClick={() => trackEvent("portal_demo_click", { location: "portal_section" })}
+              className="inline-flex items-center gap-2 border border-white/15 hover:border-white/30 text-white font-semibold text-sm px-7 py-3.5 rounded-full transition-colors"
+            >
+              Learn More About the Portal <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* PRACTICAL SCENARIO */}
+      <section className="py-24 border-t border-white/5">
+        <div className="max-w-5xl mx-auto px-5">
+          <div className="text-center mb-12">
+            <p className="text-[#22c55e] text-sm font-semibold uppercase tracking-widest mb-3">
+              In practice
+            </p>
+            <h2 className="text-3xl md:text-4xl font-black text-white">
+              What this looks like on a real property
+            </h2>
+            <p className="mt-3 text-white/45 text-base max-w-xl mx-auto">
+              A maintenance coordinator for a 48-unit apartment community notices a mattress and box spring stacked against the dumpster enclosure — before the Friday HOA walkthrough.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-6">
+            {SCENARIO_STEPS.map(({ num, title, desc }) => (
+              <div
+                key={num}
+                className="relative bg-white/4 border border-white/8 rounded-2xl p-7 hover:border-[#22c55e]/40 hover:bg-white/6 transition-all"
+              >
+                <div className="w-10 h-10 rounded-full bg-[#22c55e] flex items-center justify-center shrink-0 mb-4">
+                  <span className="font-black text-black text-sm">{num}</span>
                 </div>
                 <h3 className="font-bold text-white text-base">{title}</h3>
                 <p className="mt-1.5 text-sm text-white/45 leading-relaxed">{desc}</p>
@@ -525,6 +635,74 @@ export default function Commercial() {
         </div>
       </section>
 
+      {/* WHO WE WORK WITH */}
+      <section className="py-24 border-t border-white/5">
+        <div className="max-w-6xl mx-auto px-5">
+          <div className="mb-14 max-w-2xl">
+            <p className="text-[#22c55e] text-sm font-semibold uppercase tracking-widest mb-3">
+              Who we work with
+            </p>
+            <h2 className="text-3xl md:text-4xl font-black text-white">
+              Built for anyone who manages properties
+            </h2>
+            <p className="mt-4 text-white/45 text-base">
+              Whether you manage one building or a regional portfolio, Squatterz fits into your existing operations.
+            </p>
+          </div>
+
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {WHO_TILES.map(({ icon: Icon, label, desc }) => (
+              <div
+                key={label}
+                className="bg-white/4 border border-white/8 rounded-2xl p-6 hover:border-[#22c55e]/40 hover:bg-white/6 transition-all"
+              >
+                <div className="w-11 h-11 rounded-xl bg-[#22c55e]/10 border border-[#22c55e]/20 flex items-center justify-center mb-4">
+                  <Icon className="w-5 h-5 text-[#22c55e]" />
+                </div>
+                <h3 className="font-bold text-white text-base">{label}</h3>
+                <p className="mt-1.5 text-sm text-white/45 leading-relaxed">{desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* SERVICE AREA */}
+      <section className="py-24 border-t border-white/5 bg-white/[0.02]">
+        <div className="max-w-6xl mx-auto px-5">
+          <div className="mb-12 max-w-2xl">
+            <p className="text-[#22c55e] text-sm font-semibold uppercase tracking-widest mb-3">
+              Where we work
+            </p>
+            <h2 className="text-3xl md:text-4xl font-black text-white">
+              Serving Northeast Georgia
+            </h2>
+            <p className="mt-4 text-white/50 text-base leading-relaxed">
+              Squatterz operates out of Hoschton, GA (ZIP 30548) and serves properties within approximately 50 miles. Availability depends on address, job scope, scheduling, and disposal requirements.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3 mb-8">
+            {SERVICE_CITIES.map(({ city, county }) => (
+              <div key={city} className="bg-white/4 border border-white/8 rounded-xl px-3 py-3 text-center">
+                <div className="flex items-center justify-center gap-1.5 mb-1">
+                  <MapPin className="w-3 h-3 text-[#22c55e] shrink-0" />
+                  <span className="text-white text-sm font-semibold">{city}</span>
+                </div>
+                <span className="text-white/30 text-[10px]">{county}</span>
+              </div>
+            ))}
+          </div>
+
+          <Link
+            to="/commercial/service-area"
+            className="inline-flex items-center gap-2 text-[#22c55e] text-sm font-semibold hover:text-white transition-colors"
+          >
+            View full service area &amp; coverage details <ArrowRight className="w-4 h-4" />
+          </Link>
+        </div>
+      </section>
+
       {/* FAQ */}
       <section id="faq" className="py-24 border-t border-white/5">
         <div className="max-w-3xl mx-auto px-5">
@@ -554,44 +732,59 @@ export default function Commercial() {
             <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
               <a
                 href="tel:7706282877"
+                onClick={() => trackEvent("commercial_phone_click", { location: "faq" })}
                 className="bg-[#22c55e] hover:bg-[#16a34a] text-black font-bold px-7 py-3.5 rounded-full text-sm transition-colors flex items-center justify-center gap-2"
               >
                 <Phone className="w-4 h-4" /> (770) 628-2877
               </a>
               <button
-                onClick={() => navigate("/portal/login")}
+                onClick={() => {
+                  trackEvent("commercial_onboarding_start", { location: "faq" });
+                  navigate("/portal/start");
+                }}
                 className="border border-white/15 hover:border-white/30 text-white font-semibold px-7 py-3.5 rounded-full text-sm transition-colors flex items-center justify-center gap-2"
               >
-                Set Up Account <ArrowRight className="w-4 h-4" />
+                Start an Account <ArrowRight className="w-4 h-4" />
               </button>
             </div>
           </div>
         </div>
       </section>
 
-      {/* FOOTER */}
-      <footer className="border-t border-white/5 py-10">
-        <div className="max-w-7xl mx-auto px-5 flex flex-col md:flex-row items-center justify-between gap-4">
-          <a href="/" className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-full bg-white flex items-center justify-center">
-              <Trash2 className="w-4 h-4 text-[#0a0f0d]" />
-            </div>
-            <span className="font-black tracking-widest text-xs uppercase text-white">
-              Squatterz
-            </span>
-          </a>
-          <p className="text-xs text-white/25">
-            &copy; {new Date().getFullYear()} Squatterz LLC · Gainesville, GA · All rights reserved
+      {/* FINAL CTA */}
+      <section className="py-24 border-t border-white/5 bg-white/[0.02]">
+        <div className="max-w-3xl mx-auto px-5 text-center">
+          <div className="absolute inset-0 pointer-events-none overflow-hidden">
+            <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[400px] h-[400px] bg-[#22c55e]/6 rounded-full blur-[100px]" />
+          </div>
+          <h2 className="text-3xl md:text-4xl font-black text-white">
+            Ready to get started?
+          </h2>
+          <p className="mt-4 text-white/50 text-base max-w-lg mx-auto">
+            Create your commercial account, add your first property, and submit a work order. We review every request and confirm scheduling before anything is dispatched.
           </p>
-          <div className="flex gap-6 text-xs text-white/30">
-            <a href="/" className="hover:text-white/60 transition-colors">Residential</a>
-            <a href="/commercial" className="hover:text-white/60 transition-colors">Commercial</a>
-            <button onClick={() => navigate("/portal/login")} className="hover:text-white/60 transition-colors">Client Portal</button>
-            <a href="#" className="hover:text-white/60 transition-colors">Privacy</a>
-            <a href="#" className="hover:text-white/60 transition-colors">Terms</a>
+          <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
+            <button
+              onClick={() => {
+                trackEvent("commercial_onboarding_start", { location: "final_cta" });
+                navigate("/portal/start");
+              }}
+              className="bg-[#22c55e] hover:bg-[#16a34a] text-black font-bold text-base px-8 py-4 rounded-full flex items-center justify-center gap-2 transition-all"
+            >
+              Start a Cleanup Request <ArrowRight className="w-4 h-4" />
+            </button>
+            <a
+              href="tel:7706282877"
+              onClick={() => trackEvent("commercial_phone_click", { location: "final_cta" })}
+              className="border border-white/15 hover:border-white/30 text-white font-semibold text-base px-8 py-4 rounded-full flex items-center justify-center gap-2 transition-colors"
+            >
+              <Phone className="w-4 h-4" /> (770) 628-2877
+            </a>
           </div>
         </div>
-      </footer>
+      </section>
+
+      <CommercialFooter />
     </div>
   );
 }

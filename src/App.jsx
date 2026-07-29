@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import Navigation from './components/Navigation';
 import QuoteForm from './pages/QuoteForm';
@@ -8,18 +8,27 @@ import RequestQueue from './pages/RequestQueue';
 import Dashboard from './pages/Dashboard';
 import LearningDashboard from './pages/LearningDashboard';
 import BookingFlow from './pages/BookingFlow';
-import ApprovedQuote from './pages/ApprovedQuote';
-import FinalPaymentPage from './pages/FinalPaymentPage';
 import AdminLogin from './pages/AdminLogin';
 import Commercial from './pages/Commercial';
+import PropertyManagementCleanup from './pages/commercial/PropertyManagementCleanup';
+import ApartmentCleanouts from './pages/commercial/ApartmentCleanouts';
+import EvictionCleanup from './pages/commercial/EvictionCleanup';
+import UnitTurnoverCleanout from './pages/commercial/UnitTurnoverCleanout';
+import BulkTrashRemoval from './pages/commercial/BulkTrashRemoval';
+import ClientPortalPage from './pages/commercial/ClientPortalPage';
+import ServiceArea from './pages/commercial/ServiceArea';
+import PortalStart from './pages/PortalStart';
 import CommercialAdminPage from './pages/CommercialAdminPage';
-import CommercialQuotePage from './pages/CommercialQuotePage';
 import ServiceAreaAdmin from './pages/ServiceAreaAdmin';
 import ClientLogin from './pages/ClientLogin';
 import ClientPortal from './pages/ClientPortal';
 import DispatchPage from './pages/DispatchPage';
 import { getSettings } from './utils/storage';
 import { getRepo } from './utils/repository';
+
+const ApprovedQuote = lazy(() => import('./pages/ApprovedQuote'));
+const FinalPaymentPage = lazy(() => import('./pages/FinalPaymentPage'));
+const CommercialQuotePage = lazy(() => import('./pages/CommercialQuotePage'));
 
 function AdminDashboard() {
   const [user, setUser] = useState(undefined); // undefined = loading
@@ -104,12 +113,21 @@ function AdminDashboard() {
 
 export default function App() {
   return (
+    <Suspense fallback={<div className="min-h-screen bg-gray-100 flex items-center justify-center"><div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full" /></div>}>
     <Routes>
       <Route path="/" element={<BookingFlow />} />
       <Route path="/book" element={<BookingFlow />} />
       <Route path="/quote/:id" element={<ApprovedQuote />} />
       <Route path="/invoice/:token/final" element={<FinalPaymentPage />} />
       <Route path="/commercial" element={<Commercial />} />
+      <Route path="/commercial/property-management-cleanup" element={<PropertyManagementCleanup />} />
+      <Route path="/commercial/apartment-cleanouts" element={<ApartmentCleanouts />} />
+      <Route path="/commercial/eviction-cleanup" element={<EvictionCleanup />} />
+      <Route path="/commercial/unit-turnover-cleanout" element={<UnitTurnoverCleanout />} />
+      <Route path="/commercial/bulk-trash-removal" element={<BulkTrashRemoval />} />
+      <Route path="/commercial/client-portal" element={<ClientPortalPage />} />
+      <Route path="/commercial/service-area" element={<ServiceArea />} />
+      <Route path="/portal/start" element={<PortalStart />} />
       <Route path="/portal/login" element={<ClientLogin />} />
       <Route path="/portal" element={<ClientPortal />} />
       <Route path="/admin" element={<AdminDashboard />} />
@@ -117,5 +135,6 @@ export default function App() {
       <Route path="/commercial/quote/:token" element={<CommercialQuotePage />} />
       <Route path="/dispatch" element={<DispatchPage />} />
     </Routes>
+    </Suspense>
   );
 }
