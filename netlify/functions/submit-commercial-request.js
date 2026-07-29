@@ -5,7 +5,7 @@ import {
   jsonResponse,
   errorResponse,
 } from './_shared/supabase.js';
-import { sendCommercialJobEmails, linkUploadSessionPhotos } from './_shared/commercialRequest.js';
+import { sendCommercialJobEmails, linkUploadSessionPhotos, ensureCommercialClient } from './_shared/commercialRequest.js';
 
 function buildPropertyNotes({ propType, propUnits, propNotes }) {
   return [
@@ -124,7 +124,7 @@ export default async function handler(req) {
       email: normalizedEmail,
       password,
       email_confirm: true,
-      user_metadata: { full_name: name },
+      user_metadata: { full_name: name, contact_name: name },
     });
 
     if (createErr) {
@@ -158,26 +158,15 @@ export default async function handler(req) {
         console.warn('submit-commercial-request: similar company name detected');
       }
 
-      await new Promise((r) => setTimeout(r, 400));
-
-      const { data: client, error: clientErr } = await supabase
-        .from('commercial_clients')
-        .update({
-          company_name: company,
-          contact_name: name,
-          phone,
-          job_title: jobTitle || null,
-          onboarding_status: 'in_progress',
-          last_onboarding_step: 3,
-          attribution: attribution || {},
-        })
-        .eq('user_id', user.id)
-        .select('id, company_name, contact_name, phone')
-        .single();
-
-      if (clientErr || !client) {
-        throw new Error('CLIENT_UPDATE_FAILED');
-      }
+      const client = await ensureCommercialClient(supabase, user.id, {
+        company_name: company,
+        contact_name: name,
+        phone,
+        job_title: jobTitle || null,
+        onboarding_status: 'in_progress',
+        last_onboarding_step: 3,
+        attribution: attribution || {},
+      });
       clientId = client.id;
 
       const { data: property, error: propErr } = await supabase
@@ -217,7 +206,12 @@ export default async function handler(req) {
       }
       jobId = job.id;
 
-      const photoCount = await linkUploadSessionPhotos(supabase, uploadSessionId, jobId, user.id);
+      let photoCount = 0;
+      try {
+        photoCount = await linkUploadSessionPhotos(supabase, uploadSessionId, jobId, user.id);
+      } catch (photoErr) {
+        console.error('submit-commercial-request photo link failed:', photoErr?.message || photoErr);
+      }
 
       await supabase
         .from('commercial_clients')
@@ -229,22 +223,26 @@ export default async function handler(req) {
       const adminEmail = process.env.ADMIN_EMAIL;
       const siteUrl = process.env.URL || 'https://gosquatterz.com';
 
-      await sendCommercialJobEmails({
-        supabase,
-        resendKey,
-        fromEmail,
-        adminEmail,
-        siteUrl,
-        client,
-        clientEmail: normalizedEmail,
-        property,
-        job,
-        unit: jobUnit,
-        description,
-        preferredDate: jobDate,
-        photoCount,
-        isNewAccount: true,
-      });
+      try {
+        await sendCommercialJobEmails({
+          supabase,
+          resendKey,
+          fromEmail,
+          adminEmail,
+          siteUrl,
+          client,
+          clientEmail: normalizedEmail,
+          property,
+          job,
+          unit: jobUnit,
+          description,
+          preferredDate: jobDate,
+          photoCount,
+          isNewAccount: true,
+        });
+      } catch (emailErr) {
+        console.error('submit-commercial-request email failed:', emailErr?.message || emailErr);
+      }
 
       return jsonResponse({
         success: true,
@@ -253,7 +251,7 @@ export default async function handler(req) {
         jobId,
       }, 201);
     } catch (stepErr) {
-      console.error('submit-commercial-request post-auth step failed');
+      console.error('submit-commercial-request post-auth step failed:', stepErr?.message || stepErr);
 
       await supabase
         .from('commercial_clients')

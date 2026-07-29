@@ -170,6 +170,12 @@ describe('submit-commercial-request', () => {
       errorResponse: (msg, status = 400) => ({ body: { error: msg }, status }),
     }));
     vi.doMock('../../netlify/functions/_shared/commercialRequest.js', () => ({
+      ensureCommercialClient: vi.fn().mockResolvedValue({
+        id: 'client-1',
+        company_name: 'Acme',
+        contact_name: 'Joe',
+        phone: '770',
+      }),
       sendCommercialJobEmails: vi.fn().mockResolvedValue(undefined),
       linkUploadSessionPhotos: vi.fn().mockResolvedValue(0),
     }));

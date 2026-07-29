@@ -16,6 +16,7 @@ import {
   clearDraft,
   buildPropertyAddress,
 } from "../utils/commercialRequestDraft";
+import { submitAuthenticatedDraft } from "../utils/submitCommercialDraft";
 
 const PROPERTY_TYPES = [
   { value: "apartment_multifamily", label: "Apartment / Multifamily" },
@@ -352,6 +353,31 @@ export default function PortalStart() {
 
       if (data.userCreated && !data.success) {
         setSubmitted(false);
+        if (supabase) {
+          const { error: signInErr } = await supabase.auth.signInWithPassword({
+            email: draft.email.trim(),
+            password,
+          });
+          if (!signInErr) {
+            try {
+              await submitAuthenticatedDraft(supabase, draft);
+              clearDraft();
+              trackEvent("commercial_profile_created");
+              trackEvent("commercial_work_order_submitted");
+              trackEvent("commercial_onboarding_completed");
+              setStep(4);
+              setTimeout(() => navigate("/portal"), 2500);
+              return;
+            } catch (resumeErr) {
+              updateDraft({ pendingLogin: true });
+              setExistingEmailPrompt(true);
+              setError(resumeErr?.message || data.error || "Account created. Log in to finish submitting your request.");
+              return;
+            }
+          }
+        }
+        updateDraft({ pendingLogin: true });
+        setExistingEmailPrompt(true);
         setError(data.error || "Account created but submission failed. Please log in to finish.");
         return;
       }

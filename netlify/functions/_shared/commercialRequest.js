@@ -2,6 +2,53 @@
  * Shared helpers for commercial estimate request submission emails.
  */
 
+export async function ensureCommercialClient(supabase, userId, profile) {
+  const deadline = Date.now() + 8000;
+
+  while (Date.now() < deadline) {
+    const { data: row } = await supabase
+      .from('commercial_clients')
+      .select('id')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (row) {
+      const { data: client, error } = await supabase
+        .from('commercial_clients')
+        .update(profile)
+        .eq('user_id', userId)
+        .select('id, company_name, contact_name, phone')
+        .single();
+
+      if (!error && client) return client;
+      if (error) console.error('ensureCommercialClient update error:', error.message);
+    }
+
+    await new Promise((r) => setTimeout(r, 250));
+  }
+
+  const { data: inserted, error: insertErr } = await supabase
+    .from('commercial_clients')
+    .insert({
+      user_id: userId,
+      contact_name: profile.contact_name || '',
+      company_name: profile.company_name || null,
+      phone: profile.phone || null,
+      job_title: profile.job_title ?? null,
+      onboarding_status: profile.onboarding_status || 'in_progress',
+      last_onboarding_step: profile.last_onboarding_step ?? 3,
+      attribution: profile.attribution || {},
+    })
+    .select('id, company_name, contact_name, phone')
+    .single();
+
+  if (insertErr || !inserted) {
+    throw new Error(`CLIENT_ENSURE_FAILED:${insertErr?.message || 'unknown'}`);
+  }
+
+  return inserted;
+}
+
 export async function sendCommercialJobEmails({
   supabase,
   resendKey,

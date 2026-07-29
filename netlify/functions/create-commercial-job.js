@@ -14,13 +14,34 @@ export default async function handler(req) {
 
     const {
       propertyId, unit, description, preferredDate,
-      accessNotes, photoPaths, draft, uploadSessionId,
+      accessNotes, photoPaths, draft, uploadSessionId, idempotencyKey,
     } = await req.json();
 
     if (!propertyId) return errorResponse('propertyId is required');
     const isDraft = draft === true;
 
     const supabase = getServiceClient();
+
+    if (idempotencyKey) {
+      const { data: existingJob } = await supabase
+        .from('jobs')
+        .select('id, property_id')
+        .eq('idempotency_key', idempotencyKey)
+        .maybeSingle();
+
+      if (existingJob) {
+        const { data: ownedProperty } = await supabase
+          .from('properties')
+          .select('id')
+          .eq('id', existingJob.property_id)
+          .eq('client_id', client.id)
+          .maybeSingle();
+
+        if (ownedProperty) {
+          return jsonResponse({ jobId: existingJob.id, alreadySubmitted: true }, 200);
+        }
+      }
+    }
 
     // Verify property belongs to this client
     const { data: property } = await supabase
@@ -42,6 +63,7 @@ export default async function handler(req) {
         preferred_date: preferredDate ? new Date(preferredDate).toISOString() : null,
         access_notes: accessNotes || null,
         status: isDraft ? 'draft' : 'pending_review',
+        idempotency_key: idempotencyKey || null,
       })
       .select('id')
       .single();

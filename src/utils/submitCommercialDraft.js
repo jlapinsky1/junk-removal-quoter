@@ -21,6 +21,28 @@ export async function submitAuthenticatedDraft(supabase, draft) {
 
   if (clientErr || !client) throw new Error('Commercial profile not found');
 
+  if (draft.idempotencyKey) {
+    const { data: existingJob } = await supabase
+      .from('jobs')
+      .select('id, property_id')
+      .eq('idempotency_key', draft.idempotencyKey)
+      .maybeSingle();
+
+    if (existingJob) {
+      await supabase
+        .from('commercial_clients')
+        .update({ onboarding_status: 'complete', last_onboarding_step: 3 })
+        .eq('id', client.id);
+
+      clearDraft();
+      return {
+        jobId: existingJob.id,
+        propertyId: existingJob.property_id,
+        clientId: client.id,
+      };
+    }
+  }
+
   const { data: prop, error: propErr } = await supabase
     .from('properties')
     .insert({
@@ -49,6 +71,7 @@ export async function submitAuthenticatedDraft(supabase, draft) {
       preferredDate: draft.jobDate || null,
       accessNotes: buildAccessNotesText(draft),
       uploadSessionId: draft.uploadSessionId || null,
+      idempotencyKey: draft.idempotencyKey || null,
     }),
   });
 
