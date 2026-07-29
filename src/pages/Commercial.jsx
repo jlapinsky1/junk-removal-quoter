@@ -197,11 +197,11 @@ export default function Commercial() {
 
           <div className="hidden md:flex items-center gap-3">
             <a
-              href="tel:8135550123"
+              href="tel:7706282877"
               className="flex items-center gap-2 text-sm text-white/70 hover:text-white transition-colors"
             >
               <Phone className="w-4 h-4 text-[#22c55e]" />
-              <span className="font-medium">(813) 555-0123</span>
+              <span className="font-medium">(770) 628-2877</span>
             </a>
             <button
               onClick={() => navigate("/portal/login")}
@@ -553,10 +553,10 @@ export default function Commercial() {
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
               <a
-                href="tel:8135550123"
+                href="tel:7706282877"
                 className="bg-[#22c55e] hover:bg-[#16a34a] text-black font-bold px-7 py-3.5 rounded-full text-sm transition-colors flex items-center justify-center gap-2"
               >
-                <Phone className="w-4 h-4" /> (813) 555-0123
+                <Phone className="w-4 h-4" /> (770) 628-2877
               </a>
               <button
                 onClick={() => navigate("/portal/login")}

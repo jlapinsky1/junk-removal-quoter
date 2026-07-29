@@ -1284,9 +1284,9 @@ function BrandHeader() {
 
         {/* Right side */}
         <div className="flex items-center gap-6">
-          <a href="tel:+18135550123" className="text-gray-400 hover:text-white text-sm font-medium transition-colors hidden sm:flex items-center gap-2">
+          <a href="tel:+17706282877" className="text-gray-400 hover:text-white text-sm font-medium transition-colors hidden sm:flex items-center gap-2">
             <PhoneIcon className="w-4 h-4" />
-            (813) 555-0123
+            (770) 628-2877
           </a>
           <button
             onClick={() => document.getElementById('hero-zip')?.focus() || window.scrollTo({ top: 0, behavior: 'smooth' })}
