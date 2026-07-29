@@ -36,7 +36,7 @@ export async function submitAuthenticatedDraft(supabase, draft) {
 
   if (propErr || !prop) throw new Error('Failed to save property');
 
-  const res = await fetch('/.netlify/functions/create-commercial-job', {
+  const res = await fetch('/api/create-commercial-job', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

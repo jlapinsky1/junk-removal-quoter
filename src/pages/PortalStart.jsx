@@ -3,8 +3,9 @@ import { useNavigate, Link } from "react-router-dom";
 import {
   Trash2, Mail, Lock, User, Phone, Building2, Briefcase,
   MapPin, AlertTriangle, CheckCircle, ArrowLeft, ArrowRight,
-  ClipboardList, Camera, X,
+  ClipboardList, Camera, Calendar, X,
 } from "lucide-react";
+import { localDateString } from "../utils/dateLogic";
 import { supabase } from "../utils/supabaseClient";
 import { trackEvent } from "../utils/analytics";
 import { getRepo } from "../utils/repository";
@@ -89,6 +90,16 @@ function InputRow({ icon: Icon, children }) {
 
 const inputCls = "w-full bg-transparent text-sm text-white placeholder:text-white/25 outline-none";
 const selectCls = "w-full bg-transparent text-sm text-white outline-none [&>option]:bg-[#111a14]";
+
+function formatPreferredDate(isoDate) {
+  const d = new Date(`${isoDate}T12:00:00`);
+  return d.toLocaleDateString(undefined, {
+    weekday: "short",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+}
 
 function resizeImagePreview(file, maxWidth) {
   return new Promise((resolve) => {
@@ -229,7 +240,7 @@ export default function PortalStart() {
     clearError();
 
     try {
-      const res = await fetch("/.netlify/functions/check-commercial-email", {
+      const res = await fetch("/api/check-commercial-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: draft.email.trim() }),
@@ -283,7 +294,7 @@ export default function PortalStart() {
     clearError();
 
     try {
-      const res = await fetch("/.netlify/functions/submit-commercial-request", {
+      const res = await fetch("/api/submit-commercial-request", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -529,9 +540,36 @@ export default function PortalStart() {
               </FieldWrap>
 
               <FieldWrap label="Preferred Date">
-                <InputRow>
-                  <input type="date" value={draft.jobDate} onChange={(e) => updateDraft({ jobDate: e.target.value })} className={inputCls} min={new Date().toISOString().split("T")[0]} />
-                </InputRow>
+                <div className="relative">
+                  <div
+                    className={`flex items-center gap-3 bg-[#111a14] border rounded-xl px-4 py-3 min-h-[48px] pointer-events-none transition-colors ${
+                      draft.jobDate ? "border-[#22c55e]/30" : "border-white/10"
+                    }`}
+                  >
+                    <Calendar className="w-4 h-4 text-[#22c55e] shrink-0" />
+                    <span className={`text-sm flex-1 ${draft.jobDate ? "text-white" : "text-white/40"}`}>
+                      {draft.jobDate ? formatPreferredDate(draft.jobDate) : "Tap to choose a date"}
+                    </span>
+                  </div>
+                  {draft.jobDate && (
+                    <button
+                      type="button"
+                      onClick={() => updateDraft({ jobDate: "" })}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 z-10 p-1 text-white/30 hover:text-white/70 transition-colors"
+                      aria-label="Clear preferred date"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                  <input
+                    type="date"
+                    value={draft.jobDate}
+                    min={localDateString(new Date())}
+                    onChange={(e) => updateDraft({ jobDate: e.target.value })}
+                    className="absolute inset-0 z-[1] w-full h-full opacity-0 cursor-pointer [color-scheme:dark]"
+                    aria-label="Preferred date"
+                  />
+                </div>
               </FieldWrap>
 
               <FieldWrap label="Access Notes">
