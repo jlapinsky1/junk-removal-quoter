@@ -405,6 +405,37 @@ function RequestDetail({ booking, onBack }) {
     setData(prev => ({ ...prev, status }));
   }
 
+  async function handleDecline() {
+    if (!confirm('Decline this request and email the customer?')) return;
+
+    try {
+      const token = await getAdminToken();
+      const res = await fetch('/api/decline-booking', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ bookingId: data.id }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || 'Failed to decline booking');
+
+      if (body.emailSent) {
+        alert('Request declined. The customer has been notified by email.');
+      } else if (body.emailError) {
+        alert(`Request declined, but the email could not be sent: ${body.emailError}`);
+      } else {
+        alert('Request declined.');
+      }
+      onBack();
+    } catch (err) {
+      alert(`Decline failed: ${err.message}`);
+    }
+  }
+
+  const canDecline = ['pending_review', 'quote_sent', 'awaiting_deposit', 'awaiting_payment'].includes(data.status);
+
   async function handleDelete() {
     if (!confirm('Delete this request permanently?')) return;
     try {
@@ -903,6 +934,30 @@ function RequestDetail({ booking, onBack }) {
               ? `${activeBlockers.length} blocker(s) — resolve to approve`
               : data.status === 'quote_sent' ? 'Update Quote' : 'Approve & Send Quote'}
           </button>
+
+          {canDecline && (
+            <button
+              onClick={handleDecline}
+              className="w-full bg-red-50 text-red-700 border border-red-200 py-2.5 rounded-xl text-sm font-semibold hover:bg-red-100 transition-colors"
+            >
+              Decline &amp; Notify Customer
+            </button>
+          )}
+        </div>
+      )}
+
+      {canDecline && data.status !== 'pending_review' && data.status !== 'quote_sent' && (
+        <div className="bg-white rounded-xl border p-4 space-y-3">
+          <h3 className="font-bold text-gray-800">Decline Request</h3>
+          <p className="text-sm text-gray-500">
+            Decline this request and send the customer a courtesy email explaining we cannot take the job.
+          </p>
+          <button
+            onClick={handleDecline}
+            className="w-full bg-red-50 text-red-700 border border-red-200 py-2.5 rounded-xl text-sm font-semibold hover:bg-red-100 transition-colors"
+          >
+            Decline &amp; Notify Customer
+          </button>
         </div>
       )}
 
@@ -1234,8 +1289,8 @@ function RequestDetail({ booking, onBack }) {
               Mark Completed
             </button>
           )}
-          {data.status !== 'declined' && (
-            <button onClick={() => handleStatusChange('declined')} className="bg-red-50 text-red-700 py-2 rounded-lg text-sm font-medium">
+          {data.status !== 'declined' && canDecline && (
+            <button onClick={handleDecline} className="bg-red-50 text-red-700 py-2 rounded-lg text-sm font-medium">
               Decline
             </button>
           )}

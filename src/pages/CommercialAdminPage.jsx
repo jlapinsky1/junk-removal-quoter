@@ -235,6 +235,70 @@ function QuotePanel({ job, onRefresh }) {
   );
 }
 
+// ── Decline Panel ─────────────────────────────────────────────────────────
+
+function DeclinePanel({ job, onRefresh, onDeclined }) {
+  const [declining, setDeclining] = useState(false);
+  const [error, setError] = useState(null);
+  const [done, setDone] = useState(false);
+
+  const canDecline = ['pending_review', 'quote_sent', 'awaiting_payment'].includes(job.status);
+  if (!canDecline || done) {
+    if (done) {
+      return (
+        <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 text-sm text-red-300">
+          Request declined. The client has been notified by email.
+        </div>
+      );
+    }
+    return null;
+  }
+
+  const handleDecline = async () => {
+    if (!confirm('Decline this job and email the client?')) return;
+    setDeclining(true);
+    setError(null);
+    try {
+      const result = await adminFetch('/api/decline-commercial-job', {
+        method: 'POST',
+        body: JSON.stringify({ jobId: job.id }),
+      });
+      setDone(true);
+      if (!result.emailSent && result.emailError) {
+        setError(`Declined, but email failed: ${result.emailError}`);
+      }
+      setTimeout(() => {
+        onRefresh();
+        onDeclined?.();
+      }, 1200);
+    } catch (e) {
+      setError(e.message);
+      setDeclining(false);
+    }
+  };
+
+  return (
+    <div className="bg-white/4 border border-red-500/20 rounded-xl p-5 space-y-3">
+      <h3 className="font-bold text-white text-sm">Decline Request</h3>
+      <p className="text-xs text-white/50 leading-relaxed">
+        Decline this job and send the client a courtesy email explaining we cannot take it at this time.
+      </p>
+      {error && (
+        <p className="text-xs text-amber-400 flex items-center gap-1">
+          <AlertTriangle className="w-3.5 h-3.5" /> {error}
+        </p>
+      )}
+      <button
+        onClick={handleDecline}
+        disabled={declining}
+        className="w-full bg-red-500/15 hover:bg-red-500/25 border border-red-500/30 text-red-300 font-semibold text-sm py-2.5 rounded-lg transition-colors disabled:opacity-50"
+      >
+        {declining ? 'Declining…' : 'Decline & Notify Client'}
+      </button>
+    </div>
+  );
+}
+
 // ── Payment Panel ─────────────────────────────────────────────────────────
 
 function PaymentPanel({ job }) {
@@ -780,6 +844,16 @@ function JobDetail({ jobSummary, onRefresh, onClose }) {
 
       {/* Action Panels */}
       {showQuotePanel && <QuotePanel job={job} onRefresh={handleRefresh} />}
+      {showQuotePanel && (
+        <DeclinePanel
+          job={job}
+          onRefresh={handleRefresh}
+          onDeclined={() => onRefresh()}
+        />
+      )}
+      {job.status === 'awaiting_payment' && (
+        <DeclinePanel job={job} onRefresh={handleRefresh} onDeclined={() => onRefresh()} />
+      )}
       {job.paymentSummary && <PaymentPanel job={job} />}
       {showSchedulePanel && <SchedulePanel job={job} onRefresh={handleRefresh} />}
       {showCompletionPanel && <CompletionPanel job={job} onRefresh={handleRefresh} />}
