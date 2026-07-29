@@ -8,15 +8,17 @@ A full-stack platform for a junk removal business: residential booking flow, adm
 
 | Layer | Technology |
 |---|---|
-| Frontend | React 18 + Vite, Tailwind CSS |
+| Frontend | React 18 + Vite, Tailwind CSS, `react-helmet-async` |
 | API | Netlify Functions (ES modules) |
 | Database | Supabase (Postgres + RLS) |
 | Blob storage | Netlify Blobs (service area config) |
 | File storage | Supabase Storage (booking photos, private bucket) |
-| Auth | Supabase Auth (JWT) |
+| Auth | Supabase Auth (JWT + magic links for onboarding resume) |
 | Payments | Stripe (deposit + final balance via invoice) |
 | Photo analysis | Anthropic Claude API |
 | Email | Resend |
+| SEO | `react-snap` prerender (postbuild), `sitemap.xml`, `robots.txt` |
+| Analytics | GA4 via `VITE_GA4_MEASUREMENT_ID` (optional at build time) |
 | CAPTCHA | Cloudflare Turnstile (optional) |
 
 ---
@@ -54,6 +56,7 @@ VITE_STRIPE_PUBLISHABLE_KEY=pk_test_...
 SHOP_LAT=                    # shop/home-base latitude — enables real travel time
 SHOP_LNG=                    # shop/home-base longitude — enables real travel time
 ADMIN_EMAIL=                 # admin notification address for new commercial job requests
+VITE_GA4_MEASUREMENT_ID=     # optional — if unset, GA4 is skipped at build time
 VITE_GOOGLE_MAPS_API_KEY=   # optional
 TURNSTILE_SECRET_KEY=        # optional
 VITE_TURNSTILE_SITE_KEY=    # optional
@@ -71,11 +74,11 @@ stripe listen --forward-to localhost:8888/api/stripe-webhook
 ## JavaScript Tests (Vitest)
 
 ```bash
-npm test           # run all JS unit tests (watch mode)
-npm run test:run   # single pass
+npm test           # single pass (vitest run)
+npm run test:watch # watch mode
 ```
 
-The JS test suite covers all business-logic utilities (goal engine, decision engine, calibration, route scoring, date logic, service area, variance analysis, etc.). All 326 tests run in Vitest — no coverage tool is configured in the Python suite, which generates JUnit XML only.
+The JS test suite covers business-logic utilities (goal engine, decision engine, calibration, route scoring, date logic, service area, variance analysis, etc.) plus commercial onboarding handlers in `src/tests/onboarding.test.js`. The Python suite generates JUnit XML only — no JS coverage tool is configured.
 
 ---
 
@@ -225,7 +228,9 @@ Returns 404 (not 403) when disabled — does not reveal its existence. Secret co
 
 | Endpoint | Method | Auth | Purpose |
 |---|---|---|---|
-| `/api/create-commercial-job` | POST | client JWT | Submit work order (creates job, links photos, sends admin + client emails) |
+| `/api/start-commercial-onboarding` | POST | none (rate-limited) | Create auth user + commercial profile (step 1 of `/portal/start`); emails magic-link resume |
+| `/api/create-commercial-job` | POST | client JWT | Submit work order; pass `draft: true` during onboarding (no emails); otherwise creates `pending_review` and emails admin + client |
+| `/api/complete-onboarding` | POST | client JWT | Transition draft job → `pending_review`, mark onboarding complete, send confirmation + admin emails |
 | `/api/get-admin-commercial-jobs` | GET | admin JWT | Paginated, filterable commercial job list |
 | `/api/get-admin-commercial-job-detail` | GET | admin JWT | Full job detail: client, property, photos, Stripe payment summary |
 | `/api/send-commercial-quote` | POST | admin JWT | Set estimate, create Stripe invoice, send quote email with token link |
@@ -252,15 +257,34 @@ Service area config is stored in Netlify Blobs (not the database) so it survives
 
 ---
 
+## Commercial Marketing & SEO
+
+Public SEO landing pages for property managers (Helmet titles/descriptions/canonicals + JSON-LD). Prerendered at build time via `react-snap` (`postbuild`).
+
+| Route | Page |
+|---|---|
+| `/commercial` | Main commercial landing |
+| `/commercial/property-management-cleanup` | Property management cleanup |
+| `/commercial/apartment-cleanouts` | Apartment cleanouts |
+| `/commercial/eviction-cleanup` | Eviction cleanup |
+| `/commercial/unit-turnover-cleanout` | Unit turnover cleanout |
+| `/commercial/bulk-trash-removal` | Bulk trash removal |
+| `/commercial/client-portal` | Portal product explainer (mock UI) |
+| `/commercial/service-area` | Service area + LocalBusiness `areaServed` JSON-LD |
+
+Also published: `public/sitemap.xml`, `public/robots.txt`. Private surfaces (`/portal/*`, `/admin/*`, `/dispatch/*`) send `X-Robots-Tag: noindex, nofollow` via `netlify.toml` — do not block them in `robots.txt` so crawlers can see the header.
+
+Shared UI: `src/components/commercial/CommercialNav.jsx`, `CommercialFooter.jsx`. Helpers: `src/utils/seo.js`, `src/utils/analytics.js`. CTA clicks fire `commercial_onboarding_start`; wizard steps fire profile/property/draft/submit/completed events.
+
 ## Commercial Portal
 
-The commercial portal is a separate authenticated experience for recurring business clients (property managers, etc.) with a full end-to-end workflow mirroring the residential flow:
+Authenticated experience for recurring business clients (property managers, etc.) with onboarding + a full quote→deposit→completion workflow.
 
 ### Client-side routes
 | Route | Description |
 |---|---|
-| `/commercial` | Marketing/info page |
-| `/portal/login` | Portal sign-in / account setup |
+| `/portal/start` | 5-step onboarding wizard (account → property → draft work order → review → done) |
+| `/portal/login` | Portal sign-in ("Create an account" → `/portal/start`) |
 | `/portal` | Authenticated client dashboard (jobs, invoices, properties) |
 | `/commercial/quote/:token` | Public quote acceptance page (no login required — linked from quote email) |
 
@@ -271,25 +295,33 @@ The commercial portal is a separate authenticated experience for recurring busin
 
 ### Commercial job status flow
 ```
-pending_review → quote_sent → awaiting_payment → scheduled → in_progress → completed
+draft → pending_review → quote_sent → awaiting_payment → scheduled → in_progress → completed
+                                                                              ↘ cancelled
 ```
+`draft` is used only during onboarding so step 3 can save progress without notifying admins. `complete-onboarding` moves the job to `pending_review` and sends emails.
 
-### How it works
-1. Client submits work order via portal (with optional drag-and-drop photos)
+### Onboarding wizard (`/portal/start`)
+1. Create account → `start-commercial-onboarding` (no email enumeration; duplicate email → 409; magic-link resume email via Resend)
+2. Add first property (RLS-scoped insert)
+3. Create draft work order (`create-commercial-job` with `draft: true` — no emails)
+4. Review & submit → `complete-onboarding` (idempotent if already submitted)
+5. Success → redirect to `/portal`
+
+Abandoned setup resumes via magic link (Supabase `generateLink`) or an existing session; step is restored from `commercial_clients.last_onboarding_step`. Attribution (UTMs, referrer, landing page) is stored on the client row.
+
+### Ongoing work orders
+1. Client submits work order via portal (optional photos) → `pending_review` + emails
 2. Admin reviews at `/admin/commercial`, sets estimate, clicks "Send Quote"
-3. Client receives email with quote amount + "Review & Accept" link → `/commercial/quote/:token`
-4. Client accepts quote and pays 50% deposit via Stripe (no login required on the quote page, or via portal)
-5. Stripe webhook confirms deposit → job moves to `scheduled`; admin receives email notification
-6. Admin updates scheduled date, marks `in_progress` when crew arrives
-7. Admin uploads before/after photos, adds completion notes, clicks "Complete & Send Packet"
-8. Client receives completion packet email (before/after photos + final invoice link)
-9. Client pays remaining 50% balance via Stripe hosted invoice page
-10. `invoice.paid` webhook → `financially_completed_at` set; completion packet visible in portal
+3. Client receives email with quote + link → `/commercial/quote/:token`
+4. Client accepts and pays 50% deposit via Stripe
+5. Webhook confirms deposit → `scheduled`; admin notified
+6. Admin schedules, marks `in_progress`, completes with before/after photos
+7. Client pays remaining balance via hosted invoice; `invoice.paid` sets `financially_completed_at`
 
 ### Auth model
-- Clients authenticate via Supabase Auth; RLS scopes all rows to `commercial_clients.user_id = auth.uid()` — no cross-tenant data leakage
+- Clients authenticate via Supabase Auth; RLS (migration 017) scopes `commercial_clients`, `properties`, and `jobs` to the authenticated user — clients may insert jobs as `draft` only
 - Quote acceptance via email token requires no login (token-based, 7-day expiry)
-- All write operations from Netlify Functions use the service role (bypasses RLS); ownership is verified server-side
+- Status transitions beyond draft and admin actions use the service role; ownership is verified server-side
 
 ---
 
@@ -318,6 +350,8 @@ pending_review → quote_sent → awaiting_payment → scheduled → in_progress
 | `013_dispatch.sql` | Dispatch interface tables and auth: `dispatch_tokens`, `dispatch_events`; status transitions for `in_progress` enforcement |
 | `014_distance_fields.sql` | Adds `distance_miles` and `travel_minutes_one_way` columns to `bookings`; populated by `geocode-booking` function |
 | `015_commercial_workflow.sql` | Extends `jobs` table for full quote→deposit→completion workflow: expands status enum (adds `pending_review`, `quote_sent`, `awaiting_payment`; migrates `open` → `pending_review`), adds Stripe/quote/payment columns, adds `submission` kind to `job_photos` |
+| `016_commercial_onboarding.sql` | Onboarding columns on `commercial_clients`: `job_title`, `onboarding_status`, `last_onboarding_step`, `attribution` (plus temporary continuation-token columns later dropped by 017) |
+| `017_draft_jobs_rls.sql` | Adds `draft` job status; drops custom continuation-token columns (magic-link resume instead); enables RLS policies so clients only access their own rows and can insert jobs as `draft` only |
 
 ---
 
@@ -341,10 +375,12 @@ pending_review → quote_sent → awaiting_payment → scheduled → in_progress
 ## Build for Production
 
 ```bash
-npm run build     # outputs to dist/
+npm run build     # vite build → dist/, then react-snap prerenders public routes
 npm run preview   # local preview of prod build
 ```
 
-Deploy via Netlify: connect the GitHub repo, set build command `npm run build`, publish directory `dist`, and configure all required environment variables.
+`vite.config.js` targets `es2015` so react-snap’s bundled Chromium can execute the bundle. Stripe payment pages (`ApprovedQuote`, `FinalPaymentPage`, `CommercialQuotePage`) are lazy-loaded so prerender does not pull Stripe.js onto marketing routes. `reactSnap.include` in `package.json` lists the 9 public routes that get static HTML (home + commercial SEO pages).
+
+Deploy via Netlify: connect the GitHub repo, set build command `npm run build`, publish directory `dist`, and configure all required environment variables (including optional `VITE_GA4_MEASUREMENT_ID`). Apply migrations `016` and `017` on production Supabase before relying on onboarding.
 
 See `LAUNCH_CHECKLIST.md` for the full pre-production checklist.
