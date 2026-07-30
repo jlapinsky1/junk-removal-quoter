@@ -119,7 +119,7 @@ export default function ServiceArea() {
             <span className="text-[#22c55e]">Northeast Georgia</span>
           </h1>
           <p className="text-white/60 text-lg leading-relaxed max-w-2xl mb-8">
-            We're based in Hoschton, GA (ZIP 30548) and serve commercial properties within approximately 50 miles. Availability depends on your address, the scope of the job, scheduling, and disposal requirements for the items being removed. If you're unsure whether we cover your property, create a portal account and we'll confirm coverage when we review your first request.
+            We're based in Braselton, GA and serve commercial properties within approximately 50 miles. Availability depends on your address, the scope of the job, scheduling, and disposal requirements for the items being removed. If you're unsure whether we cover your property, create a portal account and we'll confirm coverage when we review your first request.
           </p>
           <div className="flex flex-wrap gap-3">
             <button

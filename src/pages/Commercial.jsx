@@ -180,9 +180,9 @@ const COMMERCIAL_JSON_LD = {
       "telephone": "+17706282877",
       "address": {
         "@type": "PostalAddress",
-        "addressLocality": "Hoschton",
+        "addressLocality": "Braselton",
         "addressRegion": "GA",
-        "postalCode": "30548",
+        "postalCode": "30517",
         "addressCountry": "US",
       },
       "areaServed": SERVICE_AREA_SUMMARY.map((c) => `${c}, GA`),
@@ -264,8 +264,8 @@ export default function Commercial() {
           <div className="lg:flex lg:items-center lg:gap-12">
             <div className="lg:w-1/2 space-y-7">
               <div className="inline-flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-4 py-2 text-sm">
-                <LayoutDashboard className="w-4 h-4 text-[#22c55e]" />
-                <span className="text-white/80 font-medium">Commercial Portal Included</span>
+                <MapPin className="w-4 h-4 text-[#22c55e]" />
+                <span className="text-white/80 font-medium">Local crew · Northeast Georgia</span>
               </div>
 
               <div>
@@ -274,7 +274,7 @@ export default function Commercial() {
                   <span className="text-[#22c55e]">Every Cleanup Documented.</span>
                 </h1>
                 <p className="mt-5 text-lg md:text-xl text-white/70 leading-relaxed max-w-xl">
-                  From a single mattress or trash pickup to full unit cleanouts and recurring portfolio work. Request apartment cleanouts, eviction cleanup, unit-turn debris removal, bulk pickups, and property cleanup across Northeast Georgia, then manage every property, estimate, open job, completion record, and invoice from one commercial portal.
+                  A Braselton-based cleanup crew serving property managers across Northeast Georgia. From a single mattress or trash pickup to full unit cleanouts and recurring portfolio work, we handle apartment cleanouts, eviction cleanup, unit-turn debris removal, bulk pickups, and property cleanup, with every property, estimate, open job, completion record, and invoice in one commercial portal.
                 </p>
               </div>
 
@@ -524,7 +524,7 @@ export default function Commercial() {
               <p className="text-[#22c55e] text-sm font-semibold uppercase tracking-widest mb-2">Service area</p>
               <h2 className="text-2xl md:text-3xl font-black text-white">Northeast Georgia</h2>
               <p className="mt-3 text-white/45 text-sm leading-relaxed">
-                Based in Hoschton (30548), serving properties within ~50 miles across Jackson, Hall, Gwinnett, Barrow, and Forsyth counties.
+                Based in Braselton, GA, serving properties within ~50 miles across Jackson, Hall, Gwinnett, Barrow, and Forsyth counties.
               </p>
             </div>
             <Link

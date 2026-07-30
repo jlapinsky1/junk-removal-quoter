@@ -99,7 +99,7 @@ export default function CommercialFooter() {
 
         <div className="border-t border-white/5 pt-6 flex flex-col md:flex-row items-center justify-between gap-4">
           <p className="text-xs text-white/25">
-            &copy; {new Date().getFullYear()} Squatterz LLC &middot; Hoschton, GA &middot; All rights reserved
+            &copy; {new Date().getFullYear()} Squatterz LLC &middot; Braselton, GA &middot; All rights reserved
           </p>
           <div className="flex gap-6 text-xs text-white/30">
             <Link to="/" className="hover:text-white/60 transition-colors">Residential</Link>

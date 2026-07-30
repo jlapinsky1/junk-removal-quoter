@@ -248,7 +248,7 @@ export default function IllegalDumpingRemoval() {
         <section className="max-w-4xl mx-auto px-5 mb-16">
           <h2 className="text-2xl font-black mb-2">Service area</h2>
           <p className="text-white/50 text-sm mb-6 leading-relaxed">
-            Based in Hoschton (30548), serving apartment communities and commercial properties within roughly 50 miles across Northeast Georgia. Priority coverage includes Gainesville, Buford, Lawrenceville, Braselton, Hoschton, and Suwanee, plus surrounding communities in Jackson, Hall, Gwinnett, Barrow, and Forsyth counties.
+            Based in Braselton, GA, serving apartment communities and commercial properties within roughly 50 miles across Northeast Georgia. Priority coverage includes Gainesville, Buford, Lawrenceville, Braselton, Hoschton, and Suwanee, plus surrounding communities in Jackson, Hall, Gwinnett, Barrow, and Forsyth counties.
           </p>
           <div className="flex flex-wrap gap-2 mb-4">
             {SERVICE_CITIES.map((city) => (
