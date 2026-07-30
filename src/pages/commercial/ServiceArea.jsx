@@ -37,8 +37,8 @@ const SERVICE_AREA_JSON_LD = {
       "@type": "BreadcrumbList",
       "itemListElement": [
         { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://gosquatterz.com/" },
-        { "@type": "ListItem", "position": 2, "name": "Commercial", "item": "https://gosquatterz.com/commercial" },
-        { "@type": "ListItem", "position": 3, "name": "Service Area", "item": "https://gosquatterz.com/commercial/service-area" },
+        { "@type": "ListItem", "position": 2, "name": "Commercial", "item": makeCanonical("/commercial") },
+        { "@type": "ListItem", "position": 3, "name": "Service Area", "item": makeCanonical("/commercial/service-area") },
       ],
     },
   ],

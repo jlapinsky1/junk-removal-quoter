@@ -24,8 +24,8 @@ const PORTAL_JSON_LD = {
       "@type": "BreadcrumbList",
       "itemListElement": [
         { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://gosquatterz.com/" },
-        { "@type": "ListItem", "position": 2, "name": "Commercial", "item": "https://gosquatterz.com/commercial" },
-        { "@type": "ListItem", "position": 3, "name": "Client Portal", "item": "https://gosquatterz.com/commercial/client-portal" },
+        { "@type": "ListItem", "position": 2, "name": "Commercial", "item": makeCanonical("/commercial") },
+        { "@type": "ListItem", "position": 3, "name": "Client Portal", "item": makeCanonical("/commercial/client-portal") },
       ],
     },
   ],

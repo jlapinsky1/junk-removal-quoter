@@ -23,14 +23,14 @@ const PM_JSON_LD = {
       "provider": { "@id": "https://gosquatterz.com/#organization" },
       "areaServed": "Northeast Georgia",
       "name": "Property Management Cleanup Services",
-      "url": "https://gosquatterz.com/commercial/property-management-cleanup",
+      "url": makeCanonical("/commercial/property-management-cleanup"),
     },
     {
       "@type": "BreadcrumbList",
       "itemListElement": [
         { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://gosquatterz.com/" },
-        { "@type": "ListItem", "position": 2, "name": "Commercial", "item": "https://gosquatterz.com/commercial" },
-        { "@type": "ListItem", "position": 3, "name": "Property Management Cleanup", "item": "https://gosquatterz.com/commercial/property-management-cleanup" },
+        { "@type": "ListItem", "position": 2, "name": "Commercial", "item": makeCanonical("/commercial") },
+        { "@type": "ListItem", "position": 3, "name": "Property Management Cleanup", "item": makeCanonical("/commercial/property-management-cleanup") },
       ],
     },
   ],

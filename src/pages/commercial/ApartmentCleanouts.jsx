@@ -23,14 +23,14 @@ const APARTMENT_JSON_LD = {
       "provider": { "@id": "https://gosquatterz.com/#organization" },
       "areaServed": "Northeast Georgia",
       "name": "Apartment Cleanouts for Property Managers and Landlords",
-      "url": "https://gosquatterz.com/commercial/apartment-cleanouts",
+      "url": makeCanonical("/commercial/apartment-cleanouts"),
     },
     {
       "@type": "BreadcrumbList",
       "itemListElement": [
         { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://gosquatterz.com/" },
-        { "@type": "ListItem", "position": 2, "name": "Commercial", "item": "https://gosquatterz.com/commercial" },
-        { "@type": "ListItem", "position": 3, "name": "Apartment Cleanouts", "item": "https://gosquatterz.com/commercial/apartment-cleanouts" },
+        { "@type": "ListItem", "position": 2, "name": "Commercial", "item": makeCanonical("/commercial") },
+        { "@type": "ListItem", "position": 3, "name": "Apartment Cleanouts", "item": makeCanonical("/commercial/apartment-cleanouts") },
       ],
     },
   ],

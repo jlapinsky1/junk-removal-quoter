@@ -23,14 +23,14 @@ const EVICTION_JSON_LD = {
       "provider": { "@id": "https://gosquatterz.com/#organization" },
       "areaServed": "Northeast Georgia",
       "name": "Eviction Cleanup and Abandoned-Property Removal",
-      "url": "https://gosquatterz.com/commercial/eviction-cleanup",
+      "url": makeCanonical("/commercial/eviction-cleanup"),
     },
     {
       "@type": "BreadcrumbList",
       "itemListElement": [
         { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://gosquatterz.com/" },
-        { "@type": "ListItem", "position": 2, "name": "Commercial", "item": "https://gosquatterz.com/commercial" },
-        { "@type": "ListItem", "position": 3, "name": "Eviction Cleanup", "item": "https://gosquatterz.com/commercial/eviction-cleanup" },
+        { "@type": "ListItem", "position": 2, "name": "Commercial", "item": makeCanonical("/commercial") },
+        { "@type": "ListItem", "position": 3, "name": "Eviction Cleanup", "item": makeCanonical("/commercial/eviction-cleanup") },
       ],
     },
   ],

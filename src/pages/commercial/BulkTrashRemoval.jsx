@@ -23,14 +23,14 @@ const BULK_JSON_LD = {
       "provider": { "@id": "https://gosquatterz.com/#organization" },
       "areaServed": "Northeast Georgia",
       "name": "Bulk Trash Removal for Apartments and Commercial Properties",
-      "url": "https://gosquatterz.com/commercial/bulk-trash-removal",
+      "url": makeCanonical("/commercial/bulk-trash-removal"),
     },
     {
       "@type": "BreadcrumbList",
       "itemListElement": [
         { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://gosquatterz.com/" },
-        { "@type": "ListItem", "position": 2, "name": "Commercial", "item": "https://gosquatterz.com/commercial" },
-        { "@type": "ListItem", "position": 3, "name": "Bulk Trash Removal", "item": "https://gosquatterz.com/commercial/bulk-trash-removal" },
+        { "@type": "ListItem", "position": 2, "name": "Commercial", "item": makeCanonical("/commercial") },
+        { "@type": "ListItem", "position": 3, "name": "Bulk Trash Removal", "item": makeCanonical("/commercial/bulk-trash-removal") },
       ],
     },
   ],

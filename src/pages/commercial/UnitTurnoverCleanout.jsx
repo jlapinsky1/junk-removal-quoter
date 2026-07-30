@@ -23,14 +23,14 @@ const TURNOVER_JSON_LD = {
       "provider": { "@id": "https://gosquatterz.com/#organization" },
       "areaServed": "Northeast Georgia",
       "name": "Unit Turnover Cleanout Service for Property Managers",
-      "url": "https://gosquatterz.com/commercial/unit-turnover-cleanout",
+      "url": makeCanonical("/commercial/unit-turnover-cleanout"),
     },
     {
       "@type": "BreadcrumbList",
       "itemListElement": [
         { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://gosquatterz.com/" },
-        { "@type": "ListItem", "position": 2, "name": "Commercial", "item": "https://gosquatterz.com/commercial" },
-        { "@type": "ListItem", "position": 3, "name": "Unit Turnover Cleanout", "item": "https://gosquatterz.com/commercial/unit-turnover-cleanout" },
+        { "@type": "ListItem", "position": 2, "name": "Commercial", "item": makeCanonical("/commercial") },
+        { "@type": "ListItem", "position": 3, "name": "Unit Turnover Cleanout", "item": makeCanonical("/commercial/unit-turnover-cleanout") },
       ],
     },
   ],

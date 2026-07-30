@@ -47,7 +47,7 @@ const JSON_LD = {
         "Northeast Georgia",
       ],
       name: "Illegal Dumping Removal for Apartment and Commercial Properties",
-      url: "https://gosquatterz.com/commercial/illegal-dumping-removal",
+      url: makeCanonical("/commercial/illegal-dumping-removal"),
       description:
         "Fast removal of illegally dumped furniture, mattresses, appliances, and debris from apartment communities and commercial properties across Northeast Georgia.",
     },
@@ -55,12 +55,12 @@ const JSON_LD = {
       "@type": "BreadcrumbList",
       itemListElement: [
         { "@type": "ListItem", position: 1, name: "Home", item: "https://gosquatterz.com/" },
-        { "@type": "ListItem", position: 2, name: "Commercial", item: "https://gosquatterz.com/commercial" },
+        { "@type": "ListItem", position: 2, name: "Commercial", item: makeCanonical("/commercial") },
         {
           "@type": "ListItem",
           position: 3,
           name: "Illegal Dumping Removal",
-          item: "https://gosquatterz.com/commercial/illegal-dumping-removal",
+          item: makeCanonical("/commercial/illegal-dumping-removal"),
         },
       ],
     },

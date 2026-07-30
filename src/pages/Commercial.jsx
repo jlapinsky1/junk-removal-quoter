@@ -196,13 +196,13 @@ const COMMERCIAL_JSON_LD = {
       "provider": { "@id": "https://gosquatterz.com/#organization" },
       "areaServed": "Northeast Georgia",
       "name": "Commercial Property Cleanup with Client Portal",
-      "url": "https://gosquatterz.com/commercial",
+      "url": "https://gosquatterz.com/commercial/",
     },
     {
       "@type": "BreadcrumbList",
       "itemListElement": [
         { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://gosquatterz.com/" },
-        { "@type": "ListItem", "position": 2, "name": "Commercial Services", "item": "https://gosquatterz.com/commercial" },
+        { "@type": "ListItem", "position": 2, "name": "Commercial Services", "item": makeCanonical("/commercial") },
       ],
     },
   ],
