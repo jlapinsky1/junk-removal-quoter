@@ -157,14 +157,14 @@ export default function ClientPortal() {
 
       <footer className="border-t border-white/5 py-8 mt-10">
         <div className="max-w-7xl mx-auto px-4 md:px-6 flex flex-col md:flex-row items-center justify-between gap-3">
-          <a href="/commercial" className="flex items-center gap-2 text-xs text-white/30 hover:text-white/60 transition-colors">
+          <a href="/" className="flex items-center gap-2 text-xs text-white/30 hover:text-white/60 transition-colors">
             <div className="w-5 h-5 rounded-full bg-white flex items-center justify-center">
               <Trash2 className="w-3 h-3 text-[#0a0f0d]" />
             </div>
             <span className="font-bold tracking-widest uppercase">Squatterz</span>
           </a>
           <p className="text-xs text-white/25">Client Portal &middot; Gainesville, GA</p>
-          <a href="/commercial" className="text-xs text-white/30 hover:text-white/60 transition-colors">Back to Commercial</a>
+          <a href="/" className="text-xs text-white/30 hover:text-white/60 transition-colors">Back to Commercial</a>
         </div>
       </footer>
     </div>

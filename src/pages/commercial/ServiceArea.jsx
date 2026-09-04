@@ -37,8 +37,7 @@ const SERVICE_AREA_JSON_LD = {
       "@type": "BreadcrumbList",
       "itemListElement": [
         { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://gosquatterz.com/" },
-        { "@type": "ListItem", "position": 2, "name": "Commercial", "item": makeCanonical("/commercial") },
-        { "@type": "ListItem", "position": 3, "name": "Service Area", "item": makeCanonical("/commercial/service-area") },
+        { "@type": "ListItem", "position": 2, "name": "Service Area", "item": makeCanonical("/commercial/service-area") },
       ],
     },
   ],
@@ -102,7 +101,7 @@ export default function ServiceArea() {
           <nav className="flex items-center gap-2 text-xs text-white/35">
             <Link to="/" className="hover:text-white/60 transition-colors">Home</Link>
             <span>/</span>
-            <Link to="/commercial" className="hover:text-white/60 transition-colors">Commercial</Link>
+            <Link to="/" className="hover:text-white/60 transition-colors">Home</Link>
             <span>/</span>
             <span className="text-white/60">Service Area</span>
           </nav>

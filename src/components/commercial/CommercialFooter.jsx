@@ -11,7 +11,7 @@ export default function CommercialFooter() {
         <div className="grid md:grid-cols-3 gap-10 mb-10">
           {/* Col 1 — Brand */}
           <div className="space-y-4">
-            <Link to="/commercial" className="flex items-center gap-2.5">
+            <Link to="/" className="flex items-center gap-2.5">
               <div className="w-7 h-7 rounded-full bg-white flex items-center justify-center">
                 <Trash2 className="w-4 h-4 text-[#0a0f0d]" />
               </div>
@@ -64,11 +64,6 @@ export default function CommercialFooter() {
             <ul className="space-y-2.5">
               <li>
                 <Link to="/" className="text-xs text-white/45 hover:text-white/80 transition-colors">
-                  Residential Services
-                </Link>
-              </li>
-              <li>
-                <Link to="/commercial" className="text-xs text-white/45 hover:text-white/80 transition-colors">
                   Commercial Services
                 </Link>
               </li>
@@ -102,8 +97,7 @@ export default function CommercialFooter() {
             &copy; {new Date().getFullYear()} Squatterz LLC &middot; Braselton, GA &middot; All rights reserved
           </p>
           <div className="flex gap-6 text-xs text-white/30">
-            <Link to="/" className="hover:text-white/60 transition-colors">Residential</Link>
-            <Link to="/commercial" className="hover:text-white/60 transition-colors">Commercial</Link>
+            <Link to="/" className="hover:text-white/60 transition-colors">Home</Link>
           </div>
         </div>
       </div>

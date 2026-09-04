@@ -1,5 +1,5 @@
 import React, { useState, useEffect, Suspense, lazy } from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import Navigation from './components/Navigation';
 import QuoteForm from './pages/QuoteForm';
 import QuoteHistory from './pages/QuoteHistory';
@@ -7,7 +7,7 @@ import Settings from './pages/Settings';
 import RequestQueue from './pages/RequestQueue';
 import Dashboard from './pages/Dashboard';
 import LearningDashboard from './pages/LearningDashboard';
-import BookingFlow from './pages/BookingFlow';
+
 import AdminLogin from './pages/AdminLogin';
 import Commercial from './pages/Commercial';
 import PropertyManagementCleanup from './pages/commercial/PropertyManagementCleanup';
@@ -116,11 +116,11 @@ export default function App() {
   return (
     <Suspense fallback={<div className="min-h-screen bg-gray-100 flex items-center justify-center"><div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full" /></div>}>
     <Routes>
-      <Route path="/" element={<BookingFlow />} />
-      <Route path="/book" element={<BookingFlow />} />
+      <Route path="/" element={<Commercial />} />
+      <Route path="/book" element={<Navigate to="/" replace />} />
       <Route path="/quote/:id" element={<ApprovedQuote />} />
       <Route path="/invoice/:token/final" element={<FinalPaymentPage />} />
-      <Route path="/commercial" element={<Commercial />} />
+      <Route path="/commercial" element={<Navigate to="/" replace />} />
       <Route path="/commercial/property-management-cleanup" element={<PropertyManagementCleanup />} />
       <Route path="/commercial/apartment-cleanouts" element={<ApartmentCleanouts />} />
       <Route path="/commercial/eviction-cleanup" element={<EvictionCleanup />} />

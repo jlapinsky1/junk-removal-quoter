@@ -196,13 +196,12 @@ const COMMERCIAL_JSON_LD = {
       "provider": { "@id": "https://gosquatterz.com/#organization" },
       "areaServed": "Northeast Georgia",
       "name": "Commercial Property Cleanup with Client Portal",
-      "url": "https://gosquatterz.com/commercial/",
+      "url": "https://gosquatterz.com/",
     },
     {
       "@type": "BreadcrumbList",
       "itemListElement": [
         { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://gosquatterz.com/" },
-        { "@type": "ListItem", "position": 2, "name": "Commercial Services", "item": makeCanonical("/commercial") },
       ],
     },
   ],
@@ -239,13 +238,13 @@ export default function Commercial() {
           name="description"
           content="Request apartment cleanouts, eviction cleanup, unit-turn debris removal, and recurring property cleanup across Northeast Georgia. Track every job, completion packet, and invoice in one free commercial portal."
         />
-        <link rel="canonical" href={makeCanonical("/commercial")} />
+        <link rel="canonical" href={makeCanonical("/")} />
         <meta property="og:title" content="Commercial Property Cleanup with Client Portal | Squatterz" />
         <meta
           property="og:description"
           content="Every order tracked. Completion packets with photos. Free portal for multi-unit property managers across Northeast Georgia."
         />
-        <meta property="og:url" content={makeCanonical("/commercial")} />
+        <meta property="og:url" content={makeCanonical("/")} />
         <meta property="og:type" content="website" />
         <meta property="og:image" content={`${SITE_URL}${DEFAULT_OG_IMAGE}`} />
         <meta name="twitter:card" content="summary_large_image" />

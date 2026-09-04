@@ -3,6 +3,21 @@
   publish = "dist"
 
 [[redirects]]
+  from = "/commercial"
+  to = "/"
+  status = 301
+
+[[redirects]]
+  from = "/commercial/"
+  to = "/"
+  status = 301
+
+[[redirects]]
+  from = "/book"
+  to = "/"
+  status = 301
+
+[[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200

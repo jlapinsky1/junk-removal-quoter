@@ -143,7 +143,7 @@ export default function ClientLogin() {
     <div className="min-h-screen bg-[#0a0f0d] flex items-center justify-center px-5">
       <div className="w-full max-w-md space-y-8">
         <div className="text-center">
-          <a href="/commercial" className="inline-flex items-center gap-3 mb-8">
+          <a href="/" className="inline-flex items-center gap-3 mb-8">
             <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center">
               <Trash2 className="w-5 h-5 text-[#0a0f0d]" />
             </div>
@@ -267,7 +267,7 @@ export default function ClientLogin() {
         </p>
 
         <div className="text-center">
-          <a href="/commercial" className="inline-flex items-center gap-1.5 text-xs text-white/30 hover:text-white/60 transition-colors">
+          <a href="/" className="inline-flex items-center gap-1.5 text-xs text-white/30 hover:text-white/60 transition-colors">
             <ArrowLeft className="w-3 h-3" /> Back to Commercial
           </a>
         </div>

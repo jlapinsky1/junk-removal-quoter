@@ -6,11 +6,6 @@
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://gosquatterz.com/commercial/</loc>
-    <priority>0.9</priority>
-    <changefreq>monthly</changefreq>
-  </url>
-  <url>
     <loc>https://gosquatterz.com/commercial/property-management-cleanup/</loc>
     <priority>0.8</priority>
     <changefreq>monthly</changefreq>

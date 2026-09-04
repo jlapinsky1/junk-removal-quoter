@@ -55,10 +55,9 @@ const JSON_LD = {
       "@type": "BreadcrumbList",
       itemListElement: [
         { "@type": "ListItem", position: 1, name: "Home", item: "https://gosquatterz.com/" },
-        { "@type": "ListItem", position: 2, name: "Commercial", item: makeCanonical("/commercial") },
         {
           "@type": "ListItem",
-          position: 3,
+          position: 2,
           name: "Illegal Dumping Removal",
           item: makeCanonical("/commercial/illegal-dumping-removal"),
         },
@@ -162,7 +161,7 @@ export default function IllegalDumpingRemoval() {
           <nav className="flex items-center gap-2 text-xs text-white/35">
             <Link to="/" className="hover:text-white/60 transition-colors">Home</Link>
             <span>/</span>
-            <Link to="/commercial" className="hover:text-white/60 transition-colors">Commercial</Link>
+            <Link to="/" className="hover:text-white/60 transition-colors">Home</Link>
             <span>/</span>
             <span className="text-white/60">Illegal Dumping Removal</span>
           </nav>
@@ -337,7 +336,7 @@ export default function IllegalDumpingRemoval() {
         <section className="max-w-4xl mx-auto px-5 mb-16">
           <h2 className="text-sm font-semibold uppercase tracking-widest text-[#22c55e] mb-4">Related services</h2>
           <div className="flex flex-wrap gap-3">
-            <Link to="/commercial" className="text-sm text-white/55 hover:text-white border border-white/10 rounded-full px-4 py-2 transition-colors">
+            <Link to="/" className="text-sm text-white/55 hover:text-white border border-white/10 rounded-full px-4 py-2 transition-colors">
               Commercial homepage
             </Link>
             <Link to="/commercial/bulk-trash-removal" className="text-sm text-white/55 hover:text-white border border-white/10 rounded-full px-4 py-2 transition-colors">

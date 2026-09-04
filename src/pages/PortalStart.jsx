@@ -428,7 +428,7 @@ export default function PortalStart() {
     <div className="min-h-screen bg-[#0a0f0d] text-white">
       <header className="fixed top-0 inset-x-0 z-50 border-b border-white/5 bg-[#0a0f0d]/90 backdrop-blur-md">
         <div className="max-w-lg mx-auto px-5 h-14 flex items-center justify-between">
-          <Link to="/commercial" className="flex items-center gap-2.5">
+          <Link to="/" className="flex items-center gap-2.5">
             <div className="w-7 h-7 rounded-full bg-white flex items-center justify-center">
               <Trash2 className="w-4 h-4 text-[#0a0f0d]" />
             </div>

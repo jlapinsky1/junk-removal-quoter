@@ -29,8 +29,7 @@ const TURNOVER_JSON_LD = {
       "@type": "BreadcrumbList",
       "itemListElement": [
         { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://gosquatterz.com/" },
-        { "@type": "ListItem", "position": 2, "name": "Commercial", "item": makeCanonical("/commercial") },
-        { "@type": "ListItem", "position": 3, "name": "Unit Turnover Cleanout", "item": makeCanonical("/commercial/unit-turnover-cleanout") },
+        { "@type": "ListItem", "position": 2, "name": "Unit Turnover Cleanout", "item": makeCanonical("/commercial/unit-turnover-cleanout") },
       ],
     },
   ],
@@ -116,7 +115,7 @@ export default function UnitTurnoverCleanout() {
           <nav className="flex items-center gap-2 text-xs text-white/35">
             <Link to="/" className="hover:text-white/60 transition-colors">Home</Link>
             <span>/</span>
-            <Link to="/commercial" className="hover:text-white/60 transition-colors">Commercial</Link>
+            <Link to="/" className="hover:text-white/60 transition-colors">Home</Link>
             <span>/</span>
             <span className="text-white/60">Unit Turnover Cleanout</span>
           </nav>

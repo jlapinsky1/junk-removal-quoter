@@ -15,7 +15,6 @@
     "source": "dist",
     "include": [
       "/",
-      "/commercial",
       "/commercial/property-management-cleanup",
       "/commercial/apartment-cleanouts",
       "/commercial/eviction-cleanup",

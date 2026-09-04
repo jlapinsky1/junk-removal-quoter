@@ -8,7 +8,7 @@ export default function CommercialNav() {
   return (
     <header className="fixed top-0 inset-x-0 z-50 border-b border-white/5 bg-[#0a0f0d]/90 backdrop-blur-md">
       <div className="max-w-7xl mx-auto px-5 h-16 flex items-center justify-between">
-        <Link to="/commercial" className="flex items-center gap-3">
+        <Link to="/" className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-full bg-white flex items-center justify-center">
             <Trash2 className="w-5 h-5 text-[#0a0f0d]" />
           </div>
@@ -23,10 +23,10 @@ export default function CommercialNav() {
         </Link>
 
         <nav className="hidden md:flex items-center gap-8">
-          <Link to="/commercial#services" className="text-sm text-white/60 hover:text-white transition-colors">Services</Link>
+          <Link to="/#services" className="text-sm text-white/60 hover:text-white transition-colors">Services</Link>
           <Link to="/commercial/illegal-dumping-removal" className="text-sm text-white/60 hover:text-white transition-colors">Illegal Dumping</Link>
-          <Link to="/commercial#portal" className="text-sm text-white/60 hover:text-white transition-colors">Client Portal</Link>
-          <Link to="/commercial#faq" className="text-sm text-white/60 hover:text-white transition-colors">FAQ</Link>
+          <Link to="/#portal" className="text-sm text-white/60 hover:text-white transition-colors">Client Portal</Link>
+          <Link to="/#faq" className="text-sm text-white/60 hover:text-white transition-colors">FAQ</Link>
         </nav>
 
         <div className="hidden md:flex items-center gap-3">

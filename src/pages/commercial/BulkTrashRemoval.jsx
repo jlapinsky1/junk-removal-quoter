@@ -29,8 +29,7 @@ const BULK_JSON_LD = {
       "@type": "BreadcrumbList",
       "itemListElement": [
         { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://gosquatterz.com/" },
-        { "@type": "ListItem", "position": 2, "name": "Commercial", "item": makeCanonical("/commercial") },
-        { "@type": "ListItem", "position": 3, "name": "Bulk Trash Removal", "item": makeCanonical("/commercial/bulk-trash-removal") },
+        { "@type": "ListItem", "position": 2, "name": "Bulk Trash Removal", "item": makeCanonical("/commercial/bulk-trash-removal") },
       ],
     },
   ],
@@ -107,7 +106,7 @@ export default function BulkTrashRemoval() {
           <nav className="flex items-center gap-2 text-xs text-white/35">
             <Link to="/" className="hover:text-white/60 transition-colors">Home</Link>
             <span>/</span>
-            <Link to="/commercial" className="hover:text-white/60 transition-colors">Commercial</Link>
+            <Link to="/" className="hover:text-white/60 transition-colors">Home</Link>
             <span>/</span>
             <span className="text-white/60">Bulk Trash Removal</span>
           </nav>
