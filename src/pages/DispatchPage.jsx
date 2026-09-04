@@ -133,7 +133,7 @@ export default function DispatchPage() {
       {/* Dispatch header */}
       <div className="bg-gray-900 text-white px-4 py-4 sticky top-0 z-20">
         <div className="max-w-lg mx-auto flex items-center justify-between">
-          <a href="/admin" className="text-xs text-gray-400 hover:text-white">← Admin</a>
+          <a href="/admin/settings" className="text-xs text-gray-400 hover:text-white">← Admin</a>
           <h1 className="text-base font-bold">Squatterz Dispatch</h1>
           <button
             onClick={loadJobs}

@@ -878,15 +878,15 @@ export default function CommercialAdminPage() {
 
   // Auth check
   useEffect(() => {
-    if (!supabase) { navigate('/admin'); return; }
+    if (!supabase) { navigate('/admin/settings'); return; }
     supabase.auth.getSession().then(async ({ data }) => {
-      if (!data.session) { navigate('/admin'); return; }
+      if (!data.session) { navigate('/admin/settings'); return; }
       // Verify admin
       try {
         await adminFetch('/api/get-admin-commercial-jobs?limit=1');
         setAuthed(true);
       } catch {
-        navigate('/admin');
+        navigate('/admin/settings');
         return;
       }
     });
@@ -936,7 +936,7 @@ export default function CommercialAdminPage() {
         <div className="flex items-center justify-between px-5 h-14">
           <div className="flex items-center gap-3">
             <button
-              onClick={() => navigate('/admin')}
+              onClick={() => navigate('/admin/settings')}
               className="flex items-center gap-1.5 text-xs text-white/40 hover:text-white transition-colors"
             >
               <ArrowLeft className="w-4 h-4" /> Admin

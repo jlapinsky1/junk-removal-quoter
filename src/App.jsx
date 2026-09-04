@@ -132,7 +132,8 @@ export default function App() {
       <Route path="/portal/start" element={<PortalStart />} />
       <Route path="/portal/login" element={<ClientLogin />} />
       <Route path="/portal" element={<ClientPortal />} />
-      <Route path="/admin" element={<AdminDashboard />} />
+      <Route path="/admin" element={<Navigate to="/admin/commercial" replace />} />
+      <Route path="/admin/settings" element={<AdminDashboard />} />
       <Route path="/admin/commercial" element={<CommercialAdminPage />} />
       <Route path="/commercial/quote/:token" element={<CommercialQuotePage />} />
       <Route path="/dispatch" element={<DispatchPage />} />
