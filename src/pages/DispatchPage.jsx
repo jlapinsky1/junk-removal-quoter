@@ -24,6 +24,18 @@ export default function DispatchPage() {
   const [selectedJobId, setSelectedJobId] = useState(null);
   const [statusLoading, setStatusLoading] = useState(false);
   const [toast, setToast]           = useState(null);
+  const [isOffline, setIsOffline]   = useState(!navigator.onLine);
+
+  useEffect(() => {
+    const goOffline = () => setIsOffline(true);
+    const goOnline  = () => setIsOffline(false);
+    window.addEventListener('offline', goOffline);
+    window.addEventListener('online',  goOnline);
+    return () => {
+      window.removeEventListener('offline', goOffline);
+      window.removeEventListener('online',  goOnline);
+    };
+  }, []);
 
   // Auth: mirrors AdminDashboard pattern
   useEffect(() => {
@@ -149,6 +161,12 @@ export default function DispatchPage() {
           </p>
         )}
       </div>
+
+      {isOffline && (
+        <div className="bg-yellow-400 text-yellow-900 text-xs font-semibold text-center py-2 px-4">
+          You're offline — showing cached jobs
+        </div>
+      )}
 
       <div className="max-w-lg mx-auto px-4 py-5 space-y-5">
         {jobsError ? (
