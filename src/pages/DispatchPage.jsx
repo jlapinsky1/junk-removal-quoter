@@ -7,10 +7,10 @@ import NextJobCard from '../components/dispatch/NextJobCard';
 import TodayJobsList from '../components/dispatch/TodayJobsList';
 import DispatchJobDetail from '../components/dispatch/DispatchJobDetail';
 
-// Bulletproof iOS PWA shell — position:fixed so nothing can ever scroll it
+// Explicit values — avoid inset shorthand for max iOS compat
 const appShell = {
   position: 'fixed',
-  inset: 0,
+  top: 0, left: 0, right: 0, bottom: 0,
   display: 'flex',
   flexDirection: 'column',
   overflow: 'hidden',
@@ -39,10 +39,16 @@ export default function DispatchPage() {
   const [toast, setToast]           = useState(null);
   const [isOffline, setIsOffline]   = useState(!navigator.onLine);
 
-  // Disable Safari's scroll restoration so the page always starts at the top
+  // Lock document scroll so iOS can't scroll the page behind our fixed shell
   useEffect(() => {
-    if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
-    window.scrollTo(0, 0);
+    const { style: b } = document.body;
+    const { style: h } = document.documentElement;
+    b.overflow = 'hidden'; b.position = 'fixed'; b.width = '100%';
+    h.overflow = 'hidden';
+    return () => {
+      b.overflow = ''; b.position = ''; b.width = '';
+      h.overflow = '';
+    };
   }, []);
 
   useEffect(() => {
