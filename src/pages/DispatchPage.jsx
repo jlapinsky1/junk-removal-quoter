@@ -1,11 +1,23 @@
 import React, { useState, useEffect } from 'react';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, Truck, LogOut } from 'lucide-react';
 import { getRepo } from '../utils/repository';
 import AdminLogin from './AdminLogin';
 import ConnectionStatus from '../components/dispatch/ConnectionStatus';
 import NextJobCard from '../components/dispatch/NextJobCard';
 import TodayJobsList from '../components/dispatch/TodayJobsList';
 import DispatchJobDetail from '../components/dispatch/DispatchJobDetail';
+
+// Bulletproof iOS PWA shell — position:fixed so nothing can ever scroll it
+const appShell = {
+  position: 'fixed',
+  inset: 0,
+  display: 'flex',
+  flexDirection: 'column',
+  overflow: 'hidden',
+  background: '#f3f4f6',
+};
+const safeTop    = { paddingTop:    'env(safe-area-inset-top)' };
+const safeBottom = { paddingBottom: 'env(safe-area-inset-bottom)' };
 
 function LoadingSpinner() {
   return (
@@ -108,6 +120,12 @@ export default function DispatchPage() {
     }
   }
 
+  async function handleSignOut() {
+    const repo = await getRepo();
+    await repo.signOut();
+    setUser(null);
+  }
+
   // ── Auth states ──────────────────────────────────────────────────────────
   if (user === undefined) return <LoadingSpinner />;
 
@@ -123,23 +141,43 @@ export default function DispatchPage() {
     );
   }
 
+  // ── Shared bottom nav ─────────────────────────────────────────────────────
+  const BottomNav = ({ onJobs }) => (
+    <div
+      className="bg-white border-t border-gray-200 flex-shrink-0 flex"
+      style={safeBottom}
+    >
+      <button
+        onClick={onJobs}
+        className="flex-1 flex flex-col items-center justify-center gap-1 py-2 text-blue-600"
+      >
+        <Truck className="w-6 h-6" />
+        <span className="text-[10px] font-semibold tracking-wide">Jobs</span>
+      </button>
+      <button
+        onClick={handleSignOut}
+        className="flex-1 flex flex-col items-center justify-center gap-1 py-2 text-gray-400"
+      >
+        <LogOut className="w-6 h-6" />
+        <span className="text-[10px] font-semibold tracking-wide">Sign Out</span>
+      </button>
+    </div>
+  );
+
   // ── Job detail view ──────────────────────────────────────────────────────
   if (selectedJobId) {
+    const goBack = () => { setSelectedJobId(null); loadJobs(); };
     return (
-      <div className="flex flex-col bg-gray-50" style={{ height: '100dvh' }}>
+      <div style={appShell}>
         <ConnectionStatus />
-        <div className="flex-1 overflow-y-auto" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+        <div className="flex-1 overflow-y-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
           <DispatchJobDetail
             bookingId={selectedJobId}
-            onBack={() => {
-              setSelectedJobId(null);
-              loadJobs();
-            }}
-            onJobCompleted={() => {
-              loadJobs();
-            }}
+            onBack={goBack}
+            onJobCompleted={loadJobs}
           />
         </div>
+        <BottomNav onJobs={goBack} />
       </div>
     );
   }
@@ -148,17 +186,11 @@ export default function DispatchPage() {
   const nextJob = nextJobId ? jobs.find(j => j.id === nextJobId) : null;
 
   return (
-    <div
-      className="flex flex-col bg-gray-50"
-      style={{ height: '100dvh' }}
-    >
+    <div style={appShell}>
       <ConnectionStatus />
 
-      {/* Dispatch header — fixed, never scrolls */}
-      <div
-        className="bg-gray-900 text-white flex-shrink-0"
-        style={{ paddingTop: 'env(safe-area-inset-top)' }}
-      >
+      {/* Top nav bar */}
+      <div className="bg-gray-900 text-white flex-shrink-0" style={safeTop}>
         <div className="max-w-lg mx-auto flex items-center justify-between px-4 h-14">
           <div className="w-10" />
           <div className="text-center">
@@ -172,7 +204,7 @@ export default function DispatchPage() {
           <button
             onClick={loadJobs}
             disabled={jobsLoading}
-            className="w-10 h-10 flex items-center justify-center text-gray-400 hover:text-white disabled:opacity-40 transition-colors"
+            className="w-10 h-10 flex items-center justify-center text-gray-400 disabled:opacity-40"
             aria-label="Refresh"
           >
             <RefreshCw className={`w-5 h-5 ${jobsLoading ? 'animate-spin' : ''}`} />
@@ -186,11 +218,8 @@ export default function DispatchPage() {
         </div>
       )}
 
-      {/* Scrollable content area — only this scrolls, not the whole page */}
-      <div
-        className="flex-1 overflow-y-auto"
-        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
-      >
+      {/* Scrollable content */}
+      <div className="flex-1 overflow-y-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
         <div className="max-w-lg mx-auto px-4 py-5 space-y-5">
           {jobsError ? (
             <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-center">
@@ -215,9 +244,12 @@ export default function DispatchPage() {
         </div>
       </div>
 
+      {/* Bottom tab bar */}
+      <BottomNav onJobs={() => {}} />
+
       {/* Toast */}
       {toast && (
-        <div className={`fixed bottom-6 left-4 right-4 mx-auto max-w-sm rounded-xl px-4 py-3 text-white text-sm font-semibold shadow-lg z-50 text-center
+        <div className={`fixed bottom-24 left-4 right-4 mx-auto max-w-sm rounded-xl px-4 py-3 text-white text-sm font-semibold shadow-lg z-50 text-center
           ${toast.type === 'error' ? 'bg-red-600' : 'bg-green-700'}`}>
           {toast.message}
         </div>

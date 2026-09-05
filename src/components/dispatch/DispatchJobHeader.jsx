@@ -44,10 +44,7 @@ export default function DispatchJobHeader({
   }
 
   return (
-    <div
-      className="bg-white border-b border-gray-100 px-4 pb-4 sticky top-0 z-30"
-      style={{ paddingTop: 'env(safe-area-inset-top)' }}
-    >
+    <div className="bg-white border-b border-gray-100 px-4 pb-4 sticky top-0 z-30">
       {/* Back row */}
       <div className="flex items-center gap-2 h-11">
         <button
