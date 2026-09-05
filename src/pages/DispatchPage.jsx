@@ -126,18 +126,20 @@ export default function DispatchPage() {
   // ── Job detail view ──────────────────────────────────────────────────────
   if (selectedJobId) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="flex flex-col bg-gray-50" style={{ height: '100dvh' }}>
         <ConnectionStatus />
-        <DispatchJobDetail
-          bookingId={selectedJobId}
-          onBack={() => {
-            setSelectedJobId(null);
-            loadJobs();
-          }}
-          onJobCompleted={() => {
-            loadJobs();
-          }}
-        />
+        <div className="flex-1 overflow-y-auto" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+          <DispatchJobDetail
+            bookingId={selectedJobId}
+            onBack={() => {
+              setSelectedJobId(null);
+              loadJobs();
+            }}
+            onJobCompleted={() => {
+              loadJobs();
+            }}
+          />
+        </div>
       </div>
     );
   }
@@ -146,16 +148,18 @@ export default function DispatchPage() {
   const nextJob = nextJobId ? jobs.find(j => j.id === nextJobId) : null;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div
+      className="flex flex-col bg-gray-50"
+      style={{ height: '100dvh' }}
+    >
       <ConnectionStatus />
 
-      {/* Dispatch header */}
+      {/* Dispatch header — fixed, never scrolls */}
       <div
-        className="bg-gray-900 text-white sticky top-0 z-20"
+        className="bg-gray-900 text-white flex-shrink-0"
         style={{ paddingTop: 'env(safe-area-inset-top)' }}
       >
         <div className="max-w-lg mx-auto flex items-center justify-between px-4 h-14">
-          {/* spacer to balance the right icon */}
           <div className="w-10" />
           <div className="text-center">
             <h1 className="text-base font-bold tracking-tight">Squatterz Dispatch</h1>
@@ -177,32 +181,38 @@ export default function DispatchPage() {
       </div>
 
       {isOffline && (
-        <div className="bg-yellow-400 text-yellow-900 text-xs font-semibold text-center py-2 px-4">
+        <div className="bg-yellow-400 text-yellow-900 text-xs font-semibold text-center py-2 px-4 flex-shrink-0">
           You're offline — showing cached jobs
         </div>
       )}
 
-      <div className="max-w-lg mx-auto px-4 py-5 space-y-5" style={{ paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom))' }}>
-        {jobsError ? (
-          <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-center">
-            <p className="text-red-700 font-medium mb-3">{jobsError}</p>
-            <button onClick={loadJobs} className="text-sm text-blue-600 font-semibold">Try again</button>
-          </div>
-        ) : (
-          <>
-            <NextJobCard
-              job={nextJob}
-              onStatusAction={handleStatusAction}
-              onSelectJob={setSelectedJobId}
-              statusLoading={statusLoading}
-            />
-            <TodayJobsList
-              jobs={jobs}
-              nextJobId={nextJobId}
-              onSelectJob={setSelectedJobId}
-            />
-          </>
-        )}
+      {/* Scrollable content area — only this scrolls, not the whole page */}
+      <div
+        className="flex-1 overflow-y-auto"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      >
+        <div className="max-w-lg mx-auto px-4 py-5 space-y-5">
+          {jobsError ? (
+            <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-center">
+              <p className="text-red-700 font-medium mb-3">{jobsError}</p>
+              <button onClick={loadJobs} className="text-sm text-blue-600 font-semibold">Try again</button>
+            </div>
+          ) : (
+            <>
+              <NextJobCard
+                job={nextJob}
+                onStatusAction={handleStatusAction}
+                onSelectJob={setSelectedJobId}
+                statusLoading={statusLoading}
+              />
+              <TodayJobsList
+                jobs={jobs}
+                nextJobId={nextJobId}
+                onSelectJob={setSelectedJobId}
+              />
+            </>
+          )}
+        </div>
       </div>
 
       {/* Toast */}
