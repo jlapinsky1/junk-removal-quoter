@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { RefreshCw } from 'lucide-react';
 import { getRepo } from '../utils/repository';
 import AdminLogin from './AdminLogin';
 import ConnectionStatus from '../components/dispatch/ConnectionStatus';
@@ -143,23 +144,30 @@ export default function DispatchPage() {
       <ConnectionStatus />
 
       {/* Dispatch header */}
-      <div className="bg-gray-900 text-white px-4 py-4 sticky top-0 z-20">
-        <div className="max-w-lg mx-auto flex items-center justify-between">
-          <a href="/admin/settings" className="text-xs text-gray-400 hover:text-white">← Admin</a>
-          <h1 className="text-base font-bold">Squatterz Dispatch</h1>
+      <div
+        className="bg-gray-900 text-white sticky top-0 z-20"
+        style={{ paddingTop: 'env(safe-area-inset-top)' }}
+      >
+        <div className="max-w-lg mx-auto flex items-center justify-between px-4 h-14">
+          {/* spacer to balance the right icon */}
+          <div className="w-10" />
+          <div className="text-center">
+            <h1 className="text-base font-bold tracking-tight">Squatterz Dispatch</h1>
+            {todayDate && (
+              <p className="text-[11px] text-gray-400 leading-none mt-0.5">
+                {new Date(todayDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+              </p>
+            )}
+          </div>
           <button
             onClick={loadJobs}
             disabled={jobsLoading}
-            className="text-xs text-gray-400 hover:text-white disabled:opacity-50"
+            className="w-10 h-10 flex items-center justify-center text-gray-400 hover:text-white disabled:opacity-40 transition-colors"
+            aria-label="Refresh"
           >
-            {jobsLoading ? 'Loading…' : 'Refresh'}
+            <RefreshCw className={`w-5 h-5 ${jobsLoading ? 'animate-spin' : ''}`} />
           </button>
         </div>
-        {todayDate && (
-          <p className="text-center text-xs text-gray-400 mt-1">
-            {new Date(todayDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-          </p>
-        )}
       </div>
 
       {isOffline && (
@@ -168,7 +176,7 @@ export default function DispatchPage() {
         </div>
       )}
 
-      <div className="max-w-lg mx-auto px-4 py-5 space-y-5">
+      <div className="max-w-lg mx-auto px-4 py-5 space-y-5" style={{ paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom))' }}>
         {jobsError ? (
           <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-center">
             <p className="text-red-700 font-medium mb-3">{jobsError}</p>

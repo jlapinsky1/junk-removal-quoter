@@ -1,4 +1,5 @@
 import React from 'react';
+import { ChevronLeft } from 'lucide-react';
 import StatusActionButton from './StatusActionButton';
 
 const STATUS_LABELS = {
@@ -43,13 +44,18 @@ export default function DispatchJobHeader({
   }
 
   return (
-    <div className="bg-white border-b border-gray-200 px-4 py-4 sticky top-0 z-30">
-      <div className="flex items-center gap-3 mb-3">
+    <div
+      className="bg-white border-b border-gray-100 px-4 pb-4 sticky top-0 z-30"
+      style={{ paddingTop: 'env(safe-area-inset-top)' }}
+    >
+      {/* Back row */}
+      <div className="flex items-center gap-2 h-11">
         <button
           onClick={onBack}
-          className="text-blue-600 font-semibold text-sm"
+          className="flex items-center gap-0.5 text-blue-600 font-semibold text-base -ml-1"
         >
-          ← Back
+          <ChevronLeft className="w-5 h-5" />
+          Jobs
         </button>
         <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${statusColor}`}>
           {statusLabel}
@@ -57,9 +63,9 @@ export default function DispatchJobHeader({
       </div>
 
       <div className="mb-3">
-        <p className="text-xs text-gray-500">{appointmentWindow ?? 'Time TBD'}</p>
-        <h1 className="text-xl font-bold text-gray-900 leading-snug">{customerName}</h1>
-        <p className="text-sm text-gray-600">{shortAddress}</p>
+        <p className="text-xs text-gray-400 font-medium">{appointmentWindow ?? 'Time TBD'}</p>
+        <h1 className="text-xl font-bold text-gray-900 leading-snug mt-0.5">{customerName}</h1>
+        <p className="text-sm text-gray-500">{shortAddress}</p>
       </div>
 
       <StatusActionButton

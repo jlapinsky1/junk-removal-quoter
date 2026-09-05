@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { ChevronLeft } from 'lucide-react';
 import { getRepo } from '../../utils/repository';
 import DispatchJobHeader from './DispatchJobHeader';
 import CustomerContactCard from './CustomerContactCard';
@@ -128,7 +129,9 @@ export default function DispatchJobDetail({ bookingId, onBack, onJobCompleted })
   if (error) {
     return (
       <div className="p-4 space-y-4">
-        <button onClick={onBack} className="text-blue-600 font-semibold text-sm">← Back</button>
+        <button onClick={onBack} className="flex items-center gap-0.5 text-blue-600 font-semibold text-base -ml-1">
+          <ChevronLeft className="w-5 h-5" /> Jobs
+        </button>
         <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-center">
           <p className="text-red-700 font-medium mb-3">{error}</p>
           <button onClick={loadJob} className="text-sm text-blue-600 font-semibold">Try again</button>

@@ -21,7 +21,7 @@ export default function TodayJobsList({ jobs, nextJobId, onSelectJob }) {
 
   return (
     <div className="space-y-2">
-      <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide px-1">
+      <h3 className="text-[11px] font-bold text-gray-400 uppercase tracking-widest px-1 pb-1">
         Today's Schedule
       </h3>
       {jobs.map(job => {
@@ -33,24 +33,23 @@ export default function TodayJobsList({ jobs, nextJobId, onSelectJob }) {
           <button
             key={job.id}
             onClick={() => onSelectJob?.(job.id)}
-            className={`w-full text-left rounded-2xl p-4 border transition-colors ${
+            className={`w-full text-left rounded-2xl p-4 border transition-colors active:scale-[0.98] ${
               isCurrent
-                ? 'bg-blue-50 border-blue-300 ring-2 ring-blue-400'
+                ? 'bg-blue-50 border-blue-200 ring-2 ring-blue-400'
                 : isCompleted
-                  ? 'bg-gray-50 border-gray-100'
-                  : 'bg-white border-gray-100 hover:bg-gray-50'
+                  ? 'bg-gray-50 border-gray-100 opacity-60'
+                  : 'bg-white border-gray-100 active:bg-gray-50'
             }`}
           >
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-xs text-gray-400 mb-0.5">{job.appointmentWindow ?? 'Time TBD'}</p>
-                <p className={`font-semibold truncate ${isCompleted ? 'text-gray-400' : 'text-gray-900'}`}>
+                <p className="text-[11px] text-gray-400 mb-0.5 font-medium">{job.appointmentWindow ?? 'Time TBD'}</p>
+                <p className={`font-bold truncate text-base ${isCompleted ? 'text-gray-400' : 'text-gray-900'}`}>
                   {job.customerName}
                 </p>
-                <p className={`text-sm truncate ${isCompleted ? 'text-gray-400' : 'text-gray-500'}`}>
+                <p className={`text-sm truncate mt-0.5 ${isCompleted ? 'text-gray-400' : 'text-gray-500'}`}>
                   {shortAddress}
                 </p>
-                <p className="text-xs text-gray-400 mt-0.5">{job.bookingRef}</p>
               </div>
               <span className={`flex-shrink-0 text-xs font-semibold px-2.5 py-1 rounded-full ${STATUS_BADGE[job.status] ?? 'bg-gray-100 text-gray-600'}`}>
                 {STATUS_LABELS[job.status] ?? job.status}
