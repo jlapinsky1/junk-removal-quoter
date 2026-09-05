@@ -27,6 +27,12 @@ export default function DispatchPage() {
   const [toast, setToast]           = useState(null);
   const [isOffline, setIsOffline]   = useState(!navigator.onLine);
 
+  // Disable Safari's scroll restoration so the page always starts at the top
+  useEffect(() => {
+    if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+    window.scrollTo(0, 0);
+  }, []);
+
   useEffect(() => {
     const goOffline = () => setIsOffline(true);
     const goOnline  = () => setIsOffline(false);
